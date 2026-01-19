@@ -1,0 +1,88 @@
+# ISV_2026.py 노드를 위한 파라미터 파일 (직접 로드 방식)
+
+# ROS 노드 기본 설정
+node_settings:
+  timer_period_seconds: 0.5  # 5Hz
+
+# PID 제어기 파라미터
+pid:
+  p_gain: 8.0
+  i_gain: 0.0
+  d_gain: 0.0
+  output_limits:
+    min: -30.0
+    max: 30.0
+
+# 서보 모터(Key) 설정
+servo:
+  min_deg: 60.0
+  max_deg: 120.0
+  neutral_deg: 90.0
+
+# GPS 및 주행 목표
+navigation:
+  origin:
+    lat: 35.2316117
+    lon: 129.08254347
+
+  goal_gps_lats: [35.2322997, 35.2315962, 35.23157352, 35.2316117]
+  goal_gps_lons: [129.0825272, 129.08246026, 129.08252906, 129.08254347]
+  #각 status 도착지점들 
+  #0번째 인덱스= 장애물 회피 후 호핑투어 시작지점 
+  #0번째 인덱스= 호핑투어 후 카메라 객체인식 지점
+  #2번째 인덱스= 객체인식 후 장애물 회피 시작지점
+  #3번째 인덱스= 도착지점(유지 지점) 
+
+  arrival_radius_m: 2.0
+  arrival_latch_release_factor: 1.5
+
+# 상태 머신 (State Machine)
+state_machine:
+  thruster_defaults:
+    state0: 30.0
+    state1: 15.0
+    state2: 15.0
+    state3: 12.0
+    state4: 0.0
+  arrival_behavior:
+    backoff_thrust: -10.0
+    backoff_counts: 4
+
+# 비전(Vision) 관련 설정
+vision:
+  screen_width: 640
+  angle_conversion_factor: 90.0
+
+# 비전 목표물 설정
+vision_targets:
+  # 인식 가능한 전체 객체 목록
+  available_objects:
+    - "Blue Circle"
+    - "Blue Cross"
+    - "Blue Triangle"
+    - "Green Circle"
+    - "Green Cross"
+    - "Green Triangle"
+    - "Red Circle"
+    - "Red Cross"
+    - "Red Triangle"
+  
+  # 상태 2(추적)에서 찾아야 할 목표 객체 이름
+  tracking_target: "Red Circle"
+
+# 라이다(Lidar) 및 장애물 회피
+lidar_obstacle_avoidance:
+  risk_calc:
+    min_safe_dist: 0.0
+    max_safe_dist: 7.0
+    distance_weight: 10000.0
+    angle_weight: 0.3
+    goal_weight: 7.0
+  docking:
+    obstacle_reverse_thrust: -10.0
+    obstacle_distance_threshold_m: 0.2
+    final_stop_distance_m: 0.4
+
+# LED 색상 밝기 (0-255)
+led:
+  default_brightness: 20
