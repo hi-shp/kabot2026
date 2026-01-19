@@ -1,0 +1,16 @@
+/wtrtk_ros2_driver:
+  ros__parameters:
+    serial_port: "/dev/ttyUSB0"
+    serial_baudrate: 115200
+
+    publish_nmea_topic: "nmea_sentence"
+    publish_nmea_topic_frame_id: "gps_link"
+
+    subscribe_rtcm_topic: "rtcm" # if empty, driver do not subscribes rtcm topic
+
+    update_rate_1hz: True
+    # update_rate_2hz: True
+    # update_rate_5hz: True
+    # update_rate_10hz: True
+    # update_rate_20hz: True
+    # update_rate_50hz: False # only WTRTK-980 supports it

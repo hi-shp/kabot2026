@@ -1,0 +1,15 @@
+iahrs_ros2_driver:
+  ros__parameters:
+    port: /dev/ttyIMU
+    frame_id: imu_link
+    publish_tf: false # tf publish 여부
+    # base_link -> imu_link로 (0, 0, 0, 0, 0, 0, 1) tf publish
+
+    sync_period_ms: 30 # iAHRS에서 PC로 전송하는 sync 데이터 주기 (ms)
+    sync_sensor_accel: true # 가속도 센서 데이터 활성화 여부
+    sync_sensor_gyro: true # 각속도 센서 데이터 활성화 여부
+    sync_sensor_mag: true # 지자기 센서 데이터 활성화 여부
+    sync_sensor_quaternion: true # 쿼터니언 형태의 orientation
+
+    enable_filter: true # iAHRS의 칼만 필터 활성화 여부
+    # sync 데이터의 orientation 등을 얻기 위해서는 활성화 필요.

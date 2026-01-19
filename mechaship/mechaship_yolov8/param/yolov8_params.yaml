@@ -1,0 +1,17 @@
+/detect_node:
+  ros__parameters:
+    image_topic: "/image_raw/compressed"
+    model_params:
+      rknn_model: "best.rknn"
+      label: "labels.txt"
+      img_size: 640
+      conf: 0.1 # Confidence threshold
+      iou: 0.8 # IOU threshold
+      fps: 10 # fps limit
+      enable: True
+
+/visualize_node:
+  ros__parameters:
+    image_topic: "/image_raw/compressed"
+    detections_topic: "/detections"
+    preview: True
