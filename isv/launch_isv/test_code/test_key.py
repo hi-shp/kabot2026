@@ -17,7 +17,7 @@ class KeyAlignNode(Node):
         self.msg.data = 90.0
 
         self.publish_count = 0
-        self.max_publish_count = 10   # 총 몇 번 보낼지
+        self.max_publish_count = 20   # 총 몇 번 보낼지
 
         # 0.1초마다 publish
         self.timer = self.create_timer(0.1, self.timer_callback)

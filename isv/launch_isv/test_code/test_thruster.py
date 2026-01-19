@@ -14,7 +14,7 @@ class ThrusterFixedPublisher(Node):
         )
 
         msg = Float64()
-        msg.data = 0.0
+        msg.data = 10.0
 
         # 한 번만 publish
         self.publisher_.publish(msg)

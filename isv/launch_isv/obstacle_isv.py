@@ -6,7 +6,7 @@ def calculate_angle_risk(
     angle_to_goal,
     angle_range,
     distance_weight,
-    angle_weight,
+    angle_weight,   
     goal_weight,
     angle_increment,
     critical_distance=0.2,
