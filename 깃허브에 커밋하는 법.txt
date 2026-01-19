@@ -1,0 +1,4 @@
+cd /home/ubuntu/ros2_ws/src
+git add .
+git commit -m "."
+git push
