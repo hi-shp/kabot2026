@@ -41,6 +41,7 @@ setup(
             'lidar_preprocess = launch_isv.Lidar_Preprocess:main',
             'obstacle_isv = launch_isv.obstacle_isv:main',
             'status3_test = launch_isv.status3_test:main',
+            'gps_pursue = launch_isv.gps_pursue:main',
         ],
     },
 )

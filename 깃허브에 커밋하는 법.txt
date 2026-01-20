@@ -1,4 +1,4 @@
 cd /home/ubuntu/ros2_ws/src
 git add .
-git commit -m "윈도우와 리눅스 시간 동기화"
+git commit -m "1월 20일 오후 3시 현재 파일들"
 git push
