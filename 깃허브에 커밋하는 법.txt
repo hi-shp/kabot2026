@@ -1,4 +1,4 @@
 cd /home/ubuntu/ros2_ws/src
 git add .
-git commit -m "1월 20일 오후 3시 현재 파일들"
+git commit -m "test_GPS 지도를 구글맵 api로 변경"
 git push

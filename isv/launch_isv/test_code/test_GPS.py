@@ -2,137 +2,154 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix
-
 import threading
 from flask import Flask, render_template_string, jsonify
+import yaml
+import os
 
-# --- Flask 앱 설정 ---
 app = Flask(__name__)
-current_pos = {"lat": 0.0, "lon": 0.0}
-path_history = []
+# 발급받은 Google Maps API 키를 사용합니다.
+GOOGLE_MAPS_API_KEY = "AIzaSyDoIwjXsVxvJy0GoNWK8Bf1UjDGktbO1o4"
 
-# HTML/Leaflet 프론트엔드 코드
+current_pos = {"lat": 0.0, "lon": 0.0}
+
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>ROS2 GPS Live Map</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>Google Satellite Mission Monitor</title>
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ key }}"></script>
     <style>
         #map { height: 100vh; width: 100%; }
-        .info-box { 
-            position: absolute; top: 10px; right: 10px; z-index: 1000; 
-            background: white; padding: 10px; border-radius: 5px; 
-            box-shadow: 0 0 15px rgba(0,0,0,0.2); font-family: sans-serif;
+        body { margin: 0; padding: 0; background: #000; }
+        .status-ui { 
+            position: absolute; 
+            top: 15px; 
+            right: 15px; 
+            z-index: 10; 
+            background: rgba(255,255,255,0.9); 
+            padding: 15px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3); 
+            font-family: sans-serif;
+            min-width: 180px;
         }
     </style>
 </head>
 <body>
-    <div id="map"></div>
-    <div class="info-box">
-        <strong>마우스 좌표:</strong> <span id="mouse-coords">0, 0</span><br>
-        <small style="color: #666;">좌클릭: "위도, 경도" 복사</small>
+    <div class="status-ui">
+        <b style="color: #4285F4;">🚢 KABOT 2026</b><br>
+        <small id="gps-stat">GPS 대기 중...</small><hr>
+        LAT: <span id="lat">0.0</span><br>
+        LON: <span id="lon">0.0</span><br>
+        <small style="color: #666;">(클릭 시 좌표 복사)</small>
     </div>
+    <div id="map"></div>
 
     <script>
-        var map = L.map('map').setView([0, 0], 2);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        let map, boatMarker;
+        let isFirst = true;
 
-        var pathLine = L.polyline([], {color: 'red', weight: 3}).addTo(map);
-        
-        // 현재 위치를 나타내는 작은 점 (CircleMarker)
-        var currentDot = L.circleMarker([0, 0], {
-            radius: 6,
-            fillColor: "#007bff",
-            color: "#ffffff",
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 0.8
-        }).addTo(map);
+        function initMap() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 18,
+                center: { lat: 35.2316, lng: 129.0825 },
+                mapTypeId: 'satellite',
+                tilt: 0
+            });
 
-        var isFirstLock = true;
+            // 지도 클릭 이벤트: 알림 없이 클립보드 복사만 수행
+            map.addListener("click", (mapsMouseEvent) => {
+                const lat = mapsMouseEvent.latLng.lat().toFixed(7);
+                const lng = mapsMouseEvent.latLng.lng().toFixed(7);
+                const coordText = `${lat}, ${lng}`;
+                
+                // 클립보드 복사 (백그라운드에서 실행)
+                navigator.clipboard.writeText(coordText);
+            });
 
-        // 마우스 움직임 감지
-        map.on('mousemove', function(e) {
-            document.getElementById('mouse-coords').innerHTML = e.latlng.lat.toFixed(7) + ", " + e.latlng.lng.toFixed(7);
-        });
+            boatMarker = new google.maps.Marker({
+                position: { lat: 0, lng: 0 },
+                map: map,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: "#EA4335",
+                    fillOpacity: 1,
+                    strokeWeight: 2,
+                    strokeColor: "white"
+                }
+            });
 
-        // [좌클릭] 클립보드 복사 (숫자, 숫자) - 알림 없음
-        map.on('click', function(e) {
-            const text = e.latlng.lat.toFixed(7) + ", " + e.latlng.lng.toFixed(7);
-            navigator.clipboard.writeText(text);
-        });
-
-        // 우클릭 이동 기능 삭제 (브라우저 기본 메뉴 사용 가능)
-
-        // 1초마다 데이터 업데이트
-        setInterval(function() {
-            fetch('/data')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.lat === 0 && data.lon === 0) return;
-                    
-                    var newPos = [data.lat, data.lon];
-                    currentDot.setLatLng(newPos);
-                    pathLine.setLatLngs(data.path);
-
-                    if (isFirstLock) {
-                        map.setView(newPos, 18);
-                        isFirstLock = false;
-                    }
+            fetch('/waypoints').then(r => r.json()).then(wps => {
+                wps.forEach((wp, i) => {
+                    new google.maps.Marker({
+                        position: { lat: wp.lat, lng: wp.lon },
+                        map: map,
+                        label: { text: i.toString(), color: 'white' },
+                        title: "Mission Point " + i
+                    });
                 });
+            });
+        }
+
+        setInterval(() => {
+            fetch('/data').then(r => r.json()).then(data => {
+                if (data.lat === 0) return;
+                const pos = { lat: data.lat, lng: data.lon };
+                document.getElementById('lat').innerText = data.lat.toFixed(7);
+                document.getElementById('lon').innerText = data.lon.toFixed(7);
+                document.getElementById('gps-stat').innerText = "정상 수신 중";
+
+                boatMarker.setPosition(pos);
+                if (isFirst) {
+                    map.setCenter(pos);
+                    map.setZoom(20);
+                    isFirst = false;
+                }
+            });
         }, 1000);
+
+        window.onload = initMap;
     </script>
 </body>
 </html>
 """
 
 @app.route('/')
-def index():
-    return render_template_string(HTML_TEMPLATE)
+def index(): 
+    return render_template_string(HTML_TEMPLATE, key=GOOGLE_MAPS_API_KEY)
 
 @app.route('/data')
-def data():
-    return jsonify({"lat": current_pos["lat"], "lon": current_pos["lon"], "path": path_history})
+def data(): 
+    return jsonify(current_pos)
 
-# --- ROS 2 Node ---
-class GPSMapServer(Node):
-    def __init__(self):
-        super().__init__('gps_map_server')
-        self.create_subscription(NavSatFix, "/gps/fix", self.gps_cb, 10)
-        self.get_logger().info("Map Server Started. Access http://localhost:5000")
-
-    def gps_cb(self, msg: NavSatFix):
-        if msg.latitude != msg.latitude:
-            return
-            
-        current_pos["lat"] = msg.latitude
-        current_pos["lon"] = msg.longitude
-        
-        if not path_history or (abs(path_history[-1][0] - msg.latitude) > 0.000001):
-            path_history.append([msg.latitude, msg.longitude])
-
-def run_flask():
-    import logging
-    log = logging.getLogger('werkzeug')
-    log.setLevel(logging.ERROR)
-    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = GPSMapServer()
-
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
-
+@app.route('/waypoints')
+def get_waypoints():
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        # isv_params.yaml 파일을 읽어 waypoints 정보를 가져옵니다.
+        with open('isv_params.yaml', 'r', encoding='utf-8') as f:
+            params = yaml.safe_load(f)
+        return jsonify(params['navigation']['waypoints']) 
+    except Exception as e:
+        print(f"YAML Load Error: {e}")
+        return jsonify([])
+
+class GPSMapNode(Node):
+    def __init__(self):
+        super().__init__('google_map_viewer')
+        self.create_subscription(NavSatFix, "/gps/fix", self.gps_cb, 10) 
+
+    def gps_cb(self, msg):
+        if msg.latitude == msg.latitude:
+            current_pos["lat"] = msg.latitude
+            current_pos["lon"] = msg.longitude
+
+def main():
+    rclpy.init()
+    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5000), daemon=True).start()
+    rclpy.spin(GPSMapNode())
+    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
