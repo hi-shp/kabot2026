@@ -1,4 +1,4 @@
 cd /home/ubuntu/ros2_ws/src
 git add .
-git commit -m "test gps,imu,lidar 코드 생성"
+git commit -m "윈도우와 리눅스 시간 동기화"
 git push
