@@ -253,13 +253,10 @@ class MotorControlNode(Node):
 
         dist = math.sqrt(dx * dx + dy * dy)
         self.dist_to_goal_m = dist
-
+    
         self.goal_abs_deg = self.normalize_360(degrees(math.atan2(dx, dy)))
-
-        if self.now_heading is not None:
-            self.goal_rel_deg = self.normalize_360(self.goal_abs_deg - self.now_heading)
-        else:
-            self.goal_rel_deg = None
+        self.goal_rel_deg = self.normalize_360(self.goal_abs_deg - self.now_heading)
+       
 
         if dist > (self.arrival_radius_m * self.arrival_latch_release_factor):
             self.arrival_latched = False
