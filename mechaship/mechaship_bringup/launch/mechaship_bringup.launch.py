@@ -14,6 +14,14 @@ def generate_launch_description():
         get_package_share_directory("mechaship_bringup"), "param"
     )
 
+    imu_reformatter_node = Node(
+        package="mechaship_bringup",
+        executable="imu_reformatter.py", # CMake에서 설치한 파일명과 일치해야 함
+        name="imu_reformatter",
+        output="screen",
+        emulate_tty=True,
+    )
+
     # micro-ros
     micro_ros_node = Node(
         executable="micro_ros_agent",
@@ -161,6 +169,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             micro_ros_node,
+            imu_reformatter_node,
             actuator_cfg_launch_arg,
             actuator_cfg_node,
             gps_driver_launch_arg,

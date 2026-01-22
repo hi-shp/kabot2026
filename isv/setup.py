@@ -33,7 +33,6 @@ setup(
             'obstacle_isv = launch_isv.obstacle_isv:main',
             'status3_test = launch_isv.status3_test:main',
             'gps_pursue = launch_isv.gps_pursue:main',
-            'control_panel = launch_isv.control_panel:main',
         ],
     },
 )

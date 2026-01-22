@@ -4,7 +4,7 @@ import yaml
 import math
 import time
 import sys
-import signal  # 시그널 처리를 위해 추가
+import signal
 from math import degrees
 
 import rclpy
@@ -32,6 +32,7 @@ class GPSPursueNode(Node):
         self.dist_publisher = self.create_publisher(Float32, "/waypoint/distance", 10)
         self.rel_deg_publisher = self.create_publisher(Float32, "/waypoint/rel_deg", 10)
         self.goal_publisher = self.create_publisher(NavSatFix, "/waypoint/goal", 10)
+        self.curr_yaw_publisher = self.create_publisher(Float32, "/current_yaw", 10)
 
         # 서브스크라이버 설정
         qos_profile = qos_profile_sensor_data
@@ -44,7 +45,9 @@ class GPSPursueNode(Node):
         self.wp_index = 0
         self.current_goal_enu = None
         
-        self.yaw_rad = None
+        self.current_yaw_rel = 0.0  # 시작 시점(0도) 기준 현재 배의 회전각
+        self.initial_yaw_abs = None # 시작 시점의 IMU 절대 각도 (고정값)
+        
         self.dist_to_goal_m = None
         self.goal_rel_deg = None  
         self.arrived_all = False
@@ -57,7 +60,9 @@ class GPSPursueNode(Node):
     def _load_params_from_yaml(self):
         script_dir = os.path.dirname(os.path.realpath(__file__))
         yaml_path = os.path.join(script_dir, "isv_params.yaml")
-        
+        if not os.path.exists(yaml_path):
+            yaml_path = os.path.join(os.path.dirname(script_dir), "isv_params.yaml")
+
         with open(yaml_path, "r") as file:
             params = yaml.safe_load(file)
 
@@ -70,6 +75,7 @@ class GPSPursueNode(Node):
         self.origin_lat = float(nav["origin"]["lat"])
         self.origin_lon = float(nav["origin"]["lon"])
         self.waypoints = nav["waypoints"] 
+        self.arrival_radius_m = float(nav.get("arrival_radius_m", 1.0))
 
         self.thruster_cfg = params["state_machine"]["thruster_defaults"]
         self.default_thruster = float(self.thruster_cfg.get("state0", 10.0))
@@ -89,10 +95,24 @@ class GPSPursueNode(Node):
     def imu_callback(self, msg: Imu):
         q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
         _, _, yaw_rad = euler_from_quaternion(q)
-        self.yaw_rad = -yaw_rad
+        
+        # IMU의 절대 방위각 (보통 East=0, CCW+)
+        current_yaw_abs = -yaw_rad 
+
+        # 프로그램 시작 시 첫 절대 방위각을 기준점으로 고정
+        if self.initial_yaw_abs is None:
+            self.initial_yaw_abs = current_yaw_abs
+
+        # [수정] 시작 방향(0도)을 기준으로 현재 배가 회전한 상대 각도 계산
+        # 왼쪽으로 돌면 +, 오른쪽으로 돌면 -
+        rel_yaw_deg = self.normalize_180(degrees(current_yaw_abs - self.initial_yaw_abs))
+        self.current_yaw_rel = rel_yaw_deg # 도(degree) 단위
+        
+        # 현재 Yaw 퍼블리시
+        self.curr_yaw_publisher.publish(Float32(data=float(rel_yaw_deg)))
 
     def gps_listener_callback(self, gps: NavSatFix):
-        if math.isnan(gps.latitude) or math.isnan(gps.longitude):
+        if math.isnan(gps.latitude) or math.isnan(gps.longitude) or self.initial_yaw_abs is None:
             return
 
         if not self.origin_set:
@@ -104,12 +124,19 @@ class GPSPursueNode(Node):
         if self.current_goal_enu is not None:
             goal_e, goal_n = self.current_goal_enu
             dx, dy = goal_e - curr_e, goal_n - curr_n
+            
             self.dist_to_goal_m = math.hypot(dx, dy)
 
-            if self.yaw_rad is not None:
-                vec_ang_ccw = math.atan2(dy, dx)
-                rel_ccw = vec_ang_ccw - self.yaw_rad
-                self.goal_rel_deg = self.normalize_180(-degrees(rel_ccw))
+            # 1. 목표 지점의 절대 방위각 계산 (East=0 기준)
+            target_ang_abs = degrees(math.atan2(dy, dx))
+            
+            # 2. 목표 지점을 초기 기준 방위(배가 처음 보고 있던 방향) 기준으로 변환
+            # target_ang_rel: 배의 초기 정면을 0도로 했을 때 목표가 있는 방향
+            target_ang_rel = self.normalize_180(target_ang_abs - degrees(self.initial_yaw_abs))
+            
+            # 3. [최종 상대 각도] = 목표의 상대 방위 - 내 배의 현재 상대 회전량
+            # 이것이 현재 배의 정면을 기준으로 목표가 몇 도 옆에 있는지를 나타냅니다.
+            self.goal_rel_deg = self.normalize_180(target_ang_rel - self.current_yaw_rel)
 
     def update_current_goal(self):
         if self.wp_index < len(self.waypoints):
@@ -120,16 +147,18 @@ class GPSPursueNode(Node):
             goal_msg.latitude = target_lat
             goal_msg.longitude = target_lon
             self.goal_publisher.publish(goal_msg)
+            self.get_logger().info(f"📍 목표 이동: {self.wp_index+1}/{len(self.waypoints)}")
         else:
             self.current_goal_enu = None
             self.arrived_all = True
+            self.get_logger().info("🏁 모든 목표 지점에 도착했습니다.")
 
     def timer_callback(self):
         if self.arrived_all or self.dist_to_goal_m is None or self.goal_rel_deg is None:
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
         else:
-            if self.dist_to_goal_m <= 3.0:
+            if self.dist_to_goal_m <= self.arrival_radius_m:
                 self.wp_index += 1
                 self.update_current_goal()
                 return
@@ -137,47 +166,42 @@ class GPSPursueNode(Node):
             state_key = f"state{self.wp_index}"
             self.cmd_thruster = float(self.thruster_cfg.get(state_key, self.default_thruster))
             
-            steer_error = self.goal_rel_deg
+            # 조향 명령: 중립 + 오차(P제어)
+            # goal_rel_deg가 (+)면 왼쪽으로 조향, (-)면 오른쪽으로 조향
             self.cmd_key_degree = constrain(
-                self.servo_neutral_deg + steer_error,
+                self.servo_neutral_deg + self.goal_rel_deg,
                 self.servo_min_deg,
                 self.servo_max_deg
             )
 
         self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
         self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
-
+        
         if self.dist_to_goal_m is not None:
             self.dist_publisher.publish(Float32(data=float(self.dist_to_goal_m)))
         if self.goal_rel_deg is not None:
             self.rel_deg_publisher.publish(Float32(data=float(self.goal_rel_deg)))
 
     def send_stop_commands(self):
-        if not rclpy.ok():
-            return
-        
+        if not rclpy.ok(): return
         safe_key = Float64(data=float(self.servo_neutral_deg))
         safe_thruster = Float64(data=0.0)
-        
-        for i in range(10):
-            try:
-                self.key_publisher.publish(safe_key)
-                self.thruster_publisher.publish(safe_thruster)
-                time.sleep(0.05)
-            except Exception:
-                break
+        for _ in range(5):
+            self.key_publisher.publish(safe_key)
+            self.thruster_publisher.publish(safe_thruster)
+            time.sleep(0.1)
 
 def main(args=None):
     rclpy.init(args=args)
     node = GPSPursueNode()
     
-    # 신호 핸들러 설정 (Ctrl+C 즉시 대응)
     def signal_handler(sig, frame):
+        node.get_logger().warn("안전 종료 중...")
         node.send_stop_commands()
         node.destroy_node()
         rclpy.shutdown()
         sys.exit(0)
-
+    
     signal.signal(signal.SIGINT, signal_handler)
 
     try:
