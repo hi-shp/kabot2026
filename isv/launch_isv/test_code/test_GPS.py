@@ -17,7 +17,7 @@ HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>KABOT 2026 Mission Monitor</title>
+    <title>KABOT 2026 GPS</title>
     <script src="https://maps.googleapis.com/maps/api/js?key={{ key }}"></script>
     <style>
         #map { height: 100vh; width: 100%; }

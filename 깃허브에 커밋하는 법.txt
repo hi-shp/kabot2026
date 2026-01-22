@@ -1,4 +1,0 @@
-cd /home/ubuntu/ros2_ws/src
-git add .
-git commit -m "1월 22일 오후 4시반 코드"
-git push

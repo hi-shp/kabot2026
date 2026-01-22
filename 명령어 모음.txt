@@ -1,0 +1,21 @@
+깃허브에 커밋하는 법
+cd /home/ubuntu/ros2_ws/src
+git add .
+git commit -m "객체인식 성공적! conf 0.8잡아도 안정적임"
+git push
+
+
+
+기타 명령어
+
+기존 ros2 프로세스 모두 종료
+pkill -9 -f ros2
+
+rtk 기존 프로세스 검색
+ps -ef | grep ntrip
+
+테스트용 gps좌표 퍼블리시 해보기
+ros2 topic pub -1 /gps/fix sensor_msgs/msg/NavSatFix "{latitude: 35.2316117, longitude: 129.08254347}"
+
+윈도우에서 카메라 보기
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml address:=0.0.0.0

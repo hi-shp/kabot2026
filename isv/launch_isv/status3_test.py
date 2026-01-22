@@ -72,18 +72,17 @@ class Status0TestNode(Node):
         self.origin = [self.origin_lat, self.origin_lon, 0.0]
         self.origin_set = False
 
-        self.goal_gps_coords = list(zip(self.goal_gps_lats, self.goal_gps_lons))
+        # waypoints 리스트 초기화 (load_params에서 읽어온 값 사용)
         self.now_goal = None  # (east, north) of current goal
-
         self.dist_to_goal_m = None
 
-        # IMU yaw (rad) in ENU convention (typically CCW positive from +x(East))
+        # IMU yaw (rad) in ENU convention
         self.yaw_rad = None
 
         # For display only (north=0, CW+)
         self.goal_abs_deg = None
 
-        # Boat-frame relative angle to goal (bow=0, CW+), normalized to [-180, 180)
+        # Boat-frame relative angle to goal (bow=0, CW+)
         self.goal_rel_deg = None
 
         self.latest_angle_risk = None
@@ -114,8 +113,9 @@ class Status0TestNode(Node):
         nav = params["navigation"]
         self.origin_lat = float(nav["origin"]["lat"])
         self.origin_lon = float(nav["origin"]["lon"])
-        self.goal_gps_lats = nav["goal_gps_lats"]
-        self.goal_gps_lons = nav["goal_gps_lons"]
+        
+        # [수정] 통합된 waypoints 리스트 로드
+        self.waypoints = nav["waypoints"]
 
         sm = params["state_machine"]["thruster_defaults"]
         self.state_params = {i: {"thruster": v} for i, v in enumerate(sm.values())}
@@ -129,7 +129,7 @@ class Status0TestNode(Node):
 
     # ----------------- Angle helpers -----------------
     def normalize_360(self, deg):
-        deg= ( deg +360) %360
+        deg = (deg + 360) % 360
         return deg 
 
     def normalize_180(self, deg):
@@ -146,7 +146,7 @@ class Status0TestNode(Node):
         return msg
 
     def gps_enu_converter(self, lla):
-        """Simple local tangent plane approx: returns (east, north) meters"""
+        """GPS 좌표를 지역 ENU 미터 좌표로 변환"""
         lat, lon, _ = lla
         lat0, lon0, _ = self.origin
 
@@ -165,18 +165,22 @@ class Status0TestNode(Node):
         _, _, yaw_rad = euler_from_quaternion(q)
         yaw_deg = degrees(yaw_rad)
         self.now_heading = self.normalize_360(yaw_deg)
-
+        self.yaw_rad = yaw_rad
 
     def gps_listener_callback(self, gps: NavSatFix):
         if (not self.origin_set) and (not math.isnan(gps.latitude)) and (not math.isnan(gps.longitude)):
-            if not self.goal_gps_lats or not self.goal_gps_lons:
-                self.get_logger().warn("Goal GPS coordinates are not set in parameters. Skipping GPS initialization.")
+            # [수정] 통합 리스트 존재 여부 확인
+            if not self.waypoints:
+                self.get_logger().warn("Waypoints are not set in parameters.")
                 return
+            
             self.origin_set = True
-            self.goal_xy_coords = [self.gps_enu_converter([lat, lon, 0.0]) for (lat, lon) in self.goal_gps_coords]
+            
+            # [수정] waypoint 구조 [lat, lon]를 순회하며 ENU로 변환
+            self.goal_xy_coords = [self.gps_enu_converter([lat, lon, 0.0]) for (lat, lon) in self.waypoints]
+            
             self.now_goal = self.goal_xy_coords[0]
-            self.arrival_latched = False
-            self.get_logger().info("GPS Origin and Goals Initialized.")
+            self.get_logger().info("GPS Origin and Goals (from waypoints list) Initialized.")
 
         if (not self.origin_set) or (self.now_goal is None):
             return
@@ -192,10 +196,6 @@ class Status0TestNode(Node):
     
         self.goal_abs_deg = self.normalize_360(degrees(math.atan2(dx, dy)))
         self.goal_rel_deg = self.normalize_360(self.goal_abs_deg - self.now_heading)
-       
-
-       
-        
 
     def lidar_listener_callback(self, scan: LaserScan):
         filtered = detect_and_cluster(scan.ranges)
@@ -204,7 +204,6 @@ class Status0TestNode(Node):
             self.latest_angle_risk = None
             return
 
-        # calculate_angle_risk() 입력 각도는 보트 기준(선수 0, CW+)이라고 가정
         angle = calculate_angle_risk(
             filtered,
             self.goal_rel_deg,
@@ -216,9 +215,7 @@ class Status0TestNode(Node):
             1,
         )
 
-        # 출력도 동일한 각도계라고 가정하고 -180~180으로 정규화
         self.latest_angle_risk = -self.normalize_180(angle)
-        
         
     # ----------------- Control loop -----------------
     def timer_callback(self):
@@ -231,11 +228,12 @@ class Status0TestNode(Node):
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
         else:
+            # 첫 번째 상태(state0)의 트러스터 값 사용
             self.cmd_thruster = float(self.state_params[0]["thruster"])
 
             steer = self.latest_angle_risk if self.latest_angle_risk is not None else 0.0
             self.cmd_key_degree = constrain(
-                self.servo_neutral_deg +steer,
+                self.servo_neutral_deg + steer,
                 self.servo_min_deg,
                 self.servo_max_deg,
             )
@@ -259,20 +257,19 @@ class Status0TestNode(Node):
             sys.stdout.write("\033[H\033[J")
             panel = (
                 f"┌─────────── [ 실시간 항해 컨트롤 패널 ] ───────────┐\n"
-                f"│   IMU yaw (raw)       : {h}                      │\n"
+                f"│   IMU yaw (raw)       : {h}                       │\n"
                 f"│   목표 방위 (ABS, N0 CW+) : {gabs}                │\n"
                 f"│   목표 상대각 (REL, Bow0 CW+) : {grel}            │\n"
-                f"│   LiDAR risk angle        : {risk}               │\n"
-                f"│   목표 거리 (DIST)        : {dist}               │\n"
+                f"│   LiDAR risk angle         : {risk}               │\n"
+                f"│   목표 거리 (DIST)         : {dist}               │\n"
                 f"│   조향 각도 (SERVO)       : {self.cmd_key_degree:6.1f}°             │\n"
-                f"│   추진 출력 (THRUST)      : {self.cmd_thruster:6.1f}%              │\n"
+                f"│   추진 출력 (THRUST)      : {self.cmd_thruster:6.1f}%               │\n"
                 f"└───────────────────────────────────────────────────┘\n"
             )
             sys.stdout.write(panel)
             sys.stdout.flush()
 
     def send_stop_commands(self):
-        """종료 시 안전 명령 반복 발행"""
         sys.stdout.write("\n[EMERGENCY] STOPPING SHIP...")
         sys.stdout.flush()
 
