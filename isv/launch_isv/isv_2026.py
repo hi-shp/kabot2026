@@ -120,7 +120,7 @@ class MotorControlNode(Node):
 
     # ---------------- Utils ----------------
     def normalize_360(self, deg: float) -> float:
-        return (deg % 360.0 + 360.0) % 360.0
+        return (deg + 360.0) % 360.0
 
     def angle_diff_180(self, deg: float) -> float:
         """0~360을 -180~180으로 변환"""

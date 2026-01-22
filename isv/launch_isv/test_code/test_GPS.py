@@ -6,9 +6,9 @@ import threading
 from flask import Flask, render_template_string, jsonify
 import yaml
 import os
+import sys
 
 app = Flask(__name__)
-# 발급받은 Google Maps API 키를 사용합니다.
 GOOGLE_MAPS_API_KEY = "AIzaSyDoIwjXsVxvJy0GoNWK8Bf1UjDGktbO1o4"
 
 current_pos = {"lat": 0.0, "lon": 0.0}
@@ -17,77 +17,132 @@ HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Google Satellite Mission Monitor</title>
+    <title>KABOT 2026 Mission Monitor</title>
     <script src="https://maps.googleapis.com/maps/api/js?key={{ key }}"></script>
     <style>
         #map { height: 100vh; width: 100%; }
-        body { margin: 0; padding: 0; background: #000; }
+        body { margin: 0; padding: 0; background: #000; overflow: hidden; }
         .status-ui { 
-            position: absolute; 
-            top: 15px; 
-            right: 15px; 
-            z-index: 10; 
-            background: rgba(255,255,255,0.9); 
-            padding: 15px; 
-            border-radius: 8px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3); 
-            font-family: sans-serif;
-            min-width: 180px;
+            position: absolute; top: 15px; right: 15px; z-index: 10; 
+            background: rgba(255,255,255,0.95); padding: 15px; border-radius: 8px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4); font-family: sans-serif; min-width: 200px;
+        }
+        #coord-tooltip {
+            position: absolute; background: rgba(0, 0, 0, 0.85); color: #00FF00;
+            padding: 8px 12px; border-radius: 4px; font-size: 13px;
+            font-family: 'Courier New', monospace; font-weight: bold;
+            pointer-events: none; display: none; z-index: 1000;
+            white-space: nowrap; border: 1px solid rgba(255,255,255,0.2);
         }
     </style>
 </head>
 <body>
+    <div id="coord-tooltip"></div>
     <div class="status-ui">
-        <b style="color: #4285F4;">🚢 KABOT 2026</b><br>
-        <small id="gps-stat">GPS 대기 중...</small><hr>
-        LAT: <span id="lat">0.0</span><br>
-        LON: <span id="lon">0.0</span><br>
-        <small style="color: #666;">(클릭 시 좌표 복사)</small>
+        <b style="color: #1A73E8;">🚢 KABOT 2026 MONITOR</b><br>
+        <small id="gps-stat" style="font-weight: bold; color: #d93025;">GPS 연결 대기 중...</small><hr>
+        <b>LAT:</b> <span id="lat">0.0000000</span><br>
+        <b>LON:</b> <span id="lon">0.0000000</span><br>
+        <small style="color: #70757a;">(맵/선/마커 어디든 클릭 시 복사)</small>
     </div>
     <div id="map"></div>
 
     <script>
-        let map, boatMarker;
+        let map, boatMarker, trailPath;
+        let pathCoordinates = []; 
         let isFirst = true;
+        let lastMousedOverLatLng = ""; 
+        const tooltip = document.getElementById('coord-tooltip');
+
+        function forceCopy(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+        }
 
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
                 zoom: 18,
                 center: { lat: 35.2316, lng: 129.0825 },
-                mapTypeId: 'satellite',
-                tilt: 0
+                mapTypeId: 'roadmap',
+                tilt: 0,
+                streetViewControl: false
             });
 
-            // 지도 클릭 이벤트: 알림 없이 클립보드 복사만 수행
-            map.addListener("click", (mapsMouseEvent) => {
-                const lat = mapsMouseEvent.latLng.lat().toFixed(7);
-                const lng = mapsMouseEvent.latLng.lng().toFixed(7);
-                const coordText = `${lat}, ${lng}`;
-                
-                // 클립보드 복사 (백그라운드에서 실행)
-                navigator.clipboard.writeText(coordText);
+            trailPath = new google.maps.Polyline({
+                path: pathCoordinates,
+                geodesic: true,
+                strokeColor: "#0055FF",
+                strokeOpacity: 1.0,
+                strokeWeight: 4,
+                map: map,
+                zIndex: 50 // 지지도보다는 위, 마커보다는 아래
+            });
+
+            // 마우스 이동 이벤트 (지도 전체 좌표 감지)
+            map.addListener("mousemove", (e) => {
+                const lat = e.latLng.lat().toFixed(7);
+                const lng = e.latLng.lng().toFixed(7);
+                lastMousedOverLatLng = `${lat}, ${lng}`;
+
+                tooltip.style.display = 'block';
+                tooltip.style.left = (event.pageX + 15) + 'px';
+                tooltip.style.top = (event.pageY + 10) + 'px';
+                tooltip.innerHTML = `LAT: ${lat}<br>LON: ${lng}`;
+            });
+
+            map.addListener("mouseout", () => {
+                tooltip.style.display = 'none';
+            });
+
+            // --- 클릭 이벤트 통합 관리 ---
+            
+            // 1. 지도 빈 곳 클릭
+            map.addListener("click", () => {
+                if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng);
+            });
+
+            // 2. 경로 선(Polyline) 클릭
+            trailPath.addListener("click", () => {
+                if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng);
             });
 
             boatMarker = new google.maps.Marker({
                 position: { lat: 0, lng: 0 },
                 map: map,
+                zIndex: 100,
                 icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 8,
-                    fillColor: "#EA4335",
-                    fillOpacity: 1,
-                    strokeWeight: 2,
-                    strokeColor: "white"
+                    path: google.maps.SymbolPath.CIRCLE, scale: 7,
+                    fillColor: "#EA4335", fillOpacity: 1,
+                    strokeWeight: 2, strokeColor: "white"
                 }
             });
 
+            // 3. 현재 위치 마커 클릭
+            boatMarker.addListener("click", () => {
+                if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng);
+            });
+
+            // 4. 웨이포인트 마커 로드 및 클릭 이벤트 추가
             fetch('/waypoints').then(r => r.json()).then(wps => {
+                if(!wps) return;
                 wps.forEach((wp, i) => {
-                    new google.maps.Marker({
+                    const wpMarker = new google.maps.Marker({
                         position: { lat: wp.lat, lng: wp.lon },
                         map: map,
-                        label: { text: i.toString(), color: 'white' },
-                        title: "Mission Point " + i
+                        zIndex: 80,
+                        label: { text: i.toString(), color: 'white', fontWeight: 'bold' }
+                    });
+                    
+                    // 웨이포인트 클릭 시 복사
+                    wpMarker.addListener("click", () => {
+                        if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng);
                     });
                 });
             });
@@ -95,18 +150,20 @@ HTML_TEMPLATE = """
 
         setInterval(() => {
             fetch('/data').then(r => r.json()).then(data => {
-                if (data.lat === 0) return;
+                if (data.lat === 0 || isNaN(data.lat)) return;
                 const pos = { lat: data.lat, lng: data.lon };
                 document.getElementById('lat').innerText = data.lat.toFixed(7);
                 document.getElementById('lon').innerText = data.lon.toFixed(7);
-                document.getElementById('gps-stat').innerText = "정상 수신 중";
-
+                const statElem = document.getElementById('gps-stat');
+                statElem.innerText = "정상 수신 중";
+                statElem.style.color = "#1e8e3e";
                 boatMarker.setPosition(pos);
-                if (isFirst) {
-                    map.setCenter(pos);
-                    map.setZoom(20);
-                    isFirst = false;
+                const lastPoint = pathCoordinates[pathCoordinates.length - 1];
+                if (!lastPoint || lastPoint.lat !== pos.lat || lastPoint.lng !== pos.lng) {
+                    pathCoordinates.push(pos);
+                    trailPath.setPath(pathCoordinates);
                 }
+                if (isFirst) { map.setCenter(pos); map.setZoom(20); isFirst = false; }
             });
         }, 1000);
 
@@ -127,8 +184,10 @@ def data():
 @app.route('/waypoints')
 def get_waypoints():
     try:
-        # isv_params.yaml 파일을 읽어 waypoints 정보를 가져옵니다.
-        with open('isv_params.yaml', 'r', encoding='utf-8') as f:
+        yaml_name = 'isv_params.yaml'
+        if not os.path.exists(yaml_name):
+            return jsonify([])
+        with open(yaml_name, 'r', encoding='utf-8') as f:
             params = yaml.safe_load(f)
         return jsonify(params['navigation']['waypoints']) 
     except Exception as e:
@@ -141,15 +200,19 @@ class GPSMapNode(Node):
         self.create_subscription(NavSatFix, "/gps/fix", self.gps_cb, 10) 
 
     def gps_cb(self, msg):
-        if msg.latitude == msg.latitude:
+        if msg.latitude == msg.latitude and msg.longitude == msg.longitude:
             current_pos["lat"] = msg.latitude
             current_pos["lon"] = msg.longitude
 
 def main():
     rclpy.init()
-    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5000), daemon=True).start()
-    rclpy.spin(GPSMapNode())
-    rclpy.shutdown()
+    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False), daemon=True).start()
+    try:
+        rclpy.spin(GPSMapNode())
+    except KeyboardInterrupt:
+        pass
+    finally:
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

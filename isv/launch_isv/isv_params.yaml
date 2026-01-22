@@ -15,8 +15,8 @@ pid:
 
 # 서보 모터(Key) 설정
 servo:
-  min_deg: 60.0
-  max_deg: 120.0
+  min_deg: 45
+  max_deg: 135.0
   neutral_deg: 90.0
 
 # GPS 및 주행 목표
@@ -39,7 +39,7 @@ navigation:
 # 상태 머신 (State Machine)
 state_machine:
   thruster_defaults:
-    state0: 20.0
+    state0: 0
     state1: 15.0
     state2: 15.0
     state3: 12.0
