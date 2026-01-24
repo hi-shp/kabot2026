@@ -19,7 +19,7 @@ from rclpy.qos import qos_profile_sensor_data
 
 # ROS 2 Messages
 from sensor_msgs.msg import CompressedImage
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String  # String 메시지 추가
 from vision_msgs.msg import Detection2D, Detection2DArray, ObjectHypothesisWithPose
 
 
@@ -35,6 +35,7 @@ class DetectNode(Node):
             self.get_logger().fatal("SBC에서 실행해주시기 바랍니다.")
             return TransitionCallbackReturn.ERROR
 
+        # 파라미터 로드
         self.image_topic = (
             self.get_parameter_or(
                 "image_topic",
@@ -109,8 +110,14 @@ class DetectNode(Node):
 
         self.rknn_helper = RKNNHelper(conf, iou, self.img_size)
 
+        # 퍼블리셔 설정
         self.detection_publisher: Publisher = self.create_lifecycle_publisher(
             Detection2DArray, "detections", qos_profile_sensor_data
+        )
+        
+        # ★ /detect 토픽을 위한 문자열 퍼블리셔 추가
+        self.info_publisher: Publisher = self.create_lifecycle_publisher(
+            String, "detect", qos_profile_sensor_data
         )
 
         self.detection_enable_subscription = self.create_subscription(
@@ -164,6 +171,7 @@ class DetectNode(Node):
     def on_cleanup(self, state: State) -> TransitionCallbackReturn:
         self.destroy_timer(self.timer)
         self.destroy_publisher(self.detection_publisher)
+        self.destroy_publisher(self.info_publisher) # 퍼블리셔 정리
         self.destroy_subscription(self.detection_enable_subscription)
         return TransitionCallbackReturn.SUCCESS
 
@@ -203,12 +211,21 @@ class DetectNode(Node):
             w = x2 - x1
             h = y2 - y1
 
-            # ★ 터미널 출력
-            self.get_logger().info(
+            # 1. 정보 문자열 생성
+            info_str = (
                 f"[DETECT] label={self.classes[int(class_id)]} "
                 f"center=({x:.1f}, {y:.1f}) size=({w:.1f}, {h:.1f}) score={score:.2f}"
             )
 
+            # 2. /detect 토픽으로 퍼블리시
+            detect_info_msg = String()
+            detect_info_msg.data = info_str
+            self.info_publisher.publish(detect_info_msg)
+
+            # (참고) 터미널 출력도 유지
+            self.get_logger().info(info_str)
+
+            # 기존 vision_msgs 메시지 구성
             detection = Detection2D()
             detection.header = self.compressed_image.header
 

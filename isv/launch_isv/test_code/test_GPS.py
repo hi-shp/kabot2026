@@ -23,6 +23,12 @@ HTML_TEMPLATE = """
     <style>
         #map { height: 100vh; width: 100%; }
         body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+        
+        /* [핵심 수정] 평상시에는 손바닥 커서, 클릭하는 순간(active)에만 화살표(default)로 변경 */
+        #map { cursor: grab; }
+        #map:active { cursor: default !important; }
+        #map div, #map img, #map span { cursor: inherit !important; }
+
         .status-ui {
             position: absolute; top: 15px; right: 15px; z-index: 10;
             background: rgba(255,255,255,0.95); padding: 15px; border-radius: 8px;
@@ -44,7 +50,7 @@ HTML_TEMPLATE = """
         <small id="gps-stat" style="font-weight: bold; color: #d93025;">GPS 연결 대기 중...</small><hr>
         <b>LAT:</b> <span id="lat">0.0000000</span><br>
         <b>LON:</b> <span id="lon">0.0000000</span><br>
-        <small style="color: #70757a;">(맵/선/마커 클릭 시 좌표 복사)</small>
+        <small style="color: #70757a;">(클릭하는 순간 좌표 복사)</small>
     </div>
     <div id="map"></div>
 
@@ -73,7 +79,9 @@ HTML_TEMPLATE = """
                 center: { lat: 35.2316, lng: 129.0825 },
                 mapTypeId: 'roadmap',
                 tilt: 0,
-                streetViewControl: false
+                streetViewControl: false,
+                draggableCursor: 'grab', // 기본은 손 모양
+                draggingCursor: 'grabbing'
             });
 
             trailPath = new google.maps.Polyline({
@@ -97,8 +105,14 @@ HTML_TEMPLATE = """
             });
 
             map.addListener("mouseout", () => { tooltip.style.display = 'none'; });
-            map.addListener("click", () => { if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); });
-            trailPath.addListener("click", () => { if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); });
+            
+            // mousedown 이벤트 발생 시 좌표 복사 (클릭 시작 시점)
+            map.addListener("mousedown", () => { 
+                if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); 
+            });
+            trailPath.addListener("mousedown", () => { 
+                if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); 
+            });
 
             boatMarker = new google.maps.Marker({
                 position: { lat: 0, lng: 0 },
@@ -111,9 +125,10 @@ HTML_TEMPLATE = """
                 }
             });
 
-            boatMarker.addListener("click", () => { if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); });
+            boatMarker.addListener("mousedown", () => { 
+                if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); 
+            });
 
-            // 웨이포인트 로드: 검정 원 + 흰색 숫자 (1번부터 시작)
             fetch('/waypoints').then(r => r.json()).then(wps => {
                 if(!wps || wps.length === 0) return;
                 wps.forEach((wp, i) => {
@@ -122,7 +137,7 @@ HTML_TEMPLATE = """
                         map: map,
                         zIndex: 80,
                         label: {
-                            text: (i + 1).toString(), // 0,1,2,3 -> 1,2,3,4 로 변경
+                            text: (i + 1).toString(),
                             color: 'white',
                             fontWeight: 'bold',
                             fontSize: '11px'
@@ -137,7 +152,9 @@ HTML_TEMPLATE = """
                             labelOrigin: new google.maps.Point(0, 0)
                         }
                     });
-                    wpMarker.addListener("click", () => { if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); });
+                    wpMarker.addListener("mousedown", () => { 
+                        if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); 
+                    });
                 });
             });
         }
@@ -182,21 +199,13 @@ def get_waypoints():
         current_dir = os.path.dirname(os.path.abspath(__file__))
         parent_dir = os.path.dirname(current_dir)
         yaml_path = os.path.join(parent_dir, 'isv_params.yaml')
-        
-        if not os.path.exists(yaml_path):
-            print(f"❌ 파일을 찾을 수 없습니다: {yaml_path}")
-            return jsonify([])
-            
+        if not os.path.exists(yaml_path): return jsonify([])
         with open(yaml_path, 'r', encoding='utf-8') as f:
             params = yaml.safe_load(f)
-        
         raw_wps = params.get('navigation', {}).get('waypoints', [])
         formatted_wps = [{"lat": float(wp[0]), "lon": float(wp[1])} for wp in raw_wps if len(wp) >= 2]
-        
-        print(f"✅ {len(formatted_wps)}개의 웨이포인트를 로드했습니다.")
         return jsonify(formatted_wps)
     except Exception as e:
-        print(f"⚠️ YAML 로드 에러: {e}")
         return jsonify([])
 
 class GPSMapNode(Node):
@@ -214,10 +223,8 @@ def main():
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False), daemon=True).start()
     try:
         rclpy.spin(GPSMapNode())
-    except KeyboardInterrupt:
-        pass
-    finally:
-        rclpy.shutdown()
+    except KeyboardInterrupt: pass
+    finally: rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

@@ -26,11 +26,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'get_gps = launch_isv.get_gps:main',
             'isv_2026 = launch_isv.isv_2026:main',
-            'detection_test = launch_isv.detection_test:main',
-            'lidar_preprocess = launch_isv.Lidar_Preprocess:main',
-            'obstacle_isv = launch_isv.obstacle_isv:main',
+            'lidar_process = launch_isv.lidar_process:main',
             'status3_test = launch_isv.status3_test:main',
             'gps_pursue = launch_isv.gps_pursue:main',
         ],

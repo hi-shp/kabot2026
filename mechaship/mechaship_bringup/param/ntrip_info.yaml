@@ -3,7 +3,7 @@ ntrip_client:
     host: "RTS2.ngii.go.kr" # 국토지리정보원 NTRIP
     # host: "192.168." # 사설 NTRIP 기지국
     mountpoint: "VRS-RTCM31"
-    username: "isv_2026"
+    username: "hishp0917"
     password: "ngii" # 계정 패스워드
 
     namespace: ""
@@ -12,7 +12,7 @@ ntrip_client:
 
     port: 2101
     ntrip_version: "None"
-    authenticate: true
+    authenticate: True
     ssl: false
     cert: "None"
     key: "None"

@@ -21,7 +21,7 @@ from math import degrees
 import time
 
 from obstacle_isv import calculate_angle_risk
-from Lidar_Preprocess import detect_and_cluster
+from isv.launch_isv.lidar_process import detect_and_cluster
 
 from vision_msgs.msg import Detection2DArray
 from mechaship_interfaces.msg import RgbwLedColor

@@ -23,35 +23,25 @@ def constrain(v, lo, hi):
 class GPSPursueNode(Node):
     def __init__(self):
         super().__init__("gps_pursue_node")
-
         self._load_params_from_yaml()
-
-        # 퍼블리셔 설정
         self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
         self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
         self.dist_publisher = self.create_publisher(Float32, "/waypoint/distance", 10)
         self.rel_deg_publisher = self.create_publisher(Float32, "/waypoint/rel_deg", 10)
         self.goal_publisher = self.create_publisher(NavSatFix, "/waypoint/goal", 10)
         self.curr_yaw_publisher = self.create_publisher(Float32, "/current_yaw", 10)
-
-        # 서브스크라이버 설정
         qos_profile = qos_profile_sensor_data
         self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile)
         self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_listener_callback, qos_profile)
-
-        # 상태 변수
         self.origin = [self.origin_lat, self.origin_lon, 0.0]
         self.origin_set = False
         self.wp_index = 0
         self.current_goal_enu = None
-        
-        self.current_yaw_rel = 0.0  # 시작 시점(0도) 기준 현재 배의 회전각
-        self.initial_yaw_abs = None # 시작 시점의 IMU 절대 각도 (고정값)
-        
+        self.current_yaw_rel = 0.0
+        self.initial_yaw_abs = None
         self.dist_to_goal_m = None
         self.goal_rel_deg = None  
         self.arrived_all = False
-
         self.cmd_key_degree = self.servo_neutral_deg
         self.cmd_thruster = 0.0
 
@@ -96,19 +86,14 @@ class GPSPursueNode(Node):
         q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
         _, _, yaw_rad = euler_from_quaternion(q)
         
-        # IMU의 절대 방위각 (보통 East=0, CCW+)
         current_yaw_abs = -yaw_rad 
 
-        # 프로그램 시작 시 첫 절대 방위각을 기준점으로 고정
         if self.initial_yaw_abs is None:
             self.initial_yaw_abs = current_yaw_abs
 
-        # [수정] 시작 방향(0도)을 기준으로 현재 배가 회전한 상대 각도 계산
-        # 왼쪽으로 돌면 +, 오른쪽으로 돌면 -
         rel_yaw_deg = self.normalize_180(degrees(current_yaw_abs - self.initial_yaw_abs))
-        self.current_yaw_rel = rel_yaw_deg # 도(degree) 단위
+        self.current_yaw_rel = rel_yaw_deg
         
-        # 현재 Yaw 퍼블리시
         self.curr_yaw_publisher.publish(Float32(data=float(rel_yaw_deg)))
 
     def gps_listener_callback(self, gps: NavSatFix):
@@ -126,16 +111,8 @@ class GPSPursueNode(Node):
             dx, dy = goal_e - curr_e, goal_n - curr_n
             
             self.dist_to_goal_m = math.hypot(dx, dy)
-
-            # 1. 목표 지점의 절대 방위각 계산 (East=0 기준)
             target_ang_abs = degrees(math.atan2(dy, dx))
-            
-            # 2. 목표 지점을 초기 기준 방위(배가 처음 보고 있던 방향) 기준으로 변환
-            # target_ang_rel: 배의 초기 정면을 0도로 했을 때 목표가 있는 방향
             target_ang_rel = self.normalize_180(target_ang_abs - degrees(self.initial_yaw_abs))
-            
-            # 3. [최종 상대 각도] = 목표의 상대 방위 - 내 배의 현재 상대 회전량
-            # 이것이 현재 배의 정면을 기준으로 목표가 몇 도 옆에 있는지를 나타냅니다.
             self.goal_rel_deg = self.normalize_180(target_ang_rel - self.current_yaw_rel)
 
     def update_current_goal(self):
@@ -165,9 +142,6 @@ class GPSPursueNode(Node):
 
             state_key = f"state{self.wp_index}"
             self.cmd_thruster = float(self.thruster_cfg.get(state_key, self.default_thruster))
-            
-            # 조향 명령: 중립 + 오차(P제어)
-            # goal_rel_deg가 (+)면 왼쪽으로 조향, (-)면 오른쪽으로 조향
             self.cmd_key_degree = constrain(
                 self.servo_neutral_deg + self.goal_rel_deg,
                 self.servo_min_deg,

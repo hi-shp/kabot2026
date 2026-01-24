@@ -5,7 +5,7 @@
       rknn_model: "best.rknn"
       label: "labels.txt"
       img_size: 640
-      conf: 0.7 # Confidence threshold
+      conf: 0.3 # Confidence threshold
       iou: 0.8 # IOU threshold
       fps: 10 # fps limit
       enable: True
