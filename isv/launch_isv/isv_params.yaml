@@ -1,6 +1,6 @@
 # 1. ROS 노드 기본 설정
 node_settings:
-  timer_period_seconds: 0.1  # 10Hz (안정적인 제어 주기)
+  timer_period: 0.5  # 2Hz (안정적인 제어 주기)
 
 # 2. 서보 모터(Key) 설정
 servo:
@@ -13,53 +13,36 @@ navigation:
   waypoints:
     - [35.2316291, 129.0824758]   # WP 0: 호핑 구간 진입점 (Course 1 목표)
     - [35.2316117, 129.08254347]  # WP 1: 3코스 진입점 (Course 2 목표)
-  
-  # 지점별 도달 판정 범위 (미터 단위)
-  arrival_radii:
-    - 3.5  # WP 0: 미션 구간 진입을 위해 넉넉하게 설정
-    - 0.5  # WP 1: 도킹 진입을 위해 정밀하게 설정
+  arrival_radius: # 지점별 도달 판정 범위 (미터 단위)
+    - 0.5  # WP 0, 호핑 부표 앞부분 도착범위
+    - 2.0  # WP 1, 마지막 주행모드 시작점 도착범위
 
 # 4. 상태 머신 및 추진기 설정 (3단계 구조)
-state_machine:
-  thruster_defaults:
-    state0: 15.0  # 단계 0: 장애물 회피 주행 (Course 1)
-    state1: 20.0  # 단계 1: 호핑 및 객체 인식 (Course 2)
-    state2: 12.0  # 단계 2: 최종 도킹 주행 (Course 3)
-  
-  arrival_behavior:
-    stop_thrust: 0.0
+state:
+  state0: 5.0  # 단계 0: 장애물 회피 주행 (Course 1)
+  state1: 20.0  # 단계 1: 호핑 및 객체 인식 (Course 2)
+  state2: 12.0  # 단계 2: 최종 도킹 주행 (Course 3)
 
 # 5. 비전(Vision) 및 객체 인식
 vision:
   screen_width: 640
   angle_conversion_factor: 90.0
+  # available_objects: # 인식 가능한 객체 후보
+  #   - "Blue Circle"
+  #   - "Blue Cross"
+  #   - "Blue Triangle"
+  #   - "Green Circle"
+  #   - "Green Cross"
+  #   - "Green Triangle"
+  #   - "Red Circle"
+  #   - "Red Cross"
+  #   - "Red Triangle"
+  # target: "Red Circle"
 
-vision_targets:
-  available_objects:
-    - "Blue Circle"
-    - "Blue Cross"
-    - "Blue Triangle"
-    - "Green Circle"
-    - "Green Cross"
-    - "Green Triangle"
-    - "Red Circle"
-    - "Red Cross"
-    - "Red Triangle"
-  tracking_target: "Red Circle"
-
-# 6. 라이다(Lidar) 및 장애물 회피
-lidar_obstacle_avoidance:
-  # 작년 검증 데이터 기반 위험도 파라미터
-  risk_calc:
-    max_risk_threshold: 60.0       # 위험 판단 임계값
-    ship_padding: 23              # 배 폭 고려 안전 반경 (index)
-    risk_function_a: 135.72       # y = a * e^(b*x)
-    risk_function_b: -0.6109      #
-  
-  # 최종 도킹 설정
-  docking:
-    obstacle_distance_threshold_m: 0.3 # 3코스 최종 정지 거리
-
-# 7. LED 설정
-led:
-  default_brightness: 20
+course2:
+  ros__parameters:
+    hoping_target: "Red Triangle"
+    detection_target: "Green Triangle"
+    class_name_map:
+      - "0:Red Triangle"
+      - "1:Green Triangle"

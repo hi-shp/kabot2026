@@ -1,161 +1,227 @@
 #!/usr/bin/env python3
+import os, yaml, math, time, sys, signal
+import numpy as np
+from math import degrees, radians, exp
 import rclpy
 from rclpy.node import Node
-import numpy as np
-import math
-import os
-import yaml
-from math import degrees, radians, atan2, sin, cos, exp
-from sensor_msgs.msg import NavSatFix, LaserScan, Imu
-from std_msgs.msg import Float64
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import (
+    QoSProfile,
+    QoSReliabilityPolicy,
+    QoSHistoryPolicy,
+    QoSDurabilityPolicy,
+)
+from sensor_msgs.msg import NavSatFix, Imu, LaserScan
+from std_msgs.msg import Float64, Float32
+from tf_transformations import euler_from_quaternion
 
-class CourseOneNavigator(Node):
+def constrain(v, lo, hi):
+    if math.isnan(v): return lo + (hi - lo) / 2.0
+    return lo if v < lo else hi if v > hi else v
+
+def set_risk_zone(array, center, spread):
+    """장애물 지점(center) 주변으로 위험 구역(spread)을 설정"""
+    array[center] = 1
+    for i in range(1, spread + 1):
+        if center - i >= 0: array[center - i] = 1
+        if center + i <= 180: array[center + i] = 1
+    return array
+
+class GPSLidarFusionNode(Node):
     def __init__(self):
-        super().__init__('course_one_navigator')
-
-        # 1. 파라미터 로드 (isv_params.yaml)
-        self.load_params()
-
-        # 2. 상태 변수 초기화
-        self.current_pos = {"lat": 0.0, "lon": 0.0}
-        self.imu_heading = 0.0
-        self.safe_indices = []
-        self.target_wp_idx = 0  # 1코스 목표는 첫 번째 웨이포인트
-
-        # 3. QoS 설정 (전달받은 예제 기준)
-        lidar_qos = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=1)
-        gps_qos = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, history=HistoryPolicy.KEEP_LAST, depth=10)
-        imu_qos = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=10)
-
-        # 4. 구독 및 발행
-        self.create_subscription(NavSatFix, "/gps/fix", self.gps_cb, gps_qos)
-        self.create_subscription(LaserScan, "/scan", self.lidar_cb, lidar_qos)
-        self.create_subscription(Imu, "/imu", self.imu_cb, imu_qos)
+        super().__init__("gps_lidar_fusion_node")
+        self._load_params_from_yaml()
         
-        self.key_pub = self.create_publisher(Float64, "/actuator/key/degree", 10)
-        self.thruster_pub = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
+        # --- QoS 설정 (참고 코드 반영) ---
+        lidar_qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            durability=QoSDurabilityPolicy.VOLATILE,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=5,
+        )
+        
+        # Publishers
+        self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
+        self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
+        self.dist_publisher = self.create_publisher(Float32, "/waypoint/distance", 10)
+        self.rel_deg_publisher = self.create_publisher(Float32, "/waypoint/rel_deg", 10)
+        
+        # Subscribers
+        self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, lidar_qos)
+        self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_listener_callback, 10)
+        self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, lidar_qos)
+        
+        # 주행 및 제어 변수
+        self.origin = None 
+        self.origin_set = False
+        self.wp_index = 0
+        self.current_goal_enu = None
+        self.current_yaw_rel = 0.0
+        self.initial_yaw_abs = None
+        self.dist_to_goal_m = None
+        self.goal_rel_deg = None  
+        self.arrived_all = False
+        
+        # --- 라이다 및 위험도 관련 설정 (참고 코드 수치 적용) ---
+        self.max_risk_threshold = 60.0  # 위험도 임계값
+        self.safe_angles = list(range(181)) # 초기값은 전구간 안전
+        self.final_heading = 90.0
 
-        # 5. 제어 루프 타이머 (YAML의 timer_period_seconds 사용)
-        self.create_timer(self.timer_period, self.control_loop)
-        self.get_logger().info("Course 1 Navigator Initialized with YAML Params")
+        self.create_timer(self.timer_period_seconds, self.timer_callback)
 
-    def load_params(self):
-        """YAML 파일에서 직접 파라미터 로드"""
+    def _load_params_from_yaml(self):
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        yaml_path = os.path.join(script_dir, "isv_params.yaml")
         try:
-            # 파일 경로 설정 (image_34a76d.png의 구조 반영)
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            yaml_path = os.path.join(current_dir, 'isv_params.yaml')
-            
-            with open(yaml_path, 'r', encoding='utf-8') as f:
-                params = yaml.safe_load(f)
-            
-            # 노드 설정
-            self.timer_period = params['node_settings']['timer_period_seconds']
-            
-            # 서보 설정
-            self.min_deg = params['servo']['min_deg']
-            self.max_deg = params['servo']['max_deg']
-            self.neutral_deg = params['servo']['neutral_deg']
-            
-            # 내비게이션 (첫 번째 웨이포인트를 WP1으로 설정)
-            self.waypoints = params['navigation']['waypoints']
-            self.arrival_radius = params['navigation']['arrival_radius_m']
-            
-            # 추진기 출력 (상태 0: 주행 시작 단계 출력 사용)
-            self.default_thrust = params['state_machine']['thruster_defaults']['state0']
-            
-            # 라이다 위험도 관련 (작년 로직 수치 유지)
-            self.max_risk_threshold = 60.0  # 작년 검증값
-            self.ship_padding = 23         # 작년 검증값 (배 폭 고려)
-
+            with open(yaml_path, "r", encoding='utf-8') as file:
+                params = yaml.safe_load(file)
         except Exception as e:
-            self.get_logger().error(f"Failed to load YAML: {e}")
-            # 로드 실패 시 기본값 강제 할당
-            self.timer_period = 0.5
-            self.neutral_deg = 90.0
-            self.default_thrust = 10.0
+            self.get_logger().error(f"YAML 로드 실패: {e}"); sys.exit(1)
 
-    def get_bearing(self, lat1, lon1, lat2, lon2):
-        dLon = radians(lon2 - lon1)
-        y = sin(dLon) * cos(radians(lat2))
-        x = cos(radians(lat1)) * sin(radians(lat2)) - sin(radians(lat1)) * cos(radians(lat2)) * cos(dLon)
-        return (degrees(atan2(y, x)) + 360) % 360
+        self.timer_period_seconds = params["node_settings"]["timer_period"]
+        self.servo_neutral_deg = float(params["servo"]["neutral_deg"])
+        self.servo_min_deg = float(params["servo"]["min_deg"])
+        self.servo_max_deg = float(params["servo"]["max_deg"])
+        self.waypoints = params["navigation"]["waypoints"] 
+        self.arrival_radii = params["navigation"]["arrival_radius"]
+        self.state_cfg = params["state"]
 
-    def gps_cb(self, msg):
-        self.current_pos["lat"] = msg.latitude
-        self.current_pos["lon"] = msg.longitude
+    def normalize_180(self, deg):
+        return (deg + 180.0) % 360.0 - 180.0
 
-    def imu_cb(self, msg):
-        q = msg.orientation
-        siny_cosp = 2 * (q.w * q.z + q.x * q.y)
-        cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
-        # 90도 오프셋 좌표계 보정 필요 시 여기서 조정
-        self.imu_heading = (degrees(atan2(siny_cosp, cosy_cosp)) + 360) % 360
+    def gps_enu_converter(self, lla):
+        if self.origin is None: return 0.0, 0.0
+        lat, lon = lla[0], lla[1]
+        lat0, lon0 = self.origin[0], self.origin[1]
+        R = 6378137.0
+        dlat, dlon = math.radians(lat - lat0), math.radians(lon - lon0)
+        latm = math.radians((lat + lat0) * 0.5)
+        return dlon * R * math.cos(latm), dlat * R
 
-    def lidar_cb(self, msg):
-        num_ranges = len(msg.ranges)
-        mid = num_ranges // 2
-        half = num_ranges // 4  # 전방 180도
+    def imu_callback(self, msg: Imu):
+        q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
+        _, _, yaw_rad = euler_from_quaternion(q)
+        current_yaw_abs = -yaw_rad 
+        if self.initial_yaw_abs is None: self.initial_yaw_abs = current_yaw_abs
+        self.current_yaw_rel = self.normalize_180(degrees(current_yaw_abs - self.initial_yaw_abs))
 
-        relevant_data = np.array(msg.ranges[mid-half : mid+half])
-        relevant_data = np.where((relevant_data <= msg.range_min) | (relevant_data >= msg.range_max), 0, relevant_data)
+    def lidar_callback(self, data):
+        """라이다 데이터를 처리하여 안전한 각도 리스트(safe_angles) 도출"""
+        ranges = np.array(data.ranges)
+        # 참고 코드의 전방 relevant_data 추출 (인덱스 500~1500)
+        relevant_data = ranges[500:1500]
+        relevant_data = relevant_data[(relevant_data != 0) & (relevant_data != float("inf"))]
+        
+        if len(relevant_data) == 0: return
 
-        # 181개로 보간(Interpolation)
-        avg_distances = np.interp(np.linspace(0, len(relevant_data)-1, 181), 
-                                  np.arange(len(relevant_data)), relevant_data)
-
+        cumulative_distance = np.zeros(181)
+        sample_count = np.zeros(181)
+        average_distance = np.zeros(181)
+        risk_values = np.zeros(181)
         risk_map = np.zeros(181)
-        for i, dist in enumerate(avg_distances):
-            if dist > 0:
-                # 작년 위험도 함수: y = 135.72 * e^(-0.6109x)
-                risk = 135.72 * exp(-0.6109 * dist)
-                if risk >= self.max_risk_threshold:
-                    start = max(0, i - self.ship_padding)
-                    end = min(180, i + self.ship_padding)
-                    risk_map[start:end+1] = 1 
 
-        self.safe_indices = np.where(risk_map == 0)[0]
+        # 1. 거리 데이터를 180도 인덱스로 매핑
+        for i in range(len(relevant_data)):
+            length = relevant_data[i]
+            angle_index = round((len(relevant_data) - 1 - i) * 180 / len(relevant_data))
+            cumulative_distance[angle_index] += length
+            sample_count[angle_index] += 1
 
-    def control_loop(self):
-        if self.current_pos["lat"] == 0.0 or not self.waypoints: return
+        # 2. 평균 거리 및 위험도 계산 (작년 위험도 함수 적용)
+        for j in range(181):
+            if sample_count[j] != 0:
+                average_distance[j] = cumulative_distance[j] / sample_count[j]
+                # y = 135.72 * e^(-0.6109x)
+                risk_values[j] = 135.72 * math.exp(-0.6109 * average_distance[j])
 
-        # 1. 목표 WP 설정 (첫 번째 웨이포인트)
-        target = self.waypoints[self.target_wp_idx]
+        # 3. 위험 구역 설정 (스프레드 23 적용)
+        for k in range(181):
+            if risk_values[k] >= self.max_risk_threshold:
+                set_risk_zone(risk_map, k, 23)
+
+        # 4. 안전한 각도 리스트 업데이트
+        self.safe_angles = np.where(risk_map == 0)[0].tolist()
+
+    def gps_listener_callback(self, gps: NavSatFix):
+        if math.isnan(gps.latitude) or math.isnan(gps.longitude): return
+        if not self.origin_set:
+            self.origin = [gps.latitude, gps.longitude]
+            self.origin_set = True
+            self.update_current_goal(); return
+
+        if self.initial_yaw_abs is None: return
+        curr_e, curr_n = self.gps_enu_converter([gps.latitude, gps.longitude])
         
-        # 2. 목표 방위각 계산
-        target_bearing = self.get_bearing(self.current_pos["lat"], self.current_pos["lon"], target[0], target[1])
-        
-        # 3. 상대 각도 및 목표 인덱스 계산
-        relative_angle = (target_bearing - self.imu_heading + 180) % 360 - 180
-        desired_idx = 90 + relative_angle
+        if self.current_goal_enu is not None:
+            goal_e, goal_n = self.current_goal_enu
+            dx, dy = goal_e - curr_e, goal_n - curr_n
+            self.dist_to_goal_m = math.hypot(dx, dy)
+            target_ang_abs = degrees(math.atan2(dy, dx))
+            target_ang_rel = self.normalize_180(target_ang_abs - degrees(self.initial_yaw_abs))
+            # GPS가 원하는 상대 각도 (90도가 정면인 체계로 변환)
+            self.goal_rel_deg = self.normalize_180(target_ang_rel - self.current_yaw_rel) + 90.0
 
-        # 4. 장애물 회피 조향 결정
-        if hasattr(self, 'safe_indices') and len(self.safe_indices) > 0:
-            final_steering = float(self.safe_indices[np.abs(self.safe_indices - desired_idx).argmin()])
+    def update_current_goal(self):
+        if self.wp_index < len(self.waypoints):
+            target_lat, target_lon = self.waypoints[self.wp_index]
+            self.current_goal_enu = self.gps_enu_converter([target_lat, target_lon])
+            radius = self.arrival_radii[self.wp_index] if self.wp_index < len(self.arrival_radii) else 1.0
+            self.get_logger().info(f"🎯 WP {self.wp_index} 목표: {target_lat}, {target_lon}")
         else:
-            final_steering = self.neutral_deg
+            self.current_goal_enu = None; self.arrived_all = True
+            self.get_logger().info("🏁 모든 목적지 도착 완료")
 
-        # YAML의 서보 한계값 적용
-        final_steering = max(self.min_deg, min(self.max_deg, final_steering))
+    def timer_callback(self):
+        if not self.origin_set or self.arrived_all or self.dist_to_goal_m is None or self.goal_rel_deg is None:
+            cmd_t, cmd_k = 0.0, self.servo_neutral_deg
+        else:
+            # WP 도착 판정
+            current_radius = self.arrival_radii[self.wp_index] if self.wp_index < len(self.arrival_radii) else 1.0
+            if self.dist_to_goal_m <= current_radius:
+                self.wp_index += 1; self.update_current_goal(); return
 
-        # 5. 제어 명령 퍼블리시
-        self.key_pub.publish(Float64(data=final_steering))
-        self.thruster_pub.publish(Float64(data=self.default_thrust))
+            # 1. GPS 기반 목적지 각도 (desired_heading)
+            desired_heading = self.goal_rel_deg 
 
-        # 6. WP 도달 판정 (거리 계산 생략, 도달 시 로깅)
-        self.get_logger().info(f"Dist to WP: {target_bearing:.1f}deg, Steer: {final_steering:.1f}")
+            # 2. 세이프 존 중 목적지와 가장 가까운 각도 선택
+            if len(self.safe_angles) > 0:
+                self.final_heading = float(min(self.safe_angles, key=lambda x: abs(x - desired_heading)))
+            else:
+                self.final_heading = 90.0 # 안전 구역 없으면 정면 (또는 정지 로직)
 
-def main():
-    rclpy.init()
-    node = CourseOneNavigator()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+            # 3. 조향 제한 (45~135도)
+            self.final_heading = constrain(self.final_heading, 45.0, 135.0)
+
+            # 4. 최종 출력 각도 계산 (중립 90도 기준 보정)
+            # cmd_k = self.servo_neutral_deg + (self.final_heading - 90.0)
+            # 참고 코드 방식에 따라 final_heading 자체가 출력 각도로 사용됨
+            cmd_k = self.final_heading
+            
+            state_key = f"state{self.wp_index}"
+            cmd_t = float(self.state_cfg.get(state_key, 20.0))
+
+        # 발행
+        self.key_publisher.publish(Float64(data=float(cmd_k)))
+        self.thruster_publisher.publish(Float64(data=float(cmd_t)))
+        self.dist_publisher.publish(Float32(data=float(self.dist_to_goal_m or 0.0)))
+        self.rel_deg_publisher.publish(Float32(data=float(self.final_heading - 90.0)))
+
+    def send_stop_commands(self):
+        if not rclpy.ok(): return
+        for _ in range(5):
+            self.key_publisher.publish(Float64(data=self.servo_neutral_deg))
+            self.thruster_publisher.publish(Float64(data=0.0))
+            time.sleep(0.1)
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = GPSLidarFusionNode()
+    def signal_handler(sig, frame):
+        node.send_stop_commands(); node.destroy_node(); rclpy.shutdown(); sys.exit(0)
+    signal.signal(signal.SIGINT, signal_handler)
+    try: rclpy.spin(node)
+    except KeyboardInterrupt: pass
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok(): node.send_stop_commands(); node.destroy_node(); rclpy.shutdown()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
