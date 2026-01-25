@@ -89,6 +89,8 @@
 
 
 #!/usr/bin/env python3
+import os
+import csv
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
@@ -96,67 +98,94 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 import numpy as np
 
 
-class LidarFront180Printer(Node):
+class LidarFrontMinus90To0Logger(Node):
     def __init__(self):
-        super().__init__("lidar_front_minus90_to_0_printer")
+        super().__init__("lidar_front_minus90_to_0_logger")
 
         qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
             depth=1,
         )
-
         self.create_subscription(LaserScan, "/scan", self.scan_cb, qos)
 
+        # ✅ 설정값
+        self.sample_period_sec = 2.0
+        self.max_dist_m = 2.0
+        self.target_count = 90  # -90~0 구간을 90개로
+
+        # ✅ 마지막으로 저장한 시간
+        self.last_saved_time = self.get_clock().now()
+
+        # ✅ 저장 파일
+        self.csv_path = os.path.expanduser("~/lidar_front_-90_0.csv")
+
+        # 파일이 없으면 헤더 작성
+        if not os.path.exists(self.csv_path):
+            with open(self.csv_path, "w", newline="") as f:
+                w = csv.writer(f)
+                w.writerow(["stamp_sec", "k", "angle_deg", "distance_m"])
+        self.get_logger().info(f"Logging to {self.csv_path} every {self.sample_period_sec:.1f}s")
+
     def scan_cb(self, msg: LaserScan):
+        now = self.get_clock().now()
+        dt = (now - self.last_saved_time).nanoseconds / 1e9
+
+        # ✅ 2초에 1번만 처리
+        if dt < self.sample_period_sec:
+            return
+
+        self.last_saved_time = now
+
         num_ranges = len(msg.ranges)
         if num_ranges == 0:
             return
 
-        # 전방 180도 구간 인덱스
+        # 전방 180도 구간
         mid = num_ranges // 2
         half = num_ranges // 4
         start_idx = mid - half
         end_idx = mid + half
+        front_ranges = list(msg.ranges[start_idx:end_idx])  # (-90~+90 가정)
 
-        front_ranges = list(msg.ranges[start_idx:end_idx])  # (-90 ~ +90 가정)
+        # ✅ -90~0 구간만 (앞 1/2)
+        left_len = len(front_ranges) // 2
+        # local index 범위: [0, left_len-1]
+        sample_pos = np.linspace(0, left_len - 1, self.target_count).astype(int)
 
-        # ✅ -90도 ~ 0도 구간만 사용 (전방의 왼쪽 절반)
-        # front_ranges 길이의 절반이 (-90 ~ 0)
-        front_half_end_local = len(front_ranges) // 2
-        front_left_ranges = front_ranges[:front_half_end_local]
+        # 메시지 timestamp (가능하면 센서 stamp 사용)
+        stamp_sec = float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) / 1e9
 
-        # 90개로 출력
-        target_count = 90
-        sample_pos = np.linspace(0, len(front_left_ranges) - 1, target_count).astype(int)
-
-        print("\n===== FRONT (-90° ~ 0°) (90 values) angle + distance ( >2.0m -> 0 ) =====")
-
+        rows = []
         for k, local_i in enumerate(sample_pos):
-            # front_left_ranges 기준 local_i -> 원본 global_i로 변환
             global_i = start_idx + local_i
             r = msg.ranges[global_i]
 
             angle_rad = msg.angle_min + global_i * msg.angle_increment
-            angle_deg = np.degrees(angle_rad)
+            angle_deg = float(np.degrees(angle_rad))
 
-            # INVALID 처리
+            # INVALID 처리 -> 0으로 저장
             if (not np.isfinite(r)) or (r <= msg.range_min) or (r >= msg.range_max):
-                print(f"[{k:03d}] {angle_deg:+7.2f}° : INVALID ({r})")
-                continue
+                r_out = 0.0
+            else:
+                # 2m 초과 -> 0
+                r_out = 0.0 if r > self.max_dist_m else float(r)
 
-            # 2m 초과는 0으로
-            if r > 2.0:
-                r = 0.0
+            rows.append([stamp_sec, k, angle_deg, r_out])
 
-            print(f"[{k:03d}] {angle_deg:+7.2f}° : {r:7.3f} m")
+        # ✅ CSV에 append 저장
+        with open(self.csv_path, "a", newline="") as f:
+            w = csv.writer(f)
+            w.writerows(rows)
 
-        print("===== END =====\n")
+        # ✅ 콘솔에 간단 요약만 출력 (원하면 전체 90개도 출력 가능)
+        nonzero = sum(1 for r in rows if r[3] > 0.0)
+        self.get_logger().info(f"Saved 90 values (-90~0). nonzero={nonzero}/90")
 
 
 def main():
     rclpy.init()
-    node = LidarFront180Printer()
+    node = LidarFrontMinus90To0Logger()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

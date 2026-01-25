@@ -27,22 +27,18 @@ state:
 vision:
   screen_width: 640
   angle_conversion_factor: 90.0
-  # available_objects: # 인식 가능한 객체 후보
-  #   - "Blue Circle"
-  #   - "Blue Cross"
-  #   - "Blue Triangle"
-  #   - "Green Circle"
-  #   - "Green Cross"
-  #   - "Green Triangle"
-  #   - "Red Circle"
-  #   - "Red Cross"
-  #   - "Red Triangle"
-  # target: "Red Circle"
+  available_objects: # 인식 가능한 객체 후보
+    - "Blue Circle"
+    - "Blue Cross"
+    - "Blue Triangle"
+    - "Green Circle"
+    - "Green Cross"
+    - "Green Triangle"
+    - "Red Circle"
+    - "Red Cross"
+    - "Red Triangle"
+  target: "Red Circle"
 
-course2:
-  ros__parameters:
-    hoping_target: "Red Triangle"
-    detection_target: "Green Triangle"
-    class_name_map:
-      - "0:Red Triangle"
-      - "1:Green Triangle"
+  hoping_target: "Red Triangle"
+  detection_target: "Green Triangle"
+  

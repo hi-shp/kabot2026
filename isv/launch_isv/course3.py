@@ -46,6 +46,7 @@ class CourseThreeNavigator(Node):
         self.thrust_steer_gain = 0.15
         self.thrust_min = 5.0
 
+        
         # QoS (네 테스트 코드 스타일)
         lidar_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -117,7 +118,10 @@ class CourseThreeNavigator(Node):
         yaw_deg_360 = (degrees(atan2(siny_cosp, cosy_cosp)) + 360.0) % 360.0
 
         self.imu_heading_deg_360 = yaw_deg_360
-        self.imu_heading_deg_signed = wrap_to_180(yaw_deg_360)
+        #======수정한부분1=======================
+        self.imu_heading_deg_signed = -wrap_to_180(yaw_deg_360)
+        #======수정한부분1=======================
+
         self.have_imu = True
 
     # -------------------------
@@ -132,7 +136,8 @@ class CourseThreeNavigator(Node):
         #    범위 밖이면 "정지"로 처리(원하면 '유지'로 바꿀 수 있음)
         if (not self.have_imu) or (self.imu_heading_deg_signed > 0.0):
             self.key_pub.publish(Float64(data=float(self.neutral_deg)))
-            self.thruster_pub.publish(Float64(data=0.0))
+            self.key_pub.publish(Float64(data=float(self.max_deg)))
+            self.thruster_pub.publish(Float64(data=3.0))
             self.get_logger().info(
                 f"[WAIT/STOP] imu={self.imu_heading_deg_signed:+.1f}° (need -180~0)."
             )
@@ -173,6 +178,9 @@ class CourseThreeNavigator(Node):
 
         # index->각도 매핑: 0..179 => -90..+90 (중심각)
         best_lidar_angle = -90.0 + (best_i + 0.5)
+        #======수정한부분1=======================
+        best_lidar_angle = -best_lidar_angle
+        #======수정한부분1=======================
 
         self.last_best_angle = best_lidar_angle
         self.last_best_dist = best_dist
