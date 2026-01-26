@@ -5,24 +5,23 @@ import math
 import time
 import sys
 import signal
-from math import degrees
-
+from math import degrees, radians
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-
+from sensor_msgs.msg import LaserScan
 import numpy as np
 from sensor_msgs.msg import NavSatFix, Imu
-from std_msgs.msg import Float64, Float32
+from std_msgs.msg import Float64, Float32, String
 from tf_transformations import euler_from_quaternion
 
 def constrain(v, lo, hi):
     if math.isnan(v): return lo + (hi - lo) / 2.0
     return lo if v < lo else hi if v > hi else v
 
-class GPSPursueNode(Node):
+class Course1Node(Node):
     def __init__(self):
-        super().__init__("gps_pursue_node")
+        super().__init__("course1_node")
         self._load_params_from_yaml()
         self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
         self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
@@ -30,11 +29,17 @@ class GPSPursueNode(Node):
         self.rel_deg_publisher = self.create_publisher(Float32, "/waypoint/rel_deg", 10)
         self.goal_publisher = self.create_publisher(NavSatFix, "/waypoint/goal", 10)
         self.curr_yaw_publisher = self.create_publisher(Float32, "/current_yaw", 10)
+        self.safe_angle_list_publisher = self.create_publisher(String, "/safe_angles_list", 10)
+        self.safe_angle_publisher = self.create_publisher(Float32, "/safe_angle", 10)
         qos_profile = qos_profile_sensor_data
         self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile)
         self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_listener_callback, qos_profile)
-        
-        # 수정: origin을 None으로 시작하여 GPS 콜백에서 첫 위치를 잡도록 변경
+        self.lidar_sub = self.create_subscription(
+            LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data
+        )
+        self.safe_angles_list = []
+        self.max_clear_dist = 0.0
+        self.dist_threshold = 1.0  # 1미터 임계값
         self.origin = None
         self.origin_set = False
         self.wp_index = 0
@@ -46,15 +51,14 @@ class GPSPursueNode(Node):
         self.arrived_all = False
         self.cmd_key_degree = self.servo_neutral_deg
         self.cmd_thruster = 0.0
-
-        self.create_timer(self.timer_period_seconds, self.timer_callback)
+        self.create_timer(self.timer_period, self.timer_callback)
 
     def _load_params_from_yaml(self):
         script_dir = os.path.dirname(os.path.realpath(__file__))
         yaml_path = os.path.join(script_dir, "isv_params.yaml")
         with open(yaml_path, "r") as file:
             params = yaml.safe_load(file)
-        self.timer_period_seconds = float(params["node_settings"]["timer_period"])
+        self.timer_period = float(params["node_settings"]["timer_period"])
         self.servo_neutral_deg = float(params["servo"]["neutral_deg"])
         self.servo_min_deg = float(params["servo"]["min_deg"])
         self.servo_max_deg = float(params["servo"]["max_deg"])
@@ -91,6 +95,48 @@ class GPSPursueNode(Node):
         self.current_yaw_rel = rel_yaw_deg
         
         self.curr_yaw_publisher.publish(Float32(data=float(rel_yaw_deg)))
+
+    def lidar_callback(self, msg: LaserScan):
+        num_ranges = len(msg.ranges)
+        if num_ranges == 0: return
+        mid = num_ranges // 2
+        half = num_ranges // 4
+        start_idx = mid - half
+        end_idx = mid + half
+        ranges = np.array(msg.ranges[start_idx:end_idx], dtype=float)
+        ranges = np.flip(ranges)
+        num_front = len(ranges)
+        angles_deg = np.linspace(-90, 90, num_front)
+        invalid = (~np.isfinite(ranges)) | (ranges <= msg.range_min) | (ranges >= msg.range_max)
+        ranges[invalid] = 0.0
+        dist_180 = np.zeros(181, dtype=float)
+        target_degrees = np.arange(0, 181) 
+
+        for target_deg in target_degrees:
+            lower = (target_deg - 90) - 0.5
+            upper = (target_deg - 90) + 0.5
+            mask = (angles_deg >= lower) & (angles_deg < upper)
+            chunk = ranges[mask]
+            valid_pts = chunk[chunk > 0.0]
+            dist_180[target_deg] = float(np.mean(valid_pts)) if valid_pts.size > 0 else 0.0
+
+        safe_angles = [int(deg) for deg, dist in enumerate(dist_180) if dist > self.dist_threshold]
+        self.safe_angles_list = safe_angles
+
+        if self.safe_angles_list is not None:
+            list_msg = String()
+            list_msg.data = str(self.safe_angles_list)
+            self.safe_angle_list_publisher.publish(list_msg)
+
+        if self.safe_angles_list:
+            safe_arr = np.array(self.safe_angles_list)
+            best_angle = safe_arr[np.argmin(np.abs(safe_arr - 90))]
+            self.goal_rel_deg = float(best_angle)
+            self.max_clear_dist = float(dist_180[int(best_angle)])
+            self.safe_angle_publisher.publish(Float32(data=self.goal_rel_deg))
+        else:
+            self.max_clear_dist = 0.0
+            self.goal_rel_deg = self.servo_neutral_deg
 
     def gps_listener_callback(self, gps: NavSatFix):
         if math.isnan(gps.latitude) or math.isnan(gps.longitude) or self.initial_yaw_abs is None:
@@ -132,7 +178,6 @@ class GPSPursueNode(Node):
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
         else:
-            # waypoint별로 다른 arrival_radius 적용
             current_radius = self.arrival_radii[min(self.wp_index, len(self.arrival_radii)-1)]
             
             if self.dist_to_goal_m <= current_radius:
@@ -167,21 +212,17 @@ class GPSPursueNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = GPSPursueNode()
-    
+    node = Course1Node()
     def signal_handler(sig, frame):
         node.get_logger().warn("Stopped")
         node.send_stop_commands()
         node.destroy_node()
         rclpy.shutdown()
         sys.exit(0)
-    
     signal.signal(signal.SIGINT, signal_handler)
-
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+    except KeyboardInterrupt: pass
     finally:
         if rclpy.ok():
             node.send_stop_commands()

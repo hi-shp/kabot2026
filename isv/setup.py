@@ -28,7 +28,6 @@ setup(
         'console_scripts': [
             'isv_2026 = launch_isv.isv_2026:main',
             'lidar_process = launch_isv.lidar_process:main',
-            'status3_test = launch_isv.status3_test:main',
             'gps_pursue = launch_isv.gps_pursue:main',
             'course1 = launch_isv.course1:main',
             'course2 = launch_isv.course2:main',

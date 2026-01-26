@@ -134,6 +134,7 @@ class CourseThreeNavigator(Node):
 
         # 0) IMU 상태 필터: imu_heading이 [-180, 0]일 때만 주행 알고리즘 적용
         #    범위 밖이면 "정지"로 처리(원하면 '유지'로 바꿀 수 있음)
+        # 수정한 부분1
         if (not self.have_imu) or (self.imu_heading_deg_signed > 0.0):
             self.key_pub.publish(Float64(data=float(self.neutral_deg)))
             self.key_pub.publish(Float64(data=float(self.max_deg)))
