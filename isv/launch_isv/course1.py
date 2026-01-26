@@ -9,9 +9,8 @@ from math import degrees
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import LaserScan
 import numpy as np
-from sensor_msgs.msg import NavSatFix, Imu
+from sensor_msgs.msg import NavSatFix, Imu, LaserScan
 from std_msgs.msg import Float64, Float32, String
 from tf_transformations import euler_from_quaternion
 
@@ -22,7 +21,7 @@ def constrain(v, lo, hi):
 class Course1(Node):
     def __init__(self):
         super().__init__("Course1")
-        self._load_params_from_yaml()
+        self.load_params_from_yaml()
         self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
         self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
         self.dist_publisher = self.create_publisher(Float32, "/waypoint/distance", 10)
@@ -50,7 +49,7 @@ class Course1(Node):
         self.cmd_thruster = 0.0
         self.create_timer(self.timer_period, self.timer_callback)
 
-    def _load_params_from_yaml(self):
+    def load_params_from_yaml(self):
         script_dir = os.path.dirname(os.path.realpath(__file__))
         yaml_path = os.path.join(script_dir, "isv_params.yaml")
         with open(yaml_path, "r") as file:
@@ -179,7 +178,7 @@ class Course1(Node):
                 state_key = f"state{self.wp_index}"
                 self.cmd_thruster = float(self.thruster_cfg.get(state_key, self.default_thruster))
                 
-                self.cmd_key_degree = constrain(
+                self.cmd_key_degree = normalize_180ain(
                     steering_angle, 
                     self.servo_min_deg, 
                     self.servo_max_deg)
