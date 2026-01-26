@@ -31,15 +31,12 @@ class Course1Node(Node):
         self.curr_yaw_publisher = self.create_publisher(Float32, "/current_yaw", 10)
         self.safe_angle_list_publisher = self.create_publisher(String, "/safe_angles_list", 10)
         self.safe_angle_publisher = self.create_publisher(Float32, "/safe_angle", 10)
-        qos_profile = qos_profile_sensor_data
-        self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile)
-        self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_listener_callback, qos_profile)
-        self.lidar_sub = self.create_subscription(
-            LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data
-        )
+        self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile_sensor_data)
+        self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_listener_callback, qos_profile_sensor_data)
+        self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data)
         self.safe_angles_list = []
-        self.max_clear_dist = 0.0
-        self.dist_threshold = 1.0  # 1미터 임계값
+        self.dist_threshold = 0.3 # 장애물로 인식할 거리 (m)
+        self.side_margin = 10 # 장애물로 처리할 좌우 각도
         self.origin = None
         self.origin_set = False
         self.wp_index = 0
@@ -92,42 +89,43 @@ class Course1Node(Node):
         self.current_yaw_rel = rel_yaw_deg
         self.curr_yaw_publisher.publish(Float32(data=float(rel_yaw_deg)))
 
-    def lidar_callback(self, msg: LaserScan):
-        num_ranges = len(msg.ranges)
-        if num_ranges == 0: return
-        mid = num_ranges // 2
-        half = num_ranges // 4
-        start_idx = mid - half
-        end_idx = mid + half
-        ranges = np.array(msg.ranges[start_idx:end_idx], dtype=float)
-        ranges = np.flip(ranges)
-        num_front = len(ranges)
-        angles_deg = np.linspace(-90, 90, num_front)
-        invalid = (~np.isfinite(ranges)) | (ranges <= msg.range_min) | (ranges >= msg.range_max)
-        ranges[invalid] = 0.0
-        dist_180 = np.zeros(181, dtype=float)
-        target_degrees = np.arange(0, 181) 
-
-        for target_deg in target_degrees:
-            lower = (target_deg - 90) - 0.5
-            upper = (target_deg - 90) + 0.5
-            mask = (angles_deg >= lower) & (angles_deg < upper)
-            chunk = ranges[mask]
-            valid_pts = chunk[chunk > 0.0]
-            dist_180[target_deg] = float(np.mean(valid_pts)) if valid_pts.size > 0 else 0.0
-
-        safe_angles = [int(deg) for deg, dist in enumerate(dist_180) if dist > self.dist_threshold]
-        self.safe_angles_list = safe_angles
+    def lidar_callback(self, data):
+        ranges = np.array(data.ranges)
+        start_idx, end_idx = 500, 1500
+        subset = ranges[start_idx:end_idx]
+        cumulative_distance = np.zeros(181)
+        sample_count = np.zeros(181)
+        dist_180 = np.zeros(181)
+        for i in range(len(subset)):
+            length = subset[i]
+            if length <= data.range_min or length >= data.range_max or not np.isfinite(length):
+                continue
+            angle_index = round((len(subset) - 1 - i) * 180 / len(subset))
+            if 0 <= angle_index <= 180:
+                cumulative_distance[angle_index] += length
+                sample_count[angle_index] += 1
+        for j in range(181):
+            if sample_count[j] > 0:
+                dist_180[j] = cumulative_distance[j] / sample_count[j]
+            else:
+                dist_180[j] = 0.0
+        danger_flags = (dist_180 > 0) & (dist_180 <= self.dist_threshold)
+        expanded_danger = np.copy(danger_flags)
+        n = self.side_margin
+        for i in range(181):
+            if danger_flags[i]:
+                low = max(0, i - n)
+                high = min(181, i + n + 1)
+                expanded_danger[low:high] = True
+        self.safe_angles_list = [int(deg) for deg in range(181) if not expanded_danger[deg]]
 
         if self.safe_angles_list is not None:
             list_msg = String()
             list_msg.data = str(self.safe_angles_list)
             self.safe_angle_list_publisher.publish(list_msg)
-
         if self.safe_angles_list:
             safe_arr = np.array(self.safe_angles_list)
             best_angle = safe_arr[np.argmin(np.abs(safe_arr - 90))]
-            self.max_clear_dist = float(dist_180[int(best_angle)])
             self.safe_angle_publisher.publish(Float32(data=float(best_angle)))
 
     def gps_listener_callback(self, gps: NavSatFix):
@@ -138,7 +136,6 @@ class Course1Node(Node):
             self.origin_set = True
             self.get_logger().info(f"시작 위치: {self.origin[:2]}")
             self.update_current_goal()
-
         curr_e, curr_n = self.gps_enu_converter([gps.latitude, gps.longitude, gps.altitude])
         if self.current_goal_enu is not None:
             goal_e, goal_n = self.current_goal_enu
@@ -160,7 +157,7 @@ class Course1Node(Node):
         else:
             self.current_goal_enu = None
             self.arrived_all = True
-            self.get_logger().info("모든 목표 지점에 도착했습니다.")
+            self.get_logger().info("모든 웨이포인트 도착")
 
     def timer_callback(self):
         if self.arrived_all or self.dist_to_goal_m is None or self.goal_rel_deg is None:
@@ -181,11 +178,14 @@ class Course1Node(Node):
                 steering_angle = self.servo_neutral_deg + chosen_safe_angle
                 state_key = f"state{self.wp_index}"
                 self.cmd_thruster = float(self.thruster_cfg.get(state_key, self.default_thruster))
-
-            self.cmd_key_degree = constrain(
-                steering_angle, 
-                self.servo_min_deg, 
-                self.servo_max_deg)
+                
+                self.cmd_key_degree = constrain(
+                    steering_angle, 
+                    self.servo_min_deg, 
+                    self.servo_max_deg)
+            else:
+                self.cmd_thruster = 0.0
+                self.cmd_key_degree = self.servo_neutral_deg
 
         self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
         self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
