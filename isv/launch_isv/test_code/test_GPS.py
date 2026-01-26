@@ -9,7 +9,6 @@ import os
 import sys
 
 app = Flask(__name__)
-# 구글 맵 API 키 (사용자 키 유지)
 GOOGLE_MAPS_API_KEY = "AIzaSyDoIwjXsVxvJy0GoNWK8Bf1UjDGktbO1o4"
 
 current_pos = {"lat": 0.0, "lon": 0.0}
@@ -23,12 +22,9 @@ HTML_TEMPLATE = """
     <style>
         #map { height: 100vh; width: 100%; }
         body { margin: 0; padding: 0; background: #000; overflow: hidden; }
-        
-        /* [핵심 수정] 평상시에는 손바닥 커서, 클릭하는 순간(active)에만 화살표(default)로 변경 */
-        #map { cursor: grab; }
-        #map:active { cursor: default !important; }
+        #map { cursor: default !important; }
+        #map:active { cursor: pointer !important; }
         #map div, #map img, #map span { cursor: inherit !important; }
-
         .status-ui {
             position: absolute; top: 15px; right: 15px; z-index: 10;
             background: rgba(255,255,255,0.95); padding: 15px; border-radius: 8px;
@@ -50,17 +46,15 @@ HTML_TEMPLATE = """
         <small id="gps-stat" style="font-weight: bold; color: #d93025;">GPS 연결 대기 중...</small><hr>
         <b>LAT:</b> <span id="lat">0.0000000</span><br>
         <b>LON:</b> <span id="lon">0.0000000</span><br>
-        <small style="color: #70757a;">(클릭하는 순간 좌표 복사)</small>
+        <small style="color: #70757a;">(클릭 시 좌표 복사)</small>
     </div>
     <div id="map"></div>
-
     <script>
-        let map, boatMarker, trailPath;
+        let map, boatMarker, trailPath, clickMarker;
         let pathCoordinates = [];
         let isFirst = true;
         let lastMousedOverLatLng = "";
         const tooltip = document.getElementById('coord-tooltip');
-
         function forceCopy(text) {
             const textArea = document.createElement("textarea");
             textArea.value = text;
@@ -72,7 +66,6 @@ HTML_TEMPLATE = """
             document.execCommand('copy');
             document.body.removeChild(textArea);
         }
-
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
                 zoom: 19,
@@ -80,10 +73,21 @@ HTML_TEMPLATE = """
                 mapTypeId: 'roadmap',
                 tilt: 0,
                 streetViewControl: false,
-                draggableCursor: 'grab', // 기본은 손 모양
-                draggingCursor: 'grabbing'
+                draggableCursor: 'default',
+                draggingCursor: 'pointer'
             });
-
+            clickMarker = new google.maps.Marker({
+                map: null,
+                zIndex: 200,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 4,
+                    fillColor: "#0000FF",
+                    fillOpacity: 1,
+                    strokeWeight: 1,
+                    strokeColor: "#FFFFFF"
+                }
+            });
             trailPath = new google.maps.Polyline({
                 path: pathCoordinates,
                 geodesic: true,
@@ -93,7 +97,6 @@ HTML_TEMPLATE = """
                 map: map,
                 zIndex: 50
             });
-
             map.addListener("mousemove", (e) => {
                 const lat = e.latLng.lat().toFixed(7);
                 const lng = e.latLng.lng().toFixed(7);
@@ -102,18 +105,19 @@ HTML_TEMPLATE = """
                 tooltip.style.left = (event.pageX + 15) + 'px';
                 tooltip.style.top = (event.pageY + 10) + 'px';
                 tooltip.innerHTML = `LAT: ${lat}<br>LON: ${lng}`;
+                if (clickMarker.getMap()) {
+                    clickMarker.setPosition(e.latLng);
+                }
             });
-
             map.addListener("mouseout", () => { tooltip.style.display = 'none'; });
-            
-            // mousedown 이벤트 발생 시 좌표 복사 (클릭 시작 시점)
-            map.addListener("mousedown", () => { 
-                if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); 
+            map.addListener("mousedown", (e) => { 
+                if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng);
+                clickMarker.setPosition(e.latLng);
+                clickMarker.setMap(map);
             });
-            trailPath.addListener("mousedown", () => { 
-                if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); 
+            map.addListener("mouseup", () => { 
+                clickMarker.setMap(null);
             });
-
             boatMarker = new google.maps.Marker({
                 position: { lat: 0, lng: 0 },
                 map: map,
@@ -124,11 +128,6 @@ HTML_TEMPLATE = """
                     strokeWeight: 2, strokeColor: "white"
                 }
             });
-
-            boatMarker.addListener("mousedown", () => { 
-                if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); 
-            });
-
             fetch('/waypoints').then(r => r.json()).then(wps => {
                 if(!wps || wps.length === 0) return;
                 wps.forEach((wp, i) => {
@@ -138,9 +137,7 @@ HTML_TEMPLATE = """
                         zIndex: 80,
                         label: {
                             text: (i + 1).toString(),
-                            color: 'white',
-                            fontWeight: 'bold',
-                            fontSize: '11px'
+                            color: 'white', fontWeight: 'bold', fontSize: '11px'
                         },
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
@@ -148,17 +145,12 @@ HTML_TEMPLATE = """
                             fillColor: "#000000",
                             fillOpacity: 1,
                             strokeWeight: 1.5,
-                            strokeColor: "#FFFFFF",
-                            labelOrigin: new google.maps.Point(0, 0)
+                            strokeColor: "#FFFFFF"
                         }
-                    });
-                    wpMarker.addListener("mousedown", () => { 
-                        if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng); 
                     });
                 });
             });
         }
-
         setInterval(() => {
             fetch('/data').then(r => r.json()).then(data => {
                 if (data.lat === 0 || isNaN(data.lat)) return;
@@ -169,7 +161,6 @@ HTML_TEMPLATE = """
                 statElem.innerText = "정상 수신 중";
                 statElem.style.color = "#1e8e3e";
                 boatMarker.setPosition(pos);
-                
                 const lastPoint = pathCoordinates[pathCoordinates.length - 1];
                 if (!lastPoint || lastPoint.lat !== pos.lat || lastPoint.lng !== pos.lng) {
                     pathCoordinates.push(pos);
@@ -178,7 +169,6 @@ HTML_TEMPLATE = """
                 if (isFirst) { map.setCenter(pos); isFirst = false; }
             });
         }, 1000);
-
         window.onload = initMap;
     </script>
 </body>
@@ -212,7 +202,6 @@ class GPSMapNode(Node):
     def __init__(self):
         super().__init__('google_map_viewer')
         self.create_subscription(NavSatFix, "/gps/fix", self.gps_cb, 10)
-
     def gps_cb(self, msg):
         if msg.latitude == msg.latitude and msg.longitude == msg.longitude:
             current_pos["lat"] = msg.latitude

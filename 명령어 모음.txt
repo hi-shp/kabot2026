@@ -1,7 +1,7 @@
 # 깃허브에 커밋하는 법
 cd /home/ubuntu/ros2_ws/src
 git add .
-git commit -m "course1 2차 완성"
+git commit -m "test_GPS 가독성 개선"
 git push
 
 
