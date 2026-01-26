@@ -34,12 +34,11 @@ vision:
     - "Green Circle"
     - "Green Cross"
     - "Green Triangle"
-    - "Purple Buoy"
     - "Red Circle"
     - "Red Cross"
     - "Red Triangle"
   target: "Red Circle"
 
-  hoping_target: "Purple Buoy"
-  detection_target: "Green Triangle"
+  hoping_target: "Green Triangle"
+  detection_target: "Red Triangle"
   

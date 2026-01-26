@@ -1,7 +1,7 @@
 # 깃허브에 커밋하는 법
 cd /home/ubuntu/ros2_ws/src
 git add .
-git commit -m "Ctrl+C 했을 때 키/쓰러스터 정지하도록 course2,3 main함수 수정"
+git commit -m "1월 26일 오후 2시 코드"
 git push
 
 # foxglove on
