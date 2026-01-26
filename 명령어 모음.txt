@@ -1,8 +1,20 @@
 # 깃허브에 커밋하는 법
 cd /home/ubuntu/ros2_ws/src
 git add .
-git commit -m "test_GPS 가독성 개선"
+git commit -m "Ctrl+C 했을 때 키/쓰러스터 정지하도록 course2,3 main함수 수정"
 git push
+
+# foxglove on
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml address:=0.0.0.0
+
+# gps 맵 띄우기
+/bin/python3 /home/ubuntu/ros2_ws/src/isv/launch_isv/test_code/test_GPS.py
+
+# gps 퍼블리시
+/bin/python3 /home/ubuntu/ros2_ws/src/isv/launch_isv/gps_publish.py
+
+# RTK 아이디 비번 바꾸기
+nano ~/ros2_ws/src/mechaship/mechaship_bringup/param/ntrip_info.yaml
 
 
 # 기타 명령어
@@ -23,20 +35,8 @@ ps aux | grep ros | awk '{print $2}' | xargs kill -9
 # 테스트용 gps좌표 임의값 한 번 주기
 ros2 topic pub -1 /gps/fix sensor_msgs/msg/NavSatFix "{latitude: 35.2316117, longitude: 129.08254347}"
 
-# foxglove on
-ros2 launch foxglove_bridge foxglove_bridge_launch.xml address:=0.0.0.0
-
-# gps 맵 띄우기
-/bin/python3 /home/ubuntu/ros2_ws/src/isv/launch_isv/test_code/test_GPS.py
-
-# gps 퍼블리시
-/bin/python3 /home/ubuntu/ros2_ws/src/isv/launch_isv/gps_publish.py
-
 # 기존 빌드 삭제하고 cb
 cd ~/ros2_ws
 rm -rf build/ install/ log/
 colcon build --symlink-install
 source install/setup.bash
-
-# RTK 아이디 비번 바꾸기
-nano ~/ros2_ws/src/mechaship/mechaship_bringup/param/ntrip_info.yaml

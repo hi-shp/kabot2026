@@ -5,7 +5,7 @@ import math
 import time
 import sys
 import signal
-from math import degrees, radians
+from math import degrees
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -19,9 +19,9 @@ def constrain(v, lo, hi):
     if math.isnan(v): return lo + (hi - lo) / 2.0
     return lo if v < lo else hi if v > hi else v
 
-class Course1Node(Node):
+class Course1(Node):
     def __init__(self):
-        super().__init__("course1_node")
+        super().__init__("Course1")
         self._load_params_from_yaml()
         self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
         self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
@@ -205,7 +205,7 @@ class Course1Node(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = Course1Node()
+    node = Course1()
     def signal_handler(sig, frame):
         node.get_logger().warn("Stopped")
         node.send_stop_commands()

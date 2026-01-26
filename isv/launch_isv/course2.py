@@ -1,7 +1,9 @@
 import os
 import yaml
 import math
-
+import time
+import sys
+import signal
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -22,9 +24,9 @@ def norm_text(s: str) -> str:
     return " ".join(str(s).strip().lower().split())
 
 
-class course2(Node):
+class Course2(Node):
     def __init__(self):
-        super().__init__("course2")
+        super().__init__("Course2")
 
         # ✅ 같은 폴더의 isv_params.yaml 자동 로드
         this_dir = os.path.dirname(os.path.abspath(__file__))
@@ -38,7 +40,7 @@ class course2(Node):
 
         # ---------------- Subscribers ----------------
         self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile_sensor_data)
-        self.detection_subscriber = self.create_subscription(Detection2DArray, "/detections", self.detection_cb, qos_profile_sensor_data)
+        self.detection_subscriber = self.create_subscription(Detection2DArray, "/detections", self.detection_callback, qos_profile_sensor_data)
 
         # ---------------- State / Defaults ----------------
         self.latest_detection_msg = None
@@ -72,9 +74,6 @@ class course2(Node):
         self.led_on_brightness = 80
         self.current_led = self.make_led(white=self.led_default_white)
         self.publish_led(self.current_led)
-
-        # 로그 과다 방지용(선택)
-        self._steer_log_tick = 0
 
         # ✅ timer 등록
         self.timer_period = 0.05  # 20Hz
@@ -196,15 +195,9 @@ class course2(Node):
         self.current_servo_deg = servo_cmd
         self.key_publisher.publish(Float64(data=float(servo_cmd)))
 
-        # 로그 너무 많으면 0.5초마다 1번만
-        self._steer_log_tick += 1
-        if self._steer_log_tick % 10 == 0:  # IMU가 대략 20Hz일 때
-            self.get_logger().info(
-                f"[STEER(-90)] yaw={current:.1f} target={target:.1f} err(cur-tgt)={error:.1f} -> servo={servo_cmd:.1f}"
-            )
-
+        
     # ---------------- Detection ----------------
-    def detection_cb(self, msg: Detection2DArray):
+    def detection_callback(self, msg: Detection2DArray):
         self.latest_det_msg = msg
         self.latest_detection_msg = msg
 
@@ -287,23 +280,25 @@ class course2(Node):
 
     # ✅ DETECTION 단계에서만 호출될 함수
     # 조건: imu_target_angle == 0.0 일 때 detection_target 인식되면 imu_target_angle = -90.0
+    
     def target_detection(self, msg: Detection2DArray):
-        if abs(float(self.imu_target_angle)) > 1e-6:
-            return False
+        if norm_text(name) == tgt_norm:
+    # ROI 중심 x
+            roi_center_x = det.bbox.center.x
 
-        tgt_norm = norm_text(self.detection_target)
-
-        for det in msg.detections:
-            class_id, score = self._extract_classid_score(det)
-            if class_id is None:
-                continue
-
-            name = self.get_object_name(class_id)
-            if norm_text(name) == tgt_norm:
-                # ✅ 인식되면 -90도로 변경
+            # ✅ ROI 중앙이 이미지 중앙과 거의 같을 때
+            if abs(roi_center_x - IMAGE_CENTER_X) <= CENTER_TOL:
                 self.imu_target_angle = -90.0
-                self.get_logger().info(f"[DETECTED] {name} -> imu_target_angle set to {self.imu_target_angle}")
+                self.get_logger().info(
+                    f"[DETECTED & CENTERED] {name} "
+                    f"(roi_x={roi_center_x:.1f}) -> imu_target_angle = {self.imu_target_angle}"
+                )
                 return True
+            else:
+                self.get_logger().info(
+                    f"[DETECTED but NOT CENTERED] {name} "
+                    f"(roi_x={roi_center_x:.1f}, center={IMAGE_CENTER_X})"
+                )
 
         return False
 
@@ -329,13 +324,34 @@ class course2(Node):
         if self.phase == "DONE":
             return
 
+    def send_stop_commands(self):
+        if not rclpy.ok(): return
+        safe_key = Float64(data=float(self.servo_neutral_deg))
+        safe_thruster = Float64(data=0.0)
+        for _ in range(5):
+            self.key_publisher.publish(safe_key)
+            self.thruster_publisher.publish(safe_thruster)
+            time.sleep(0.1)
 
 def main(args=None):
     rclpy.init(args=args)
-    node = course2()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
+    node = Course2()
+    def signal_handler(sig, frame):
+        node.get_logger().warn("Stopped")
+        node.send_stop_commands()
+        node.destroy_node()
+        rclpy.shutdown()
+        sys.exit(0)
+    signal.signal(signal.SIGINT, signal_handler)
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if rclpy.ok():
+            node.send_stop_commands()
+            node.destroy_node()
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

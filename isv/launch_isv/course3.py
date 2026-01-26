@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-
+import time
+import sys
+import signal
 import numpy as np
 import math
 import os
@@ -18,7 +20,7 @@ def wrap_to_180(deg: float) -> float:
     return (deg + 180.0) % 360.0 - 180.0
 
 
-class CourseThreeNavigator(Node):
+class Course3(Node):
     """
     코스3
 
@@ -31,7 +33,7 @@ class CourseThreeNavigator(Node):
     """
 
     def __init__(self):
-        super().__init__("course_three_navigator")
+        super().__init__("Course3")
 
         # YAML(코스1 스타일 유지)
         self.load_params()
@@ -66,6 +68,7 @@ class CourseThreeNavigator(Node):
         # Pub
         self.key_pub = self.create_publisher(Float64, "/actuator/key/degree", 10)
         self.thruster_pub = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
+        
 
         # 디버그용
         self.last_best_angle = 0.0
@@ -144,40 +147,45 @@ class CourseThreeNavigator(Node):
             return
 
         # 1) 라이다 전방 180도(-90~+90)를 슬라이싱 (네 기존 방식 유지: mid 기준)
-        mid = num_ranges // 2
-        half = num_ranges // 4
-        start_idx = mid - half
-        end_idx = mid + half
-        if start_idx < 0 or end_idx > num_ranges:
-            return
+        ranges = np.array(data.ranges)
+        start_idx, end_idx = 500, 1500
+        subset = ranges[start_idx:end_idx]
+        cumulative_distance = np.zeros(181)
+        sample_count = np.zeros(181)
+        dist_180 = np.zeros(181)
+        for i in range(len(subset)):
+            length = subset[i]
+            if length <= data.range_min or length >= data.range_max or not np.isfinite(length):
+                continue
+            angle_index = round((len(subset) - 1 - i) * 180 / len(subset))
+            if 0 <= angle_index <= 180:
+                cumulative_distance[angle_index] += length
 
-        front_ranges = np.array(msg.ranges[start_idx:end_idx], dtype=float)
-        front_len = len(front_ranges)
-        if front_len < 10:
-            return
 
-        # 2) INVALID 제거(0 처리)
-        invalid = (~np.isfinite(front_ranges)) | (front_ranges <= msg.range_min) | (front_ranges >= msg.range_max)
-        front_ranges[invalid] = 0.0
+        # 4) dist_180에서 거리 큰 상위 3개 bin 선택
+        TOP_K = 3
 
-        # 3) 전방 180도를 180등분하고(1도당 1칸), 각 칸 평균거리 dist_180 생성
-        dist_180 = np.zeros(180, dtype=float)
-        for i in range(180):
-            s = int(front_len * i / 180.0)
-            e = int(front_len * (i + 1) / 180.0)
-            if e <= s:
-                e = min(s + 1, front_len)
+        # 거리값 기준 내림차순 인덱스
+        sorted_indices = np.argsort(dist_180)[::-1]
 
-            chunk = front_ranges[s:e]
-            valid = chunk[chunk > 0.0]
-            dist_180[i] = float(np.mean(valid)) if valid.size > 0 else 0.0
+        # 상위 3개 중 거리값이 0이 아닌 것만 사용
+        top_bins = []
+        for idx in sorted_indices:
+            if dist_180[idx] > 0.0:
+                top_bins.append(idx)
+            if len(top_bins) >= TOP_K:
+                break
 
-        # 4) dist_180에서 최대거리 선택
-        best_i = int(np.argmax(dist_180))
-        best_dist = float(dist_180[best_i])
-
-        # index->각도 매핑: 0..179 => -90..+90 (중심각)
-        best_lidar_angle = -90.0 + (best_i + 0.5)
+        # 혹시 유효 bin이 부족하면 fallback (기존 방식)
+        if len(top_bins) == 0:
+            best_i = int(np.argmax(dist_180))
+            best_dist = float(dist_180[best_i])
+            best_lidar_angle = -90.0 + (best_i + 0.5)
+        else:
+            # 각도 평균
+            angles = [(-90.0 + (i + 0.5)) for i in top_bins]
+            best_lidar_angle = float(np.mean(angles))
+            best_dist = float(np.max([dist_180[i] for i in top_bins]))
         #======수정한부분1=======================
         best_lidar_angle = -best_lidar_angle
         #======수정한부분1=======================
@@ -194,7 +202,7 @@ class CourseThreeNavigator(Node):
             self.get_logger().info(
                 f"[STOP] imu={self.imu_heading_deg_signed:+.1f}° | best_angle={best_lidar_angle:+.1f}° "
                 f"| best_dist={best_dist:.3f}m <= {self.stop_dist_m:.3f}m"
-            )
+            )# 임의의 topic publisher로 만들기
             return
 
         # 6) 서보 목표각: 가장 먼 각도 따라가기 (서보 범위 비대칭 고려)
@@ -231,16 +239,34 @@ class CourseThreeNavigator(Node):
         )
 
 
-def main():
-    rclpy.init()
-    node = CourseThreeNavigator()
+    def send_stop_commands(self):
+        if not rclpy.ok(): return
+        safe_key = Float64(data=float(self.servo_neutral_deg))
+        safe_thruster = Float64(data=0.0)
+        for _ in range(5):
+            self.key_publisher.publish(safe_key)
+            self.thruster_publisher.publish(safe_thruster)
+            time.sleep(0.1)
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = Course3()
+    def signal_handler(sig, frame):
+        node.get_logger().warn("Stopped")
+        node.send_stop_commands()
+        node.destroy_node()
+        rclpy.shutdown()
+        sys.exit(0)
+    signal.signal(signal.SIGINT, signal_handler)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            node.send_stop_commands()
+            node.destroy_node()
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":
