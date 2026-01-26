@@ -1,9 +1,7 @@
 import os
 import yaml
 import math
-import time
-import sys
-import signal
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -24,9 +22,9 @@ def norm_text(s: str) -> str:
     return " ".join(str(s).strip().lower().split())
 
 
-class Course2(Node):
+class course2(Node):
     def __init__(self):
-        super().__init__("Course2")
+        super().__init__("course2")
 
         # ✅ 같은 폴더의 isv_params.yaml 자동 로드
         this_dir = os.path.dirname(os.path.abspath(__file__))
@@ -282,25 +280,37 @@ class Course2(Node):
     # 조건: imu_target_angle == 0.0 일 때 detection_target 인식되면 imu_target_angle = -90.0
     
     def target_detection(self, msg: Detection2DArray):
-        if norm_text(name) == tgt_norm:
+        if abs(float(self.imu_target_angle)) > 1e-6:
+            return False
+
+        tgt_norm = norm_text(self.detection_target)
+
+        for det in msg.detections:
+            class_id, score = self._extract_classid_score(det)
+            if class_id is None:
+                continue
+
+            name = self.get_object_name(class_id)
+            
+            if norm_text(name) == tgt_norm:
     # ROI 중심 x
-            roi_center_x = det.bbox.center.x
+                roi_center_x = det.bbox.center.x
 
-            # ✅ ROI 중앙이 이미지 중앙과 거의 같을 때
-            if abs(roi_center_x - IMAGE_CENTER_X) <= CENTER_TOL:
-                self.imu_target_angle = -90.0
-                self.get_logger().info(
-                    f"[DETECTED & CENTERED] {name} "
-                    f"(roi_x={roi_center_x:.1f}) -> imu_target_angle = {self.imu_target_angle}"
-                )
-                return True
-            else:
-                self.get_logger().info(
-                    f"[DETECTED but NOT CENTERED] {name} "
-                    f"(roi_x={roi_center_x:.1f}, center={IMAGE_CENTER_X})"
-                )
+               
+                if abs(roi_center_x - (self.screen_width / 2.0)) == 0:
+                    self.imu_target_angle = -90.0
+                    self.get_logger().info(
+                        f"[DETECTED & CENTERED] {name} "
+                        f"(roi_x={roi_center_x:.1f}) -> imu_target_angle = {self.imu_target_angle}"
+                    )
+                    return True
+                else:
+                    self.get_logger().info(
+                        f"[DETECTED but NOT CENTERED] {name} "
+                        f"(roi_x={roi_center_x:.1f}, center={(self.screen_width / 2.0)})"
+                    )
 
-        return False
+            return False
 
     # ---------------- Timer ----------------
     def timer(self):
@@ -324,34 +334,13 @@ class Course2(Node):
         if self.phase == "DONE":
             return
 
-    def send_stop_commands(self):
-        if not rclpy.ok(): return
-        safe_key = Float64(data=float(self.servo_neutral_deg))
-        safe_thruster = Float64(data=0.0)
-        for _ in range(5):
-            self.key_publisher.publish(safe_key)
-            self.thruster_publisher.publish(safe_thruster)
-            time.sleep(0.1)
 
 def main(args=None):
     rclpy.init(args=args)
-    node = Course2()
-    def signal_handler(sig, frame):
-        node.get_logger().warn("Stopped")
-        node.send_stop_commands()
-        node.destroy_node()
-        rclpy.shutdown()
-        sys.exit(0)
-    signal.signal(signal.SIGINT, signal_handler)
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        if rclpy.ok():
-            node.send_stop_commands()
-            node.destroy_node()
-            rclpy.shutdown()
+    node = course2()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
 
 
 if __name__ == "__main__":

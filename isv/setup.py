@@ -27,8 +27,8 @@ setup(
     entry_points={
         'console_scripts': [
             'isv_2026 = launch_isv.isv_2026:main',
-            'lidar_process = launch_isv.lidar_process:main',
-            'gps_pursue = launch_isv.gps_pursue:main',
+            'pursue_lidar = launch_isv.pursue_lidar:main',
+            'pursue_gps = launch_isv.pursue_gps:main',
             'course1 = launch_isv.course1:main',
             'course2 = launch_isv.course2:main',
             'course3 = launch_isv.course3:main',
