@@ -136,11 +136,10 @@ class CourseThreeNavigator(Node):
         #    범위 밖이면 "정지"로 처리(원하면 '유지'로 바꿀 수 있음)
         # 수정한 부분1
         if (not self.have_imu) or (self.imu_heading_deg_signed > 0.0):
-            self.key_pub.publish(Float64(data=float(self.neutral_deg)))
             self.key_pub.publish(Float64(data=float(self.max_deg)))
             self.thruster_pub.publish(Float64(data=3.0))
             self.get_logger().info(
-                f"[WAIT/STOP] imu={self.imu_heading_deg_signed:+.1f}° (need -180~0)."
+                f"[SEARCH] imu={self.imu_heading_deg_signed:+.1f}° (need -180~0) | steer=max | thrust=3.0"
             )
             return
 

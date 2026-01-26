@@ -85,15 +85,11 @@ class Course1Node(Node):
     def imu_callback(self, msg: Imu):
         q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
         _, _, yaw_rad = euler_from_quaternion(q)
-        
         current_yaw_abs = -yaw_rad 
-
         if self.initial_yaw_abs is None:
             self.initial_yaw_abs = current_yaw_abs
-
         rel_yaw_deg = self.normalize_180(degrees(current_yaw_abs - self.initial_yaw_abs))
         self.current_yaw_rel = rel_yaw_deg
-        
         self.curr_yaw_publisher.publish(Float32(data=float(rel_yaw_deg)))
 
     def lidar_callback(self, msg: LaserScan):
@@ -131,12 +127,8 @@ class Course1Node(Node):
         if self.safe_angles_list:
             safe_arr = np.array(self.safe_angles_list)
             best_angle = safe_arr[np.argmin(np.abs(safe_arr - 90))]
-            self.goal_rel_deg = float(best_angle)
             self.max_clear_dist = float(dist_180[int(best_angle)])
-            self.safe_angle_publisher.publish(Float32(data=self.goal_rel_deg))
-        else:
-            self.max_clear_dist = 0.0
-            self.goal_rel_deg = self.servo_neutral_deg
+            self.safe_angle_publisher.publish(Float32(data=float(best_angle)))
 
     def gps_listener_callback(self, gps: NavSatFix):
         if math.isnan(gps.latitude) or math.isnan(gps.longitude) or self.initial_yaw_abs is None:
@@ -148,11 +140,9 @@ class Course1Node(Node):
             self.update_current_goal()
 
         curr_e, curr_n = self.gps_enu_converter([gps.latitude, gps.longitude, gps.altitude])
-        
         if self.current_goal_enu is not None:
             goal_e, goal_n = self.current_goal_enu
             dx, dy = goal_e - curr_e, goal_n - curr_n
-            
             self.dist_to_goal_m = math.hypot(dx, dy)
             target_ang_abs = degrees(math.atan2(dx, dy))
             target_ang_rel = self.normalize_180(target_ang_abs - degrees(self.initial_yaw_abs))
@@ -162,7 +152,6 @@ class Course1Node(Node):
         if self.wp_index < len(self.waypoints):
             target_lat, target_lon = self.waypoints[self.wp_index]
             self.current_goal_enu = self.gps_enu_converter([target_lat, target_lon, 0.0])
-            
             goal_msg = NavSatFix()
             goal_msg.latitude = target_lat
             goal_msg.longitude = target_lon
@@ -179,23 +168,27 @@ class Course1Node(Node):
             self.cmd_key_degree = self.servo_neutral_deg
         else:
             current_radius = self.arrival_radii[min(self.wp_index, len(self.arrival_radii)-1)]
-            
             if self.dist_to_goal_m <= current_radius:
                 self.wp_index += 1
                 self.update_current_goal()
                 return
 
-            state_key = f"state{self.wp_index}"
-            self.cmd_thruster = float(self.thruster_cfg.get(state_key, self.default_thruster))
+            if self.safe_angles_list:
+                safe_angles_deg = np.array(self.safe_angles_list) - 90
+                diff = np.abs(safe_angles_deg - self.goal_rel_deg)
+                best_idx = np.argmin(diff)
+                chosen_safe_angle = safe_angles_deg[best_idx]
+                steering_angle = self.servo_neutral_deg + chosen_safe_angle
+                state_key = f"state{self.wp_index}"
+                self.cmd_thruster = float(self.thruster_cfg.get(state_key, self.default_thruster))
+
             self.cmd_key_degree = constrain(
-                self.servo_neutral_deg + self.goal_rel_deg,
-                self.servo_min_deg,
-                self.servo_max_deg
-            )
+                steering_angle, 
+                self.servo_min_deg, 
+                self.servo_max_deg)
 
         self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
         self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
-        
         if self.dist_to_goal_m is not None:
             self.dist_publisher.publish(Float32(data=float(self.dist_to_goal_m)))
         if self.goal_rel_deg is not None:
@@ -222,7 +215,8 @@ def main(args=None):
     signal.signal(signal.SIGINT, signal_handler)
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt: pass
+    except KeyboardInterrupt:
+        pass
     finally:
         if rclpy.ok():
             node.send_stop_commands()
