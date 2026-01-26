@@ -98,7 +98,7 @@ class GPSPursueNode(Node):
         if not self.origin_set:
             self.origin = [gps.latitude, gps.longitude, gps.altitude]
             self.origin_set = True
-            self.get_logger().info(f"🛰️ 현재 위치를 원점으로 설정: {self.origin[:2]}")
+            self.get_logger().info(f"시작 위치: {self.origin[:2]}")
             self.update_current_goal()
 
         curr_e, curr_n = self.gps_enu_converter([gps.latitude, gps.longitude, gps.altitude])
@@ -108,7 +108,7 @@ class GPSPursueNode(Node):
             dx, dy = goal_e - curr_e, goal_n - curr_n
             
             self.dist_to_goal_m = math.hypot(dx, dy)
-            target_ang_abs = degrees(math.atan2(dy, dx))
+            target_ang_abs = degrees(math.atan2(dx, dy))
             target_ang_rel = self.normalize_180(target_ang_abs - degrees(self.initial_yaw_abs))
             self.goal_rel_deg = self.normalize_180(target_ang_rel - self.current_yaw_rel)
 
@@ -121,7 +121,7 @@ class GPSPursueNode(Node):
             goal_msg.latitude = target_lat
             goal_msg.longitude = target_lon
             self.goal_publisher.publish(goal_msg)
-            self.get_logger().info(f"📍 목표 이동: {self.wp_index+1}/{len(self.waypoints)}")
+            self.get_logger().info(f"웨이포인트 목표: {self.wp_index+1}/{len(self.waypoints)}")
         else:
             self.current_goal_enu = None
             self.arrived_all = True
