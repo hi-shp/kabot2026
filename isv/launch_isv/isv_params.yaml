@@ -17,11 +17,11 @@ navigation:
     - 0.5
     - 2.0
 
-# 4. 상태 및 쓰러스터 출력
-state:
-  state0: 5.0  # Course 1
-  state1: 20.0  # Course 2
-  state2: 12.0  # Course 3
+# 4. 코스별 쓰러스터 출력
+thruster:
+  course1: 5.0  # Course 1
+  course2: 10.0  # Course 2
+  course3: 12.0  # Course 3
 
 # 5. 객체 인식
 vision:
@@ -38,8 +38,6 @@ vision:
     - "Red Circle"
     - "Red Cross"
     - "Red Triangle"
-  target: "Red Circle"
-
   hoping_target: "Purple Buoy"
   detection_target: "Red Triangle"
   

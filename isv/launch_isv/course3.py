@@ -45,7 +45,7 @@ class Course3(Node):
         self.servo_neutral_deg = float(params["servo"]["neutral_deg"])
         self.servo_min_deg = float(params["servo"]["min_deg"])
         self.servo_max_deg = float(params["servo"]["max_deg"])
-        self.default_thrust = float(params["state"]["state2"])
+        self.default_thrust = float(params["thruster"]["course3"])
 
     def normalize_180(self, deg: float) -> float:
         return (deg + 180.0) % 360.0 - 180.0
@@ -67,7 +67,7 @@ class Course3(Node):
     def lidar_callback(self, msg: LaserScan):
         if self.imu_heading > 0.0:
             self.key_publisher.publish(Float64(data=float(self.servo_max_deg)))
-            self.thruster_publisher.publish(Float64(data=3.0))
+            self.thruster_publisher.publish(Float64(data=5.0))
             return
         ranges = np.array(msg.ranges)
         start_idx, end_idx = 500, 1500

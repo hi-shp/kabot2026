@@ -60,7 +60,7 @@ class Course1(Node):
         self.servo_max_deg = float(params["servo"]["max_deg"])
         self.waypoints = params["navigation"]["waypoints"]
         self.arrival_radii = float(params["navigation"]["arrival_radius"])
-        self.default_thruster = float(params["state"]["state1"])
+        self.default_thruster = float(params["thruster"]["course1"])
 
     def normalize_180(self, deg):
         return (deg + 180.0) % 360.0 - 180.0

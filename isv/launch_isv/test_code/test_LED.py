@@ -35,7 +35,6 @@ class RgbwLedTestNode(Node):
             10
         )
 
-        # 테스트 타이머
         self.step = 0
         self.timer = self.create_timer(2.0, self.timer_callback)
 
