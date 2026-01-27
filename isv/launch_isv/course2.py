@@ -11,61 +11,42 @@ from std_msgs.msg import Float64
 from mechaship_interfaces.msg import RgbwLedColor
 from tf_transformations import euler_from_quaternion
 
-
 def clamp(v: float, lo: float, hi: float) -> float:
     return lo if v < lo else hi if v > hi else v
-
-
-def norm_text(s: str) -> str:
-    """대소문자/연속 공백 무시 비교용"""
-    return " ".join(str(s).strip().lower().split())
-
 
 class course2(Node):
     def __init__(self):
         super().__init__("course2")
-
-        # ✅ 같은 폴더의 isv_params.yaml 자동 로드
         this_dir = os.path.dirname(os.path.abspath(__file__))
         self.yaml_path = os.path.join(this_dir, "isv_params.yaml")
         self._load_params_from_yaml()
-
-        # ---------------- Publishers ----------------
         self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
         self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
         self.led_pub = self.create_publisher(RgbwLedColor, "/actuator/rgbwled/color", 10)
         self.curr_yaw_publisher = self.create_publisher(Float64, "/current_yaw", 10)
         self.goal_publisher = self.create_publisher(NavSatFix, "/waypoint/goal", 10)
-        # ---------------- Subscribers ----------------
         self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile_sensor_data)
         self.detection_subscriber = self.create_subscription(Detection2DArray, "/detections", self.detection_callback, qos_profile_sensor_data)
         self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_listener_callback, qos_profile_sensor_data)
-        # ---------------- State / Defaults ----------------
         self.latest_detection_msg = None
         self.latest_det_msg = None
         self.is_hoping_started = False
-        # 서보 기본
         self.servo_neutral_deg = 90.0
         self.current_servo_deg = self.servo_neutral_deg
         self.turn_step_deg = 20.0  # 호핑에서 사용할 step
-        # IMU 현재 yaw / 목표각
         self.initial_yaw_abs = None
         self.current_yaw_rel = 0.0
         self.imu_target_angle = 0.0
         self.hop_to_detect_yaw = 0.0
-        # yaw 0도 2번 카운트 (연속 중복 카운트 방지)
         self.yaw_zero_count = 0
         self.yaw_zero_latched = False
         self.yaw_zero_tol = 2.0  # ±2deg 이내를 "0도"로 판단
-        #GPS 
         self.origin = None
         self.origin_set = False
         self.wp_index = 0
         self.gps_reach_threshold = 0.5
-        # ✅ 서보 제한 (기구/차량에 맞게 조절)
         self.servo_min_deg = 45.0
         self.servo_max_deg = 135.0
-        # LED 기본값
         self.led_default_white = 20
         self.led_on_brightness = 80
         self.current_led = self.make_led(white=self.led_default_white)
@@ -137,8 +118,7 @@ class course2(Node):
         self.led_pub.publish(msg)
     
     def led_by_target_name(self, name: str) -> RgbwLedColor:
-        """라벨 이름으로 LED 메시지 생성"""
-        n = norm_text(name)
+        n = " ".join(str(name).strip().lower().split())
         b = int(self.led_on_brightness)
         if n.startswith("blue "):
             return self.make_led(blue=b)
