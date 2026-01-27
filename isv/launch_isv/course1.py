@@ -59,7 +59,7 @@ class Course1(Node):
         self.servo_min_deg = float(params["servo"]["min_deg"])
         self.servo_max_deg = float(params["servo"]["max_deg"])
         self.waypoints = params["navigation"]["waypoints"]
-        self.arrival_radii = float(params["navigation"]["arrival_radius"])
+        self.arrival_radii = params["navigation"]["arrival_radius"]
         self.default_thruster = float(params["thruster"]["course1"])
 
     def normalize_180(self, deg):
@@ -174,7 +174,7 @@ class Course1(Node):
                 chosen_safe_angle = safe_angles_deg[best_idx]
                 steering_angle = self.servo_neutral_deg + chosen_safe_angle
                 state_key = f"state{self.wp_index}"
-                self.cmd_thruster = float(self.thruster_cfg.get(state_key, self.default_thruster))
+                self.cmd_thruster = self.default_thruster
                 self.cmd_key_degree = constrain(steering_angle, self.servo_min_deg, self.servo_max_deg)
             else:
                 self.cmd_thruster = 0.0
