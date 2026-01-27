@@ -178,7 +178,7 @@ class Course1(Node):
                 state_key = f"state{self.wp_index}"
                 self.cmd_thruster = float(self.thruster_cfg.get(state_key, self.default_thruster))
                 
-                self.cmd_key_degree = normalize_180ain(
+                self.cmd_key_degree = constrain(
                     steering_angle, 
                     self.servo_min_deg, 
                     self.servo_max_deg)
