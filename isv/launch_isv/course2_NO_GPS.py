@@ -50,7 +50,7 @@ class course2(Node):
         # yaw 0도 2번 카운트 
         self.yaw_zero_count = 0
         self.yaw_zero_latched = False
-        self.yaw_zero_tol = 0
+        self.yaw_zero_tol = 0.0
         # ✅ 순차 진행 상태
         self.phase = "HOPING"  # HOPING -> DETECTION -> DONE
         # LED 기본값
@@ -84,14 +84,15 @@ class course2(Node):
         self.available_objects = list(vision.get("available_objects", []))
         self.hoping_target = str(vision.get("hoping_target", "")).strip()
         self.detection_target = str(vision.get("detection_target", "")).strip()
-        self.screen_width = int(vision.get("screen_width", self.screen_width))
-        self.angle_conversion_factor = float(vision.get("angle_conversion_factor", self.angle_conversion_factor))
+        self.screen_width = int(vision.get("screen_width", 640))
+        self.angle_conversion_factor = float(vision.get("angle_conversion_factor",90 ))
         servo = params.get("servo", {})
         self.servo_min_deg = float(servo.get("min_deg", 45.0))
         self.servo_max_deg = float(servo.get("max_deg", 135.0))
         self.servo_neutral_deg = float(servo.get("neutral_deg", 90.0))
         node_settings = params.get("node_settings", {})
         self.timer_period= float(node_settings.get("timer_priod", 0.5))
+        self.thruster_cfg = params["state"]
         self.default_thruster = float(self.thruster_cfg.get("state1", 10.0))
 
     # ---------------- LED Utils ----------------
@@ -121,9 +122,15 @@ class course2(Node):
     # ---------------- IMU (yaw only) ----------------
     def normalize_180(self, angle_deg: float) -> float:
         a = (angle_deg + 180.0) % 360.0 - 180.0
+        if a == -180.0:
+            a = 180.0
+        return a
+
     
     def imu_callback(self, msg: Imu):
-        yaw_deg = self.normalize_180(euler_from_quaternion(msg.orientation))
+        q = msg.orientation
+        roll, pitch, yaw = euler_from_quaternion([q.x, q.y, q.z, q.w])  # ✅ 리스트로 전달
+        yaw_deg = self.normalize_180(math.degrees(yaw))                # ✅ rad -> deg
         self.current_yaw_deg = yaw_deg
 
         # ✅ HOPING 단계에서만 "yaw 0도 2번"을 감시해서 DETECTION 단계로 전환
@@ -283,7 +290,7 @@ class course2(Node):
 
     # ---------------- Timer ----------------
     def timer_callback(self):
-        self.cmd_thruster = self.default_thruster
+        self.thruster_publisher.publish(Float64(data=float(10)))
         if self.latest_det_msg is None:
             return
 
@@ -305,7 +312,7 @@ class course2(Node):
             return
 
 
-    def main(args=None):
+def main(args=None):
         rclpy.init(args=args)
         node = course2()
         rclpy.spin(node)

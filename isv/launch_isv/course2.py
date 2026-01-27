@@ -17,7 +17,6 @@ def constrain(v, lo, hi):
     return lo if v < lo else hi if v > hi else v
 
 def norm_text(s: str) -> str:
-    """대소문자/연속 공백 무시 비교용"""
     return " ".join(str(s).strip().lower().split())
 
 
@@ -87,12 +86,13 @@ class course2(Node):
         self.available_objects = list(vision.get("available_objects", []))
         self.hoping_target = str(vision.get("hoping_target", "")).strip()
         self.detection_target = str(vision.get("detection_target", "")).strip()
-        self.screen_width = int(vision.get("screen_width", self.screen_width))
+        self.screen_width = int(vision.get("screen_width", 640))
         servo = params.get("servo", {})
         self.servo_min_deg = float(servo.get("min_deg", 45.0))
         self.servo_max_deg = float(servo.get("max_deg", 135.0))
         self.servo_neutral_deg = float(servo.get("neutral_deg", 90.0))
-        self.angle_conversion_factor = float(vision.get("angle_conversion_factor", self.angle_conversion_factor))
+        self.angle_conversion_factor = float(vision.get("angle_conversion_factor", 90))
+        self.thruster_cfg = params["state"]
         self.default_thruster = float(self.thruster_cfg.get("state1", 10.0))
         nav = params["navigation"]
         self.waypoints = nav["waypoints"]
@@ -331,6 +331,7 @@ class course2(Node):
     def timer(self):
         state_key = f"state{self.wp_index}"
         self.cmd_thruster = float(self.thruster_cfg.get(state_key, self.default_thruster))
+        self.thruster_publisher.publish(Float64(self.cmd_thruster))
         if self.latest_det_msg is None:
             return
 
@@ -355,7 +356,7 @@ class course2(Node):
                     f"[PHASE] DONE -> NEXT (reached by ENU dist: {self.dist_to_goal_m:.2f} m)"
                 )
             return
-    def main(args=None):
+def main(args=None):
         rclpy.init(args=args)
         node = course2()
         rclpy.spin(node)

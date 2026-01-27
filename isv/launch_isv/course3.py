@@ -45,8 +45,7 @@ class Course3(Node):
         self.servo_neutral_deg = float(params["servo"]["neutral_deg"])
         self.servo_min_deg = float(params["servo"]["min_deg"])
         self.servo_max_deg = float(params["servo"]["max_deg"])
-        self.thruster_cfg = params["state"]
-        self.default_thrust = float(self.thruster_cfg["state2"])
+        self.default_thrust = float(params["state"]["state2"])
 
     def normalize_180(self, deg: float) -> float:
         return (deg + 180.0) % 360.0 - 180.0
@@ -126,11 +125,9 @@ class Course3(Node):
 
     def send_stop_commands(self):
         if not rclpy.ok(): return
-        safe_key = Float64(data=float(self.servo_neutral_deg))
-        safe_thruster = Float64(data=0.0)
         for _ in range(5):
-            self.key_publisher.publish(safe_key)
-            self.thruster_publisher.publish(safe_thruster)
+            self.key_publisher.publish(Float64(data=float(self.servo_neutral_deg)))
+            self.thruster_publisher.publish(Float64(data=0.0))
             time.sleep(0.1)
 
 def main(args=None):

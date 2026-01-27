@@ -58,11 +58,9 @@ class Course1(Node):
         self.servo_neutral_deg = float(params["servo"]["neutral_deg"])
         self.servo_min_deg = float(params["servo"]["min_deg"])
         self.servo_max_deg = float(params["servo"]["max_deg"])
-        nav = params["navigation"]
-        self.waypoints = nav["waypoints"] 
-        self.arrival_radii = nav.get("arrival_radius", [1.0]) 
-        self.thruster_cfg = params["state"]
-        self.default_thruster = float(self.thruster_cfg["state1"])
+        self.waypoints = params["navigation"]["waypoints"]
+        self.arrival_radii = float(params["navigation"]["arrival_radius"])
+        self.default_thruster = float(params["state"]["state1"])
 
     def normalize_180(self, deg):
         return (deg + 180.0) % 360.0 - 180.0
@@ -177,11 +175,7 @@ class Course1(Node):
                 steering_angle = self.servo_neutral_deg + chosen_safe_angle
                 state_key = f"state{self.wp_index}"
                 self.cmd_thruster = float(self.thruster_cfg.get(state_key, self.default_thruster))
-                
-                self.cmd_key_degree = constrain(
-                    steering_angle, 
-                    self.servo_min_deg, 
-                    self.servo_max_deg)
+                self.cmd_key_degree = constrain(steering_angle, self.servo_min_deg, self.servo_max_deg)
             else:
                 self.cmd_thruster = 0.0
                 self.cmd_key_degree = self.servo_neutral_deg
@@ -195,11 +189,9 @@ class Course1(Node):
 
     def send_stop_commands(self):
         if not rclpy.ok(): return
-        safe_key = Float64(data=float(self.servo_neutral_deg))
-        safe_thruster = Float64(data=0.0)
         for _ in range(5):
-            self.key_publisher.publish(safe_key)
-            self.thruster_publisher.publish(safe_thruster)
+            self.key_publisher.publish(Float64(data=float(self.servo_neutral_deg)))
+            self.thruster_publisher.publish(Float64(data=0.0))
             time.sleep(0.1)
 
 def main(args=None):
