@@ -72,15 +72,17 @@ class Course2(Node):
     def led_by_name(self, name):
         name = norm_text(name)
         r, g, b, w = 0, 0, 0, 0
-        if name == "off": pass
-        elif name.startswith("blue"): b = 100
-        elif name.startswith("green"): g = 100
-        elif name.startswith("red"): r = 100
-        elif name.startswith("white"): w = 100
-        msg = RgbwLedColor()
-        msg.red, msg.green, msg.blue, msg.white = r, g, b, w
-        self.led_publisher.publish(msg)
-        self.led_string_publisher.publish(String(data=name))
+        pub_name = "off"
+        for color in ["blue", "green", "red", "white"]:
+            if name.startswith(color):
+                pub_name = color
+                if color == "red": r = 100
+                elif color == "green": g = 100
+                elif color == "blue": b = 100
+                elif color == "white": w = 100
+                break
+        self.led_publisher.publish(RgbwLedColor(red=r, green=g, blue=b, white=w))
+        self.led_string_publisher.publish(String(data=pub_name))
 
     def imu_callback(self, msg: Imu):
         q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
@@ -88,7 +90,7 @@ class Course2(Node):
         current_yaw_abs = -yaw_rad 
         if self.initial_yaw_abs is None:
             self.initial_yaw_abs = current_yaw_abs
-        rel_yaw_deg = self.normalize_180(degrees(current_yaw_abs - self.initial_yaw_abs)) + 10.0
+        rel_yaw_deg = self.normalize_180(degrees(current_yaw_abs - self.initial_yaw_abs)) + 10.0 # 테스트용 초기 각도
         self.current_yaw_rel = rel_yaw_deg
         self.curr_yaw_publisher.publish(Float64(data=float(rel_yaw_deg)))
         current_time = time.time()
