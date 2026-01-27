@@ -4,6 +4,7 @@ Blue Triangle
 Green Circle
 Green Cross
 Green Triangle
+Purple  Buoy
 Red Circle
 Red Cross
 Red Triangle

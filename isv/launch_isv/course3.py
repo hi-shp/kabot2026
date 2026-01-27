@@ -9,7 +9,7 @@ import os
 import yaml
 from math import degrees, atan2
 from sensor_msgs.msg import LaserScan, Imu
-from std_msgs.msg import Float64, Float32
+from std_msgs.msg import Float64
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.node import Node
 from tf_transformations import euler_from_quaternion
@@ -22,22 +22,18 @@ class Course3(Node):
     def __init__(self):
         super().__init__("Course3")
         self.load_params_from_yaml()
-        self.cmd_key_degree = self.servo_neutral_deg
         self.create_subscription(LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data)
         self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile_sensor_data)
         self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
         self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
-        self.curr_yaw_publisher = self.create_publisher(Float32, "/current_yaw", 10)
-        self.max_distance_publisher= self.create_publisher(Float32, "/max_distance", 10)
-        self.best_angle_publisher = self.create_publisher(Float32,"/best_angle", 10)
-        self.imu_heading_deg_360 = 0.0
-        self.imu_heading_deg_signed = 0.0
-        self.last_best_angle = 0.0
-        self.last_max_distance = 0.0
-        self.cmd_thruster = 0.0
+        self.curr_yaw_publisher = self.create_publisher(Float64, "/current_yaw", 10)
+        self.max_distance_publisher= self.create_publisher(Float64, "/max_distance", 10)
+        self.best_angle_publisher = self.create_publisher(Float64,"/best_angle", 10)
+        self.cmd_key_degree = self.servo_neutral_deg
+        self.cmd_thruster = self.default_thrust
+        self.imu_heading = 0.0
         self.stop_dist_m = 0.3
         self.initial_yaw_abs = None
-        self.have_imu = False
         self.get_logger().info("Course 3")
 
     def load_params_from_yaml(self):
@@ -49,11 +45,8 @@ class Course3(Node):
         self.servo_neutral_deg = float(params["servo"]["neutral_deg"])
         self.servo_min_deg = float(params["servo"]["min_deg"])
         self.servo_max_deg = float(params["servo"]["max_deg"])
-        nav = params["navigation"]
-        self.waypoints = nav["waypoints"] 
-        self.arrival_radii = nav.get("arrival_radius", [1.0]) 
         self.thruster_cfg = params["state"]
-        self.default_thrust = float(self.thruster_cfg.get("state2", 10.0))
+        self.default_thrust = float(self.thruster_cfg["state2"])
 
     def normalize_180(self, deg: float) -> float:
         return (deg + 180.0) % 360.0 - 180.0
@@ -63,19 +56,17 @@ class Course3(Node):
         siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
         yaw_deg_360 = (degrees(atan2(siny_cosp, cosy_cosp)) + 360.0) % 360.0
-        self.imu_heading_deg_360 = yaw_deg_360
-        self.imu_heading_deg_signed = -self.normalize_180(yaw_deg_360)
+        self.imu_heading = -self.normalize_180(yaw_deg_360)
         q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
         _, _, yaw_rad = euler_from_quaternion(q)
         current_yaw_abs = -yaw_rad 
         if self.initial_yaw_abs is None:
             self.initial_yaw_abs = current_yaw_abs
         rel_yaw_deg = self.normalize_180(degrees(current_yaw_abs - self.initial_yaw_abs))
-        self.curr_yaw_publisher.publish(Float32(data=float(rel_yaw_deg)))
-        self.have_imu = True
+        self.curr_yaw_publisher.publish(Float64(data=float(rel_yaw_deg)))
 
     def lidar_callback(self, msg: LaserScan):
-        if (not self.have_imu) or (self.imu_heading_deg_signed > 0.0):
+        if self.imu_heading > 0.0:
             self.key_publisher.publish(Float64(data=float(self.servo_max_deg)))
             self.thruster_publisher.publish(Float64(data=3.0))
             return
@@ -111,17 +102,16 @@ class Course3(Node):
         if len(top_bins) == 0:
             best_i = int(np.argmax(dist_180))
             max_distance = float(dist_180[best_i])
-            self.max_distance_publisher.publish(Float32(data=max_distance))
+            self.max_distance_publisher.publish(Float64(data=max_distance))
             best_lidar_angle = -90.0 + best_i
         else:
             angles = [(-90.0 + i) for i in top_bins]
             best_lidar_angle = float(np.mean(angles))
             max_distance = float(np.max([dist_180[i] for i in top_bins]))
-            self.max_distance_publisher.publish(Float32(data=max_distance))
+            self.max_distance_publisher.publish(Float64(data=max_distance))
 
         self.best_angle = best_lidar_angle + 90.0
-        self.last_max_distance = max_distance
-        self.best_angle_publisher.publish(Float32(data=float(self.best_angle)))
+        self.best_angle_publisher.publish(Float64(data=float(self.best_angle)))
 
         if max_distance <= self.stop_dist_m:
             self.key_publisher.publish(Float64(data=float(self.servo_neutral_deg)))
@@ -132,7 +122,6 @@ class Course3(Node):
                     self.servo_min_deg, 
                     self.servo_max_deg)
         self.key_publisher.publish(Float64(data=self.cmd_key_degree))
-        self.cmd_thruster = self.default_thrust
         self.thruster_publisher.publish(Float64(data=self.cmd_thruster))
 
     def send_stop_commands(self):

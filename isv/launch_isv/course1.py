@@ -11,7 +11,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 import numpy as np
 from sensor_msgs.msg import NavSatFix, Imu, LaserScan
-from std_msgs.msg import Float64, Float32, String
+from std_msgs.msg import Float64, String
 from tf_transformations import euler_from_quaternion
 
 def constrain(v, lo, hi):
@@ -24,12 +24,12 @@ class Course1(Node):
         self.load_params_from_yaml()
         self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
         self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
-        self.dist_publisher = self.create_publisher(Float32, "/waypoint/distance", 10)
-        self.rel_deg_publisher = self.create_publisher(Float32, "/waypoint/rel_deg", 10)
+        self.dist_publisher = self.create_publisher(Float64, "/waypoint/distance", 10)
+        self.rel_deg_publisher = self.create_publisher(Float64, "/waypoint/rel_deg", 10)
         self.goal_publisher = self.create_publisher(NavSatFix, "/waypoint/goal", 10)
-        self.curr_yaw_publisher = self.create_publisher(Float32, "/current_yaw", 10)
+        self.curr_yaw_publisher = self.create_publisher(Float64, "/current_yaw", 10)
         self.safe_angle_list_publisher = self.create_publisher(String, "/safe_angles_list", 10)
-        self.safe_angle_publisher = self.create_publisher(Float32, "/safe_angle", 10)
+        self.safe_angle_publisher = self.create_publisher(Float64, "/safe_angle", 10)
         self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile_sensor_data)
         self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_listener_callback, qos_profile_sensor_data)
         self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data)
@@ -46,7 +46,7 @@ class Course1(Node):
         self.goal_rel_deg = None  
         self.arrived_all = False
         self.cmd_key_degree = self.servo_neutral_deg
-        self.cmd_thruster = 0.0
+        self.cmd_thruster = self.default_thruster
         self.create_timer(self.timer_period, self.timer_callback)
 
     def load_params_from_yaml(self):
@@ -62,7 +62,7 @@ class Course1(Node):
         self.waypoints = nav["waypoints"] 
         self.arrival_radii = nav.get("arrival_radius", [1.0]) 
         self.thruster_cfg = params["state"]
-        self.default_thruster = float(self.thruster_cfg.get("state0", 10.0))
+        self.default_thruster = float(self.thruster_cfg["state1"])
 
     def normalize_180(self, deg):
         return (deg + 180.0) % 360.0 - 180.0
@@ -86,7 +86,7 @@ class Course1(Node):
             self.initial_yaw_abs = current_yaw_abs
         rel_yaw_deg = self.normalize_180(degrees(current_yaw_abs - self.initial_yaw_abs))
         self.current_yaw_rel = rel_yaw_deg
-        self.curr_yaw_publisher.publish(Float32(data=float(rel_yaw_deg)))
+        self.curr_yaw_publisher.publish(Float64(data=float(rel_yaw_deg)))
 
     def lidar_callback(self, data):
         ranges = np.array(data.ranges)
@@ -125,7 +125,7 @@ class Course1(Node):
         if self.safe_angles_list:
             safe_arr = np.array(self.safe_angles_list)
             best_angle = safe_arr[np.argmin(np.abs(safe_arr - 90))]
-            self.safe_angle_publisher.publish(Float32(data=float(best_angle)))
+            self.safe_angle_publisher.publish(Float64(data=float(best_angle)))
 
     def gps_listener_callback(self, gps: NavSatFix):
         if math.isnan(gps.latitude) or math.isnan(gps.longitude) or self.initial_yaw_abs is None:
@@ -189,9 +189,9 @@ class Course1(Node):
         self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
         self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
         if self.dist_to_goal_m is not None:
-            self.dist_publisher.publish(Float32(data=float(self.dist_to_goal_m)))
+            self.dist_publisher.publish(Float64(data=float(self.dist_to_goal_m)))
         if self.goal_rel_deg is not None:
-            self.rel_deg_publisher.publish(Float32(data=float(self.goal_rel_deg)))
+            self.rel_deg_publisher.publish(Float64(data=float(self.goal_rel_deg)))
 
     def send_stop_commands(self):
         if not rclpy.ok(): return
