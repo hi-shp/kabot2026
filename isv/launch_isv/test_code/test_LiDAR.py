@@ -138,6 +138,7 @@ class LidarFrontMinus90To0Logger(Node):
         self.last_saved_time = now
 
         num_ranges = len(msg.ranges)
+        print(num_ranges)
         if num_ranges == 0:
             return
 

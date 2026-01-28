@@ -31,7 +31,7 @@ class Course1(Node):
         self.safe_angle_list_publisher = self.create_publisher(String, "/safe_angles_list", 10)
         self.safe_angle_publisher = self.create_publisher(Float64, "/safe_angle", 10)
         self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile_sensor_data)
-        self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_listener_callback, qos_profile_sensor_data)
+        self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_callback, qos_profile_sensor_data)
         self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data)
         self.safe_angles_list = []
         self.dist_threshold = 0.3 # 장애물로 인식할 거리 (m)
@@ -48,6 +48,7 @@ class Course1(Node):
         self.cmd_key_degree = self.servo_neutral_deg
         self.cmd_thruster = self.default_thruster
         self.create_timer(self.timer_period, self.timer_callback)
+        self.get_logger().info("Course 1")
 
     def load_params_from_yaml(self):
         script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -125,7 +126,7 @@ class Course1(Node):
             best_angle = safe_arr[np.argmin(np.abs(safe_arr - 90))]
             self.safe_angle_publisher.publish(Float64(data=float(best_angle)))
 
-    def gps_listener_callback(self, gps: NavSatFix):
+    def gps_callback(self, gps: NavSatFix):
         if math.isnan(gps.latitude) or math.isnan(gps.longitude) or self.initial_yaw_abs is None:
             return
         if not self.origin_set:
@@ -157,6 +158,9 @@ class Course1(Node):
             self.get_logger().info("모든 웨이포인트 도착")
 
     def timer_callback(self):
+        if not self.arrived_all and self.wp_index < len(self.waypoints):
+            lat, lon = self.waypoints[self.wp_index]
+            self.goal_publisher.publish(NavSatFix(latitude=lat, longitude=lon))
         if self.arrived_all or self.dist_to_goal_m is None or self.goal_rel_deg is None:
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
@@ -208,11 +212,6 @@ def main(args=None):
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
-    finally:
-        if rclpy.ok():
-            node.send_stop_commands()
-            node.destroy_node()
-            rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

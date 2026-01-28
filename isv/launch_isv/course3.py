@@ -132,11 +132,6 @@ def main(args=None):
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
-    finally:
-        if rclpy.ok():
-            node.send_stop_commands()
-            node.destroy_node()
-            rclpy.shutdown()
             
 if __name__ == "__main__":
     main()
