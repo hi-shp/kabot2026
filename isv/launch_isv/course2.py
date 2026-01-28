@@ -37,13 +37,14 @@ class Course2(Node):
         self.zero_count_publisher = self.create_publisher(String, "/zero_count", 10)
         self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile_sensor_data)
         self.det_sub = self.create_subscription(Detection2DArray, "/detections", self.detection_callback, qos_profile_sensor_data)
+        self.init_yaw_sub = self.create_subscription(Float64, "/imu/one_two", self.init_yaw_callback, 10)
         self.latest_det = None
         self.initial_yaw_abs = None
+        self.yaw_offset = None
         self.yaw_zero_count = 0
         self.yaw_zero_latched = False
         self.last_zero_time = 0.0
         self.zero_count_cooldown = 5.0
-        self.target_yaw = 0.0 # 호핑 후 직진할 때 유지할 각도
         self.cmd_key_degree = self.servo_neutral_deg
         self.cmd_thruster = self.default_thruster
         self.phase = "IMU"
@@ -65,6 +66,12 @@ class Course2(Node):
         self.available_objects = v["available_objects"]
         self.hoping_target = v["hoping_target"]
         self.detection_target = v["detection_target"]
+        
+    def init_yaw_callback(self, msg: Float64):
+        if self.initial_yaw_abs is None:
+            self.initial_yaw_abs = msg.data
+            self.get_logger().info(f"매니저로부터 초기 각도 수신 완료: {self.initial_yaw_abs}")
+            self.destroy_subscription(self.init_yaw_sub)
 
     def normalize_180(self, deg):
         return (deg + 180.0) % 360.0 - 180.0
@@ -85,27 +92,52 @@ class Course2(Node):
         self.led_string_publisher.publish(String(data=pub_name))
 
     def imu_callback(self, msg: Imu):
+        # 1. 외부 노드(매니저)로부터 기준 각도를 받을 때까지 대기
+        if self.initial_yaw_abs is None:
+            return
+
+        # 쿼터니언 -> 오일러 변환
         q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
         _, _, yaw_rad = euler_from_quaternion(q)
-        current_yaw_abs = -yaw_rad 
-        if self.initial_yaw_abs is None:
-            self.initial_yaw_abs = current_yaw_abs
-        rel_yaw_deg = self.normalize_180(degrees(current_yaw_abs - self.initial_yaw_abs)) + 10.0 # 테스트용 초기 각도
+        
+        # 현재 센서의 날것(Raw) 데이터 (단위: Degree)
+        current_yaw_raw_deg = degrees(-yaw_rad)
+
+        # 2. Offset 설정 (최초 1회 실행)
+        # self.init_yaw_sub는 '구독자 객체'이므로 사용하면 안 됨. 
+        # 대신 콜백에서 저장한 'self.initial_yaw_abs' 수치를 사용해야 함.
+        if self.yaw_offset is None:
+            # 목표로 하는 시작 각도(예: 90도) - 현재 센서값(예: 170도)
+            self.yaw_offset = self.initial_yaw_abs - current_yaw_raw_deg
+            self.get_logger().info(f"Yaw Offset 설정 완료: {self.yaw_offset:.2f}")
+
+        # 3. 보정된 각도 계산 (현재 센서값 + 오프셋)
+        corrected_yaw = current_yaw_raw_deg + self.yaw_offset
+        
+        # 4. -180 ~ 180 범위로 정규화
+        rel_yaw_deg = self.normalize_180(corrected_yaw)
+
+        # 5. 최종 값 저장 및 발행
         self.current_yaw_rel = rel_yaw_deg
         self.curr_yaw_publisher.publish(Float64(data=float(rel_yaw_deg)))
+        
+        # --- 아래는 0도 통과 횟수 체크 로직 ---
         current_time = time.time()
         if self.phase == "HOPING" and abs(rel_yaw_deg) < 5.0:
             if (current_time - self.last_zero_time) > self.zero_count_cooldown:
                 self.yaw_zero_count += 1
                 self.last_zero_time = current_time
-                if self.yaw_zero_count >= 2 and self.phase == "HOPING":
+                if self.yaw_zero_count >= 2:
                     self.led_by_name("off")
                     self.phase = "DETECTION"
+                    self.get_logger().info("PHASE 변경: DETECTION")
 
     def detection_callback(self, msg):
         self.latest_det = msg
 
     def timer_callback(self):
+        if self.initial_yaw_abs is None:
+            return
         self.cmd_thruster = self.default_thruster
         self.thruster_publisher.publish(Float64(data=self.cmd_thruster))
         if self.phase == "IMU":

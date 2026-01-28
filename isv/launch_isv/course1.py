@@ -30,6 +30,7 @@ class Course1(Node):
         self.curr_yaw_publisher = self.create_publisher(Float64, "/current_yaw", 10)
         self.safe_angle_list_publisher = self.create_publisher(String, "/safe_angles_list", 10)
         self.safe_angle_publisher = self.create_publisher(Float64, "/safe_angle", 10)
+        self.imu_12_publisher = self.create_publisher(Float64, '/imu/one_two', 10)
         self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile_sensor_data)
         self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_callback, qos_profile_sensor_data)
         self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data)
@@ -157,6 +158,7 @@ class Course1(Node):
             self.cmd_key_degree = self.servo_neutral_deg
             self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
             self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
+            self.imu_12_publisher.publish(Float64(data=float(self.current_yaw_rel)))
             self.get_logger().info("웨이포인트 도달")
             self.destroy_node()
             sys.exit(0)

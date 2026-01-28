@@ -3,15 +3,18 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import NavSatFix
 import threading
-from flask import Flask, render_template_string, jsonify
+from flask import Flask, render_template_string, jsonify, request
 import yaml
 import os
 import sys
 
 app = Flask(__name__)
+# 구글 맵 API 키
 GOOGLE_MAPS_API_KEY = "AIzaSyDoIwjXsVxvJy0GoNWK8Bf1UjDGktbO1o4"
 
 current_pos = {"lat": 0.0, "lon": 0.0}
+last_clicked_pos = {"lat": None, "lon": None} # 마지막 클릭 좌표 저장용
+ros_node = None
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -46,7 +49,7 @@ HTML_TEMPLATE = """
         <small id="gps-stat" style="font-weight: bold; color: #d93025;">GPS 연결 대기 중...</small><hr>
         <b>LAT:</b> <span id="lat">0.0000000</span><br>
         <b>LON:</b> <span id="lon">0.0000000</span><br>
-        <small style="color: #70757a;">(클릭 시 좌표 복사)</small>
+        <small style="color: #70757a;">(클릭 시 좌표 고정 및 지속 발행)</small>
     </div>
     <div id="map"></div>
     <script>
@@ -55,6 +58,7 @@ HTML_TEMPLATE = """
         let isFirst = true;
         let lastMousedOverLatLng = "";
         const tooltip = document.getElementById('coord-tooltip');
+
         function forceCopy(text) {
             const textArea = document.createElement("textarea");
             textArea.value = text;
@@ -66,6 +70,27 @@ HTML_TEMPLATE = """
             document.execCommand('copy');
             document.body.removeChild(textArea);
         }
+
+        function setGpsTarget(lat, lon) {
+            fetch('/set_gps', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({lat: lat, lon: lon})
+            });
+        }
+
+        function handleMapClick(latLng) {
+            const lat = latLng.lat();
+            const lon = latLng.lng();
+            const coordStr = `${lat.toFixed(7)}, ${lon.toFixed(7)}`;
+            
+            forceCopy(coordStr); 
+            setGpsTarget(lat, lon); 
+            
+            clickMarker.setPosition(latLng);
+            clickMarker.setMap(map);
+        }
+
         function initMap() {
             map = new google.maps.Map(document.getElementById("map"), {
                 zoom: 19,
@@ -76,18 +101,21 @@ HTML_TEMPLATE = """
                 draggableCursor: 'default',
                 draggingCursor: 'pointer'
             });
+
             clickMarker = new google.maps.Marker({
                 map: null,
-                zIndex: 200,
+                zIndex: 9999, 
+                optimized: false,
                 icon: {
                     path: google.maps.SymbolPath.CIRCLE,
-                    scale: 4,
+                    scale: 7,
                     fillColor: "#0000FF",
                     fillOpacity: 1,
-                    strokeWeight: 1,
+                    strokeWeight: 2,
                     strokeColor: "#FFFFFF"
                 }
             });
+
             trailPath = new google.maps.Polyline({
                 path: pathCoordinates,
                 geodesic: true,
@@ -97,6 +125,7 @@ HTML_TEMPLATE = """
                 map: map,
                 zIndex: 50
             });
+
             map.addListener("mousemove", (e) => {
                 const lat = e.latLng.lat().toFixed(7);
                 const lng = e.latLng.lng().toFixed(7);
@@ -109,32 +138,36 @@ HTML_TEMPLATE = """
                     clickMarker.setPosition(e.latLng);
                 }
             });
+
             map.addListener("mouseout", () => { tooltip.style.display = 'none'; });
+
             map.addListener("mousedown", (e) => { 
-                if (lastMousedOverLatLng) forceCopy(lastMousedOverLatLng);
-                clickMarker.setPosition(e.latLng);
-                clickMarker.setMap(map);
+                handleMapClick(e.latLng);
             });
+
             map.addListener("mouseup", () => { 
                 clickMarker.setMap(null);
             });
+
             boatMarker = new google.maps.Marker({
                 position: { lat: 0, lng: 0 },
                 map: map,
-                zIndex: 100,
+                zIndex: 500,
                 icon: {
                     path: google.maps.SymbolPath.CIRCLE, scale: 7,
                     fillColor: "#EA4335", fillOpacity: 1,
                     strokeWeight: 2, strokeColor: "white"
                 }
             });
+
             fetch('/waypoints').then(r => r.json()).then(wps => {
                 if(!wps || wps.length === 0) return;
                 wps.forEach((wp, i) => {
                     const wpMarker = new google.maps.Marker({
                         position: { lat: wp.lat, lng: wp.lon },
                         map: map,
-                        zIndex: 80,
+                        zIndex: 10,
+                        clickable: true,
                         label: {
                             text: (i + 1).toString(),
                             color: 'white', fontWeight: 'bold', fontSize: '11px'
@@ -147,6 +180,13 @@ HTML_TEMPLATE = """
                             strokeWeight: 1.5,
                             strokeColor: "#FFFFFF"
                         }
+                    });
+
+                    wpMarker.addListener("mousedown", (e) => {
+                        handleMapClick(e.latLng);
+                    });
+                    wpMarker.addListener("mouseup", () => {
+                        clickMarker.setMap(null);
                     });
                 });
             });
@@ -183,6 +223,16 @@ def index():
 def data():
     return jsonify(current_pos)
 
+@app.route('/set_gps', methods=['POST'])
+def set_gps():
+    global last_clicked_pos
+    data = request.json
+    if data:
+        last_clicked_pos["lat"] = data['lat']
+        last_clicked_pos["lon"] = data['lon']
+        return jsonify({"status": "target_updated"})
+    return jsonify({"status": "failed"}), 400
+
 @app.route('/waypoints')
 def get_waypoints():
     try:
@@ -201,19 +251,49 @@ def get_waypoints():
 class GPSMapNode(Node):
     def __init__(self):
         super().__init__('google_map_viewer')
-        self.create_subscription(NavSatFix, "/gps/fix", self.gps_cb, 10)
+        self.subscription = self.create_subscription(NavSatFix, "/gps/fix", self.gps_cb, 10)
+        self.publisher_ = self.create_publisher(NavSatFix, '/gps/fix', 10)
+        
+        # 1초에 한 번씩 타이머 실행 (1.0Hz)
+        self.timer = self.create_timer(1.0, self.timer_callback)
+
     def gps_cb(self, msg):
         if msg.latitude == msg.latitude and msg.longitude == msg.longitude:
             current_pos["lat"] = msg.latitude
             current_pos["lon"] = msg.longitude
 
+    def timer_callback(self):
+        # 마지막으로 클릭된 좌표가 있을 때만 발행
+        if last_clicked_pos["lat"] is not None:
+            msg = NavSatFix()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = 'gps'
+            msg.latitude = last_clicked_pos["lat"]
+            msg.longitude = last_clicked_pos["lon"]
+            msg.status.status = 2 # RTK Fix 상태 유지
+            self.publisher_.publish(msg)
+            
+            # 터미널 피드백 출력
+            print("\033[H", end="") 
+            print("="*45)
+            print(f" [GPS 지속 발행 중 (1Hz)]")
+            print(f" 고정 좌표: Lat {last_clicked_pos['lat']:.8f}, Lon {last_clicked_pos['lon']:.8f} ")
+            print("="*45)
+
 def main():
+    global ros_node
     rclpy.init()
+    ros_node = GPSMapNode()
+    
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False), daemon=True).start()
+    
     try:
-        rclpy.spin(GPSMapNode())
+        rclpy.spin(ros_node)
     except KeyboardInterrupt: pass
-    finally: rclpy.shutdown()
+    finally:
+        if rclpy.ok():
+            ros_node.destroy_node()
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
