@@ -152,7 +152,7 @@ class Course1(Node):
             goal_msg.latitude = target_lat
             goal_msg.longitude = target_lon
             self.goal_publisher.publish(goal_msg)
-            self.get_logger().info(f"웨이포인트 목표: {self.wp_index+1}/{len(self.waypoints)}")
+            self.get_logger().info(f"웨이포인트: [{target_lat}, {target_lon}]")
         else:
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
