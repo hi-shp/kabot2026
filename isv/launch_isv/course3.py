@@ -9,7 +9,7 @@ import os
 import yaml
 from math import degrees, atan2
 from sensor_msgs.msg import LaserScan, Imu
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, String
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.node import Node
 from tf_transformations import euler_from_quaternion
@@ -27,10 +27,13 @@ class Course3(Node):
         self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
         self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
         self.curr_yaw_publisher = self.create_publisher(Float64, "/current_yaw", 10)
+        self.safe_angle_list_publisher = self.create_publisher(String, "/safe_angles_list", 10)
         self.max_distance_publisher= self.create_publisher(Float64, "/max_distance", 10)
         self.best_angle_publisher = self.create_publisher(Float64,"/best_angle", 10)
         self.cmd_key_degree = self.servo_neutral_deg
         self.cmd_thruster = self.default_thrust
+        self.dist_threshold = 0.3 # 장애물로 인식할 거리 (m)
+        self.side_margin = 10 # 장애물로 처리할 좌우 각도
         self.imu_heading = 0.0
         self.stop_dist_m = 0.3
         self.initial_yaw_abs = None
@@ -64,62 +67,51 @@ class Course3(Node):
         rel_yaw_deg = self.normalize_180(degrees(current_yaw_abs - self.initial_yaw_abs))
         self.curr_yaw_publisher.publish(Float64(data=float(rel_yaw_deg)))
 
-    def lidar_callback(self, msg: LaserScan):
-        if self.imu_heading > 0.0:
-            self.key_publisher.publish(Float64(data=float(self.servo_max_deg)))
-            self.thruster_publisher.publish(Float64(data=5.0))
-            return
-        ranges = np.array(msg.ranges)
+    def lidar_callback(self, data):
+        ranges = np.array(data.ranges)
         start_idx, end_idx = 500, 1500
         subset = ranges[start_idx:end_idx]
-        self.cumulative_distance = np.zeros(181)
-        sample_count = np.zeros(181)
+        dist_buckets = [[] for _ in range(181)] 
         dist_180 = np.zeros(181)
+
         for i in range(len(subset)):
             length = subset[i]
-            if length <= msg.range_min or length >= msg.range_max or not np.isfinite(length):
+            if length <= data.range_min or length >= data.range_max or not np.isfinite(length):
                 continue
-            angle_index = round((len(subset) - 1 - i) * 180 / len(subset))
+            angle_index = int(round((len(subset) - 1 - i) * 180 / len(subset)))
             if 0 <= angle_index <= 180:
-                self.cumulative_distance[angle_index] += length
-                sample_count[angle_index] += 1
+                dist_buckets[angle_index].append(length)
         for j in range(181):
-            if sample_count[j] > 0:
-                dist_180[j] = self.cumulative_distance[j] / sample_count[j]
+            if dist_buckets[j]:
+                dist_180[j] = np.median(dist_buckets[j])
             else:
                 dist_180[j] = 0.0
+        danger_flags = (dist_180 > 0) & (dist_180 <= self.dist_threshold)
+        expanded_danger = np.copy(danger_flags)
+        n = self.side_margin
+        for i in range(181):
+            if danger_flags[i]:
+                expanded_danger[max(0, i - n) : min(181, i + n + 1)] = True
 
-        TOP_K = 3
-        sorted_indices = np.argsort(dist_180)[::-1]
-        top_bins = []
-        for idx in sorted_indices:
-            if dist_180[idx] > 0.0:
-                top_bins.append(idx)
-            if len(top_bins) >= TOP_K:
-                break
+        safe_indices = [deg for deg in range(181) if not expanded_danger[deg]]
 
-        if len(top_bins) == 0:
-            best_i = int(np.argmax(dist_180))
-            max_distance = float(dist_180[best_i])
-            self.max_distance_publisher.publish(Float64(data=max_distance))
-            best_lidar_angle = -90.0 + best_i
+        if safe_indices:
+            best_angle_idx = safe_indices[np.argmax([dist_180[deg] for deg in safe_indices])]
+            max_distance = float(dist_180[best_angle_idx])
         else:
-            angles = [(-90.0 + i) for i in top_bins]
-            best_lidar_angle = float(np.mean(angles))
-            max_distance = float(np.max([dist_180[i] for i in top_bins]))
-            self.max_distance_publisher.publish(Float64(data=max_distance))
+            best_angle_idx = int(np.argmax(dist_180))
+            max_distance = float(dist_180[best_angle_idx])
 
-        self.best_angle = best_lidar_angle + 90.0
-        self.best_angle_publisher.publish(Float64(data=float(self.best_angle)))
+        self.max_distance_publisher.publish(Float64(data=max_distance))
+        self.best_angle = float(best_angle_idx)
+        self.best_angle_publisher.publish(Float64(data=self.best_angle))
 
         if max_distance <= self.stop_dist_m:
             self.key_publisher.publish(Float64(data=float(self.servo_neutral_deg)))
             self.thruster_publisher.publish(Float64(data=0.0))
             return
-        self.cmd_key_degree = constrain(
-                    self.best_angle, 
-                    self.servo_min_deg, 
-                    self.servo_max_deg)
+
+        self.cmd_key_degree = constrain(self.best_angle, self.servo_min_deg, self.servo_max_deg)
         self.key_publisher.publish(Float64(data=self.cmd_key_degree))
         self.thruster_publisher.publish(Float64(data=self.cmd_thruster))
 

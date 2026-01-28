@@ -21,7 +21,7 @@ navigation:
 thruster:
   course1: 5.0  # Course 1
   course2: 10.0  # Course 2
-  course3: 12.0  # Course 3
+  course3: 5.0  # Course 3
 
 # 5. 객체 인식
 vision:
