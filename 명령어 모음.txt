@@ -1,7 +1,7 @@
 # 깃허브에 커밋하는 법
 cd /home/ubuntu/ros2_ws/src
 git add .
-git commit -m "course3 장애물회피+먼거리추종"
+git commit -m "course3 라이다 전처리 보정 완성"
 git push
 
 # foxglove on
