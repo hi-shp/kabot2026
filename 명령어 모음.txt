@@ -1,7 +1,7 @@
 # 깃허브에 커밋하는 법
 cd /home/ubuntu/ros2_ws/src
 git add .
-git commit -m "3갈래 객체 인식 후 -90추종까지 성공"
+git commit -m "1,2,3 연결 완료"
 git push
 
 # foxglove on

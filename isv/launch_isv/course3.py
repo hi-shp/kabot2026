@@ -29,11 +29,13 @@ class Course3(Node):
         self.curr_yaw_publisher = self.create_publisher(Float64, "/current_yaw", 10)
         self.max_distance_publisher= self.create_publisher(Float64, "/max_distance", 10)
         self.best_angle_publisher = self.create_publisher(Float64,"/best_angle", 10)
-        self.cmd_key_degree = self.servo_neutral_deg
-        self.cmd_thruster = self.default_thrust
-        self.imu_heading = 0.0
+        self.init_yaw_sub = self.create_subscription(Float64, "/imu/target_yaw", self.init_yaw_callback, 10)
         self.stop_dist_m = 0.3
         self.initial_yaw_abs = None
+        self.yaw_offset = None
+        self.current_yaw_rel = 0.0
+        self.cmd_key_degree = self.servo_neutral_deg
+        self.cmd_thruster = self.default_thruster
         self.get_logger().info("Course 3")
 
     def load_params_from_yaml(self):
@@ -45,23 +47,27 @@ class Course3(Node):
         self.servo_neutral_deg = float(params["servo"]["neutral_deg"])
         self.servo_min_deg = float(params["servo"]["min_deg"])
         self.servo_max_deg = float(params["servo"]["max_deg"])
-        self.default_thrust = float(params["thruster"]["course3"])
+        self.default_thruster = float(params["thruster"]["course3"])
+
+    def init_yaw_callback(self, msg: Float64):
+        if self.initial_yaw_abs is None:
+            self.initial_yaw_abs = msg.data
+            self.destroy_subscription(self.init_yaw_sub)
 
     def normalize_180(self, deg: float) -> float:
         return (deg + 180.0) % 360.0 - 180.0
 
     def imu_callback(self, msg: Imu):
-        q = msg.orientation
-        siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
-        cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
-        yaw_deg_360 = (degrees(atan2(siny_cosp, cosy_cosp)) + 360.0) % 360.0
-        self.imu_heading = -self.normalize_180(yaw_deg_360)
+        if self.initial_yaw_abs is None:
+            return
         q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
         _, _, yaw_rad = euler_from_quaternion(q)
-        current_yaw_abs = -yaw_rad 
-        if self.initial_yaw_abs is None:
-            self.initial_yaw_abs = current_yaw_abs
-        rel_yaw_deg = self.normalize_180(degrees(current_yaw_abs - self.initial_yaw_abs))
+        current_yaw_raw_deg = degrees(-yaw_rad)
+        if self.yaw_offset is None:
+            self.yaw_offset = self.initial_yaw_abs - current_yaw_raw_deg
+        corrected_yaw = current_yaw_raw_deg + self.yaw_offset
+        rel_yaw_deg = self.normalize_180(corrected_yaw)
+        self.current_yaw_rel = rel_yaw_deg
         self.curr_yaw_publisher.publish(Float64(data=float(rel_yaw_deg)))
 
     def lidar_callback(self, data):

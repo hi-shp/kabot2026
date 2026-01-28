@@ -145,14 +145,14 @@ class Course1(Node):
             self.goal_rel_deg = self.normalize_180(target_ang_rel - self.current_yaw_rel)
 
     def update_current_goal(self):
-        if self.wp_index < 1:
+        if self.wp_index == 0:
             target_lat, target_lon = self.waypoints[self.wp_index]
             self.current_goal_enu = self.gps_enu_converter([target_lat, target_lon, 0.0])
             goal_msg = NavSatFix()
             goal_msg.latitude = target_lat
             goal_msg.longitude = target_lon
             self.goal_publisher.publish(goal_msg)
-            self.get_logger().info(f"웨이포인트: [{target_lat}, {target_lon}]")
+            self.get_logger().info(f"웨이포인트 목표: {self.wp_index+1}/{len(self.waypoints)}")
         else:
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
@@ -164,18 +164,17 @@ class Course1(Node):
             sys.exit(0)
 
     def timer_callback(self):
-        if not self.arrived_all and self.wp_index < len(self.waypoints):
+        if not self.arrived_all and self.wp_index == 0:
             lat, lon = self.waypoints[self.wp_index]
             self.goal_publisher.publish(NavSatFix(latitude=lat, longitude=lon))
         if self.arrived_all or self.dist_to_goal_m is None or self.goal_rel_deg is None:
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
         else:
-            current_radius = self.arrival_radii[min(self.wp_index, len(self.arrival_radii)-1)]
+            current_radius = self.arrival_radii[0]
             if self.dist_to_goal_m <= current_radius:
                 self.wp_index += 1
                 self.update_current_goal()
-                return
 
             if self.safe_angles_list:
                 safe_angles_deg = np.array(self.safe_angles_list) - 90
