@@ -90,19 +90,20 @@ class Course1(Node):
         ranges = np.array(data.ranges)
         start_idx, end_idx = 500, 1500
         subset = ranges[start_idx:end_idx]
-        dist_buckets = [[] for _ in range(181)] 
+        cumulative_distance = np.zeros(181)
+        sample_count = np.zeros(181)
         dist_180 = np.zeros(181)
-
         for i in range(len(subset)):
             length = subset[i]
             if length <= data.range_min or length >= data.range_max or not np.isfinite(length):
                 continue
-            angle_index = int(round((len(subset) - 1 - i) * 180 / len(subset)))
+            angle_index = round((len(subset) - 1 - i) * 180 / len(subset))
             if 0 <= angle_index <= 180:
-                dist_buckets[angle_index].append(length)
+                cumulative_distance[angle_index] += length
+                sample_count[angle_index] += 1
         for j in range(181):
-            if dist_buckets[j]:
-                dist_180[j] = np.median(dist_buckets[j])
+            if sample_count[j] > 0:
+                dist_180[j] = cumulative_distance[j] / sample_count[j]
             else:
                 dist_180[j] = 0.0
         danger_flags = (dist_180 > 0) & (dist_180 <= self.dist_threshold)

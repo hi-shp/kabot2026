@@ -92,15 +92,16 @@ class Course3(Node):
         for i in range(181):
             if danger_flags[i]:
                 expanded_danger[max(0, i - n) : min(181, i + n + 1)] = True
+        self.safe_angles_list = [int(deg) for deg in range(181) if not expanded_danger[deg]]
 
-        safe_indices = [deg for deg in range(181) if not expanded_danger[deg]]
-
-        if safe_indices:
-            best_angle_idx = safe_indices[np.argmax([dist_180[deg] for deg in safe_indices])]
-            max_distance = float(dist_180[best_angle_idx])
-        else:
-            best_angle_idx = int(np.argmax(dist_180))
-            max_distance = float(dist_180[best_angle_idx])
+        if self.safe_angles_list is not None:
+            list_msg = String()
+            list_msg.data = str(self.safe_angles_list)
+            self.safe_angle_list_publisher.publish(list_msg)
+        safe_distances = [dist_180[deg] for deg in self.safe_angles_list]
+        relative_best_idx = np.argmax(safe_distances)
+        best_angle_idx = self.safe_angles_list[relative_best_idx]
+        max_distance = float(dist_180[best_angle_idx])
 
         self.max_distance_publisher.publish(Float64(data=max_distance))
         self.best_angle = float(best_angle_idx)
