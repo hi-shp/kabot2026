@@ -144,7 +144,7 @@ class Course1(Node):
             self.goal_rel_deg = self.normalize_180(target_ang_rel - self.current_yaw_rel)
 
     def update_current_goal(self):
-        if self.wp_index < len(self.waypoints):
+        if self.wp_index < 1:
             target_lat, target_lon = self.waypoints[self.wp_index]
             self.current_goal_enu = self.gps_enu_converter([target_lat, target_lon, 0.0])
             goal_msg = NavSatFix()
@@ -153,9 +153,13 @@ class Course1(Node):
             self.goal_publisher.publish(goal_msg)
             self.get_logger().info(f"웨이포인트 목표: {self.wp_index+1}/{len(self.waypoints)}")
         else:
-            self.current_goal_enu = None
-            self.arrived_all = True
-            self.get_logger().info("모든 웨이포인트 도착")
+            self.cmd_thruster = 0.0
+            self.cmd_key_degree = self.servo_neutral_deg
+            self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
+            self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
+            self.get_logger().info("웨이포인트 도달")
+            self.destroy_node()
+            sys.exit(0)
 
     def timer_callback(self):
         if not self.arrived_all and self.wp_index < len(self.waypoints):

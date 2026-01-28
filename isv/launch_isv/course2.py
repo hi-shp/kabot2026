@@ -46,7 +46,7 @@ class Course2(Node):
         self.target_yaw = 0.0 # 호핑 후 직진할 때 유지할 각도
         self.cmd_key_degree = self.servo_neutral_deg
         self.cmd_thruster = self.default_thruster
-        self.phase = "HOPING"
+        self.phase = "IMU"
         self.create_timer(self.timer_period, self.timer_callback)
         self.get_logger().info("Course 2")
 
@@ -108,6 +108,13 @@ class Course2(Node):
     def timer_callback(self):
         self.cmd_thruster = self.default_thruster
         self.thruster_publisher.publish(Float64(data=self.cmd_thruster))
+        if self.phase == "IMU":
+            error = 120.0 - self.current_yaw_rel
+            steer = self.servo_neutral_deg + error
+            self.key_publisher.publish(Float64(data=constrain(steer, self.servo_min_deg, self.servo_max_deg)))
+            if self.latest_det and self.latest_det.detections:
+                self.phase = "HOPING"
+            return
         msg = f"0도 통과 횟수: {self.yaw_zero_count}"
         if self.yaw_zero_count <= 2:
             self.zero_count_publisher.publish(String(data=msg))

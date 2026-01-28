@@ -1,7 +1,7 @@
 # 깃허브에 커밋하는 법
 cd /home/ubuntu/ros2_ws/src
 git add .
-git commit -m "1 목표 위치 실시간 출력되도록 수정"
+git commit -m "1-2 gps도달시 넘어가도록 구현"
 git push
 
 # foxglove on
