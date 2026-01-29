@@ -285,7 +285,7 @@ def main():
     rclpy.init()
     ros_node = GPSMapNode()
     
-    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False), daemon=True).start()
+    threading.Thread(target=lambda: app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False), daemon=True).start()
     
     try:
         rclpy.spin(ros_node)

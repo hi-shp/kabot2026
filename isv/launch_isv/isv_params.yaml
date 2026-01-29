@@ -4,22 +4,22 @@ node_settings:
 
 # 2. 서보 모터(Key) 설정
 servo:
-  min_deg: 45.0
-  max_deg: 135.0
+  min_deg: 30.0
+  max_deg: 150.0
   neutral_deg: 90.0
 
 # 3. GPS 및 주행 목표
 navigation:
   waypoints:
-    - [35.2316291, 129.0824758]   # WP 0: 호핑 구간 진입점
-    - [35.2316117, 129.08254347]  # WP 1: 3코스 진입점
+    - [35.2041856835, 129.21249455516667]   # WP 0: 호핑 구간 진입점
+    - [35.2042493, 129.2123643]  # WP 1: 3코스 진입점
   arrival_radius: # 지점별 도달 판정 범위 (m)
     - 0.5
     - 2.0
 
 # 4. 코스별 쓰러스터 출력
 thruster:
-  course1: 5.0  # Course 1
+  course1: 20.0  # Course 1
   course2: 10.0  # Course 2
   course3: 5.0  # Course 3
 

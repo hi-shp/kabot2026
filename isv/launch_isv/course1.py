@@ -35,8 +35,8 @@ class Course1(Node):
         self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_callback, qos_profile_sensor_data)
         self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data)
         self.safe_angles_list = []
-        self.dist_threshold = 0.3 # 장애물로 인식할 거리 (m)
-        self.side_margin = 10 # 장애물로 처리할 좌우 각도
+        self.dist_threshold = 1.2 # 장애물로 인식할 거리 (m)
+        self.side_margin = 30 # 장애물로 처리할 좌우 각도
         self.origin = None
         self.origin_set = False
         self.wp_index = 0

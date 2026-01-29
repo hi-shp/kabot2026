@@ -207,7 +207,7 @@ class Course2(Node):
                     ang = ((cx - (self.screen_width/2)) / (self.screen_width/2)) * self.angle_factor
                     self.target_name_publisher.publish(String(data=target_name))
                     self.target_angle_publisher.publish(Float64(data=ang))
-                    self.key_publisher.publish(Float64(data=70.0 if ang <= -30.0 else self.servo_neutral_deg))
+                    self.key_publisher.publish(Float64(data=40.0 if ang <= -30.0 else self.servo_neutral_deg))
         elif self.phase == "DETECTION":
             self.state_publisher.publish(String(data="Detection 모드"))
             error = 0.0 - self.current_yaw_rel

@@ -1,7 +1,7 @@
 ntrip_client:
   ros__parameters:
     host: "RTS2.ngii.go.kr" # 국토지리정보원 NTRIP
-    # host: "192.168." # 사설 NTRIP 기지국
+    # host: "192.168.0.6" # 사설 NTRIP 기지국
     mountpoint: "VRS-RTCM31"
     username: "hishp0917"
     password: "ngii" # 계정 패스워드
