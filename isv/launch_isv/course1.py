@@ -10,6 +10,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 import numpy as np
+from vision_msgs.msg import Detection2DArray
 from sensor_msgs.msg import NavSatFix, Imu, LaserScan
 from std_msgs.msg import Float64, String
 from tf_transformations import euler_from_quaternion
@@ -17,6 +18,9 @@ from tf_transformations import euler_from_quaternion
 def constrain(v, lo, hi):
     if math.isnan(v): return lo + (hi - lo) / 2.0
     return lo if v < lo else hi if v > hi else v
+
+def norm_text(s):
+    return " ".join(str(s).strip().lower().split())
 
 class Course1(Node):
     def __init__(self):
@@ -34,9 +38,11 @@ class Course1(Node):
         self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile_sensor_data)
         self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_callback, qos_profile_sensor_data)
         self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data)
+        self.det_sub = self.create_subscription(Detection2DArray, "/detections", self.detection_callback, qos_profile_sensor_data)
         self.safe_angles_list = []
         self.dist_threshold = 1.2 # 장애물로 인식할 거리 (m)
         self.side_margin = 30 # 장애물로 처리할 좌우 각도
+        self.latest_det = None
         self.origin = None
         self.origin_set = False
         self.wp_index = 0
@@ -157,11 +163,14 @@ class Course1(Node):
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
             self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
-            self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
+            self.thruster_publisher.publish(Float64(data=-5.0))
             self.imu_12_publisher.publish(Float64(data=float(self.current_yaw_rel)))
             self.get_logger().info("웨이포인트 도달")
             self.destroy_node()
             sys.exit(0)
+
+    def detection_callback(self, msg):
+        self.latest_det = msg
 
     def timer_callback(self):
         if not self.arrived_all and self.wp_index == 0:
@@ -171,10 +180,12 @@ class Course1(Node):
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
         else:
-            current_radius = self.arrival_radii[0]
-            if self.dist_to_goal_m <= current_radius:
-                self.wp_index += 1
-                self.update_current_goal()
+            if self.latest_det and self.latest_det.detections:
+                for d in self.latest_det.detections:
+                    c_id = int(d.results[0].hypothesis.class_id)
+                    if norm_text(self.available_objects[c_id]) == norm_text(self.hoping_target) or self.dist_to_goal_m <= self.arrival_radii[0]:
+                        self.wp_index += 1
+                        self.update_current_goal()
 
             if self.safe_angles_list:
                 safe_angles_deg = np.array(self.safe_angles_list) - 90

@@ -97,10 +97,10 @@ class Course2(Node):
         for color in ["blue", "green", "red", "white"]:
             if name.startswith(color):
                 pub_name = color
-                if color == "red": r = 100
-                elif color == "green": g = 100
-                elif color == "blue": b = 100
-                elif color == "white": w = 100
+                if color == "red": r = 200
+                elif color == "green": g = 200
+                elif color == "blue": b = 200
+                elif color == "white": w = 200
                 break
         self.led_publisher.publish(RgbwLedColor(red=r, green=g, blue=b, white=w))
         self.led_string_publisher.publish(String(data=pub_name))
@@ -118,7 +118,7 @@ class Course2(Node):
         self.current_yaw_rel = rel_yaw_deg
         self.curr_yaw_publisher.publish(Float64(data=float(rel_yaw_deg)))
         current_time = time.time()
-        if self.phase == "HOPING" and abs(rel_yaw_deg) < 5.0:
+        if self.phase == "HOPING" and abs(rel_yaw_deg) < 10.0:
             if (current_time - self.last_zero_time) > self.zero_count_cooldown:
                 self.yaw_zero_count += 1
                 self.last_zero_time = current_time
@@ -182,7 +182,7 @@ class Course2(Node):
         self.cmd_thruster = self.default_thruster
         self.thruster_publisher.publish(Float64(data=self.cmd_thruster))
         if self.phase == "IMU":
-            error = 120.0 - self.current_yaw_rel
+            error = 130.0 - self.current_yaw_rel
             steer = self.servo_neutral_deg + error
             self.key_publisher.publish(Float64(data=constrain(steer, self.servo_min_deg, self.servo_max_deg)))
             self.rel_deg_publisher.publish(Float64(data=120.0))
@@ -195,10 +195,11 @@ class Course2(Node):
         msg = f"0도 통과 횟수: {self.yaw_zero_count}"
         if self.yaw_zero_count <= 2:
             self.zero_count_publisher.publish(String(data=msg))
-        if not self.latest_det or not self.latest_det.detections: return
+        if not self.latest_det or not self.latest_det.detections:
+            self.key_publisher.publish(Float64(data=30.0))
         if self.phase == "HOPING":
             self.state_publisher.publish(String(data="Hoping 모드"))
-            self.led_by_name("white")
+            self.led_by_name("blue")
             for d in self.latest_det.detections:
                 c_id = int(d.results[0].hypothesis.class_id)
                 target_name = self.available_objects[c_id]
@@ -207,7 +208,7 @@ class Course2(Node):
                     ang = ((cx - (self.screen_width/2)) / (self.screen_width/2)) * self.angle_factor
                     self.target_name_publisher.publish(String(data=target_name))
                     self.target_angle_publisher.publish(Float64(data=ang))
-                    self.key_publisher.publish(Float64(data=40.0 if ang <= -30.0 else self.servo_neutral_deg))
+                    self.key_publisher.publish(Float64(data=30.0 if ang <= 10.0 else self.servo_neutral_deg))
         elif self.phase == "DETECTION":
             self.state_publisher.publish(String(data="Detection 모드"))
             error = 0.0 - self.current_yaw_rel
