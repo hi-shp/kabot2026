@@ -40,8 +40,8 @@ class Course1(Node):
         self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data)
         self.det_sub = self.create_subscription(Detection2DArray, "/detections", self.detection_callback, qos_profile_sensor_data)
         self.safe_angles_list = []
-        self.dist_threshold = 1.2 # 장애물로 인식할 거리 (m)
-        self.side_margin = 30 # 장애물로 처리할 좌우 각도
+        self.dist_threshold = 1.4 # 장애물로 인식할 거리 (m)
+        self.side_margin = 35 # 장애물로 처리할 좌우 각도
         self.latest_det = None
         self.origin = None
         self.origin_set = False
@@ -69,6 +69,12 @@ class Course1(Node):
         self.waypoints = params["navigation"]["waypoints"]
         self.arrival_radii = params["navigation"]["arrival_radius"]
         self.default_thruster = float(params["thruster"]["course1"])
+        v = params["vision"]
+        self.screen_width = int(v["screen_width"])
+        self.angle_factor = float(v["angle_conversion_factor"])
+        self.available_objects = v["available_objects"]
+        self.hoping_target = v["hoping_target"]
+        self.detection_target = v["detection_target"]
 
     def normalize_180(self, deg):
         return (deg + 180.0) % 360.0 - 180.0
@@ -163,7 +169,7 @@ class Course1(Node):
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
             self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
-            self.thruster_publisher.publish(Float64(data=-5.0))
+            self.thruster_publisher.publish(Float64(data=-20.0))
             self.imu_12_publisher.publish(Float64(data=float(self.current_yaw_rel)))
             self.get_logger().info("웨이포인트 도달")
             self.destroy_node()
