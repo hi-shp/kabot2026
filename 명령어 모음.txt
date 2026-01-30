@@ -1,7 +1,7 @@
 # 깃허브에 커밋하는 법
 cd /home/ubuntu/ros2_ws/src
 git add .
-git commit -m "10초 호핑, 도착 후진 추가"
+git commit -m "오늘 마지막 백업 코드"
 git push
 
 # foxglove on

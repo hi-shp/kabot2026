@@ -57,7 +57,7 @@ class Course2(Node):
         self.yaw_zero_count = 0
         self.yaw_zero_latched = False
         self.last_zero_time = 0.0
-        self.zero_count_cooldown = 5.0
+        self.zero_count_cooldown = 8.0
         self.cmd_key_degree = self.servo_neutral_deg
         self.cmd_thruster = self.default_thruster
         self.phase = "IMU"
@@ -208,7 +208,7 @@ class Course2(Node):
                     ang = ((cx - (self.screen_width/2)) / (self.screen_width/2)) * self.angle_factor
                     self.target_name_publisher.publish(String(data=target_name))
                     self.target_angle_publisher.publish(Float64(data=ang))
-                    self.key_publisher.publish(Float64(data=30.0 if ang <= 10.0 else self.servo_neutral_deg))
+                    self.key_publisher.publish(Float64(data=40.0 if ang <= 10.0 else self.servo_neutral_deg))
         elif self.phase == "DETECTION":
             self.state_publisher.publish(String(data="Detection 모드"))
             error = 5.0 - self.current_yaw_rel
@@ -224,8 +224,9 @@ class Course2(Node):
                         cx = float(d.bbox.center.position.x if hasattr(d.bbox.center, 'position') else d.bbox.center.x)
                         ang = ((cx - (self.screen_width/2)) / (self.screen_width/2)) * self.angle_factor
                         self.target_angle_publisher.publish(Float64(data=ang))
-                        if ang <= 50.0:
-                            self.led_by_name(name)
+                        color_name = name
+                        if ang <= 10.0:
+                            self.led_by_name(color_name)
                             self.phase = "DONE"
                             break
             else:

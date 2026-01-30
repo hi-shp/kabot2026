@@ -15,7 +15,7 @@ class ThrusterTestNode(Node):
         )
 
         self.msg = Float64()
-        self.msg.data = 0.0  # 출력 값
+        self.msg.data = 20.0  # 출력 값
 
         self.publish_count = 0
         self.max_publish_count = 20   # 총 20번 발행

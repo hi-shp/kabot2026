@@ -41,7 +41,7 @@ class Course1(Node):
         self.det_sub = self.create_subscription(Detection2DArray, "/detections", self.detection_callback, qos_profile_sensor_data)
         self.safe_angles_list = []
         self.dist_threshold = 1.4 # 장애물로 인식할 거리 (m)
-        self.side_margin = 35 # 장애물로 처리할 좌우 각도
+        self.side_margin = 30 # 장애물로 처리할 좌우 각도
         self.latest_det = None
         self.origin = None
         self.origin_set = False

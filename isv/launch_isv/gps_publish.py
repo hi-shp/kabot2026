@@ -13,7 +13,7 @@ class SimpleGpsPublisher(Node):
         self.timer = self.create_timer(0.001, self.timer_callback)
         
         # 시작 좌표 설정 (리스트 형태: [latitude, longitude])
-        self.current_pos = [35.20415523, 129.21224416]
+        self.current_pos = [35.20411022, 129.21226852]
         
         # 터미널 화면 초기화
         os.system('clear')
