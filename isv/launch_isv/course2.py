@@ -164,7 +164,7 @@ class Course2(Node):
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
             self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
-            self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
+            self.thruster_publisher.publish(Float64(data = -10.0))
             self.imu_23_publisher.publish(Float64(data=float(self.current_yaw_rel)))
             self.led_by_name("off")
             self.get_logger().info("웨이포인트 도달")
@@ -211,7 +211,7 @@ class Course2(Node):
                     self.key_publisher.publish(Float64(data=30.0 if ang <= 10.0 else self.servo_neutral_deg))
         elif self.phase == "DETECTION":
             self.state_publisher.publish(String(data="Detection 모드"))
-            error = 5.0 - self.current_yaw_rel
+            error = 0.0 - self.current_yaw_rel
             steer = self.servo_neutral_deg + error
             self.key_publisher.publish(Float64(data=constrain(steer, self.servo_min_deg, self.servo_max_deg)))
             self.rel_deg_publisher.publish(Float64(data=0.0))

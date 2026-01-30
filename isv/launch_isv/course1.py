@@ -199,7 +199,6 @@ class Course1(Node):
                 best_idx = np.argmin(diff)
                 chosen_safe_angle = safe_angles_deg[best_idx]
                 steering_angle = self.servo_neutral_deg + chosen_safe_angle
-                state_key = f"state{self.wp_index}"
                 self.cmd_thruster = self.default_thruster
                 self.cmd_key_degree = constrain(steering_angle, self.servo_min_deg, self.servo_max_deg)
             else:
