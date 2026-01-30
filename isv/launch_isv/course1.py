@@ -52,6 +52,7 @@ class Course1(Node):
         self.dist_to_goal_m = None
         self.goal_rel_deg = None  
         self.arrived_all = False
+        self.start_time = self.get_clock().now()
         self.cmd_key_degree = self.servo_neutral_deg
         self.cmd_thruster = self.default_thruster
         self.create_timer(self.timer_period, self.timer_callback)
@@ -179,6 +180,7 @@ class Course1(Node):
         self.latest_det = msg
 
     def timer_callback(self):
+        elapsed_time = (self.get_clock().now() - self.start_time).nanoseconds / 1e9
         if not self.arrived_all and self.wp_index == 0:
             lat, lon = self.waypoints[self.wp_index]
             self.goal_publisher.publish(NavSatFix(latitude=lat, longitude=lon))
@@ -186,12 +188,13 @@ class Course1(Node):
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
         else:
-            if self.latest_det and self.latest_det.detections:
-                for d in self.latest_det.detections:
-                    c_id = int(d.results[0].hypothesis.class_id)
-                    if norm_text(self.available_objects[c_id]) == norm_text(self.hoping_target) or self.dist_to_goal_m <= self.arrival_radii[0]:
-                        self.wp_index += 1
-                        self.update_current_goal()
+            if elapsed_time >= 10.0:
+                if self.latest_det and self.latest_det.detections:
+                    for d in self.latest_det.detections:
+                        c_id = int(d.results[0].hypothesis.class_id)
+                        if norm_text(self.available_objects[c_id]) == norm_text(self.hoping_target) or self.dist_to_goal_m <= self.arrival_radii[0]:
+                            self.wp_index += 1
+                            self.update_current_goal()
 
             if self.safe_angles_list:
                 safe_angles_deg = np.array(self.safe_angles_list) - 90

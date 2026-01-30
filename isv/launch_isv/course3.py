@@ -109,25 +109,24 @@ class Course3(Node):
             self.destroy_subscription(self.init_yaw_sub)
 
     def lidar_callback(self, data):
+        if self.current_yaw_rel is not None:
+            if -180.0 <= self.current_yaw_rel <= -45.0:
+                self.dist_threshold = 2.0
+            else:
+                self.dist_threshold = 1.4
         ranges = np.array(data.ranges)
         start_idx, end_idx = 500, 1500
         subset = ranges[start_idx:end_idx]
-        cumulative_distance = np.zeros(181)
-        sample_count = np.zeros(181)
-        dist_180 = np.zeros(181)
+        dist_180 = np.full(181, np.inf)
         for i in range(len(subset)):
             length = subset[i]
             if length <= data.range_min or length >= data.range_max or not np.isfinite(length):
                 continue
             angle_index = round((len(subset) - 1 - i) * 180 / len(subset))
             if 0 <= angle_index <= 180:
-                cumulative_distance[angle_index] += length
-                sample_count[angle_index] += 1
-        for j in range(181):
-            if sample_count[j] > 0:
-                dist_180[j] = cumulative_distance[j] / sample_count[j]
-            else:
-                dist_180[j] = 0.0
+                if length < dist_180[angle_index]:
+                    dist_180[angle_index] = length
+        dist_180[np.isinf(dist_180)] = 0.0
         danger_flags = (dist_180 > 0) & (dist_180 <= self.dist_threshold)
         expanded_danger = np.copy(danger_flags)
         n = self.side_margin
@@ -176,6 +175,10 @@ class Course3(Node):
         else:
             self.cmd_thruster = 0.0
             self.cmd_key_degree = self.servo_neutral_deg
+            for _ in range(20):
+                self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
+                self.thruster_publisher.publish(Float64(data= -10.0))
+                time.sleep(0.1)
             self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
             self.thruster_publisher.publish(Float64(data = 0.0))
             self.get_logger().info("웨이포인트 도달")

@@ -1,7 +1,7 @@
 # 깃허브에 커밋하는 법
 cd /home/ubuntu/ros2_ws/src
 git add .
-git commit -m "1월 30일 오후 2시 코드"
+git commit -m "10초 호핑, 도착 후진 추가"
 git push
 
 # foxglove on
@@ -16,6 +16,9 @@ ros2 launch foxglove_bridge foxglove_bridge_launch.xml address:=0.0.0.0
 # RTK 아이디 비번 바꾸기
 nano ~/ros2_ws/src/mechaship/mechaship_bringup/param/ntrip_info.yaml
 
+tmux new -s isv
+tmux attach -t isv
+tmux kill-session -t isv
 
 # 기타 명령어
 
