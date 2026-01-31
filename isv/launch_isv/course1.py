@@ -66,7 +66,7 @@ class Course1(Node):
         self.start_time = self.get_clock().now()
         # Course 1 전용 변수
         self.safe_angles_list = []
-        self.dist_threshold = 1.4
+        self.dist_threshold = 1.5
         self.side_margin = 30
         # Course 2 전용 변수
         self.yaw_zero_count = 0
@@ -145,11 +145,11 @@ class Course1(Node):
     def lidar_callback(self, data):
         if self.current_yaw_rel is not None:
             if self.phase == "WALL":
-                self.side_margin == 15
-                if -180.0 <= self.current_yaw_rel <= -45.0:
-                    self.dist_threshold = 2.0
+                self.side_margin == 10
+                if -180.0 <= self.current_yaw_rel <= -80.0:
+                    self.dist_threshold = 1.5
                 else:
-                    self.dist_threshold = 1.2
+                    self.dist_threshold = 1.4
                 ranges = np.array(data.ranges)
                 start_idx, end_idx = 500, 1500
                 subset = ranges[start_idx:end_idx]
@@ -283,7 +283,8 @@ class Course1(Node):
                 self.cmd_thruster = 0.0
                 self.cmd_key_degree = self.servo_neutral_deg
             else:
-                if elapsed_time >= 10.0:
+                print(elapsed_time)
+                if elapsed_time >= 20.0:
                     if self.latest_det and self.latest_det.detections:
                         for d in self.latest_det.detections:
                             c_id = int(d.results[0].hypothesis.class_id)
@@ -297,11 +298,9 @@ class Course1(Node):
                     diff = np.abs(safe_angles_deg - self.goal_rel_deg)
                     if len(safe_angles_deg) >= 2:
                         candidate_indices = np.argpartition(diff, 1)[:2]
-                        
                         idx1, idx2 = candidate_indices[0], candidate_indices[1]
                         dist1 = self.dist_180[safe_angles_deg[idx1] + 90]
                         dist2 = self.dist_180[safe_angles_deg[idx2] + 90]
-                        
                         best_idx = idx1 if dist1 >= dist2 else idx2
                     else:
                         best_idx = 0
@@ -351,7 +350,7 @@ class Course1(Node):
                         ang = ((cx - (self.screen_width/2)) / (self.screen_width/2)) * self.angle_factor
                         self.target_angle_publisher.publish(Float64(data=ang))
                         color_name = name
-                        if ang <= 30.0:
+                        if ang <= 40.0:
                             self.led_by_name(color_name)
                             self.phase = "DONE"
 
@@ -379,7 +378,7 @@ class Course1(Node):
             lat, lon = self.waypoints[2]
             self.goal_publisher.publish(NavSatFix(latitude=lat, longitude=lon))
             if self.arrived_all or self.dist_to_goal_m is None or self.goal_rel_deg is None:
-                self.cmd_thruster = 0.0
+                self.cmd_thruster = 20.0
                 self.cmd_key_degree = self.servo_neutral_deg
             else:
                 if self.dist_to_goal_m <= self.arrival_radii[2]:
@@ -388,7 +387,7 @@ class Course1(Node):
                     self.cmd_key_degree = self.servo_neutral_deg
                     for _ in range(20):
                         self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
-                        self.thruster_publisher.publish(Float64(data= -20.0))
+                        self.thruster_publisher.publish(Float64(data= -10.0))
                         time.sleep(0.1)
                     self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
                     self.thruster_publisher.publish(Float64(data = 0.0))
