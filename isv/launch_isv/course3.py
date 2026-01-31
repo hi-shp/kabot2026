@@ -109,6 +109,7 @@ class Course3(Node):
             self.destroy_subscription(self.init_yaw_sub)
 
     def lidar_callback(self, data):
+        
         if self.current_yaw_rel is not None:
             if -180.0 <= self.current_yaw_rel <= -45.0:
                 self.dist_threshold = 2.0

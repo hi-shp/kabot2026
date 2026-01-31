@@ -36,7 +36,7 @@ class SimpleGpsPublisher(Node):
         print("\033[H", end="") 
         print("="*45)
         print(f" [GPS 퍼블리시]")
-        print(f" 현재 위치: Lat {self.current_pos[0]:.8f}, Lon {self.current_pos[1]:.8f} ")
+        print(f" 현재 위치: Lat {self.current_pos[0]:.10f}, Lon {self.current_pos[1]:.8f} ")
         print("="*45)
 
 def main(args=None):
