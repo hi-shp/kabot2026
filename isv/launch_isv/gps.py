@@ -33,10 +33,20 @@ class GPSAverageNode(Node):
             self.calculate_and_print()
 
     def calculate_and_print(self):
-        avg_lat = sum(self.lat_list) / len(self.lat_list)
-        avg_lon = sum(self.lon_list) / len(self.lon_list)
+        # 상/하위 20개를 제외하기 위해 정렬
+        self.lat_list.sort()
+        self.lon_list.sort()
 
-        # 줄바꿈 후 최종 결과만 출력
+        # 인덱스 20부터 79까지(총 60개) 슬라이싱하여 추출
+        # 이는 상위 20개와 하위 20개를 자동으로 제외함
+        trimmed_lat = self.lat_list[20:80]
+        trimmed_lon = self.lon_list[20:80]
+
+        # 정제된 60개 데이터의 평균 계산
+        avg_lat = sum(trimmed_lat) / len(trimmed_lat)
+        avg_lon = sum(trimmed_lon) / len(trimmed_lon)
+
+        # 줄바꿈 후 기존과 동일한 형식으로 최종 결과 출력
         print("\n")
         print(f"{avg_lat:.8f}, {avg_lon:.8f}")
         print("")
@@ -46,6 +56,7 @@ class GPSAverageNode(Node):
 
 def main():
     rclpy.init()
+    # 100개를 수집하여 중간 60개를 사용
     node = GPSAverageNode(target_count=100)
     try:
         rclpy.spin(node)

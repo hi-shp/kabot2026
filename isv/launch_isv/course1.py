@@ -284,7 +284,7 @@ class Course1(Node):
                 self.cmd_key_degree = self.servo_neutral_deg
             else:
                 print(elapsed_time)
-                if elapsed_time >= 20.0:
+                if elapsed_time >= 40.0:
                     if self.latest_det and self.latest_det.detections:
                         for d in self.latest_det.detections:
                             c_id = int(d.results[0].hypothesis.class_id)
@@ -296,15 +296,6 @@ class Course1(Node):
                 if self.safe_angles_list:
                     safe_angles_deg = np.array(self.safe_angles_list) - 90
                     diff = np.abs(safe_angles_deg - self.goal_rel_deg)
-                    if len(safe_angles_deg) >= 2:
-                        candidate_indices = np.argpartition(diff, 1)[:2]
-                        idx1, idx2 = candidate_indices[0], candidate_indices[1]
-                        dist1 = self.dist_180[safe_angles_deg[idx1] + 90]
-                        dist2 = self.dist_180[safe_angles_deg[idx2] + 90]
-                        best_idx = idx1 if dist1 >= dist2 else idx2
-                    else:
-                        best_idx = 0
-
                     best_idx = np.argmin(diff)
                     chosen_safe_angle = safe_angles_deg[best_idx]
                     steering_angle = self.servo_neutral_deg + chosen_safe_angle
@@ -350,7 +341,7 @@ class Course1(Node):
                         ang = ((cx - (self.screen_width/2)) / (self.screen_width/2)) * self.angle_factor
                         self.target_angle_publisher.publish(Float64(data=ang))
                         color_name = name
-                        if ang <= 40.0:
+                        if ang <= 50.0:
                             self.led_by_name(color_name)
                             self.phase = "DONE"
 
@@ -368,7 +359,7 @@ class Course1(Node):
                     self.led_by_name("off")
                     self.phase = "WALL"
                     self.update_current_goal()
-            error = -90.0 - self.current_yaw_rel
+            error = -100.0 - self.current_yaw_rel
             steer = self.servo_neutral_deg + error
             self.key_publisher.publish(Float64(data=constrain(steer, self.servo_min_deg, self.servo_max_deg)))
             self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
