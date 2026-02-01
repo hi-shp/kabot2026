@@ -11,19 +11,21 @@ servo:
 # 3. GPS 및 주행 목표
 navigation:
   waypoints:
-    - [35.20418375, 129.21251332]   # WP 0: 호핑 구간 진입점
-    - [35.20421839, 129.21244011]  # WP 1: 3코스 진입점
-    - [35.20416816, 129.21226185]
+    - [35.20418419, 129.21251335]   # WP 0: 호핑 구간 진입점
+    - [35.20424702, 129.21239899]
+    - [35.20418980, 129.21235924]
+    - [35.20417284, 129.21232315]
+    - [35.20419227, 129.21223574]
   arrival_radius: # 지점별 도달 판정 범위 (m)
     - 0.5
-    - 3.0
+    - 2.0
     - 1.5
 
 # 4. 코스별 쓰러스터 출력
 thruster:
-  course1: 20.0  # Course 1
-  course2: 20.0  # Course 2
-  course3: 20.0  # Course 3
+  course1: 25.0  # Course 1
+  course2: 25.0  # Course 2
+  course3: 20  # Course 3
 
 # 5. 객체 인식
 vision:
@@ -41,5 +43,5 @@ vision:
     - "Red Cross"
     - "Red Triangle"
   hoping_target: "Purple Buoy"
-  detection_target: "Green Cross"
+  detection_target: "Red Triangle"
   
