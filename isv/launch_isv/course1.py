@@ -62,13 +62,12 @@ class Course1(Node):
         self.start_time = self.get_clock().now()
         # Course 1 전용 변수
         self.safe_angles_list = []
-        self.dist_threshold = 1.4
+        self.dist_threshold = 1.6
         self.side_margin = 35
         # Course 2 전용 변수
         self.yaw_zero_count = 0
         self.last_zero_time = 0.0
         self.zero_count_cooldown = 8.0
-        self.current_waypoint_idx = 1
         self.create_timer(self.timer_period, self.timer_callback)
         self.led_by_name("off")
         self.get_logger().info("Course 1")
@@ -131,7 +130,7 @@ class Course1(Node):
         self.current_yaw_rel = rel_yaw_deg
         self.curr_yaw_publisher.publish(Float64(data=float(rel_yaw_deg)))
         current_time = time.time()
-        if self.phase == "HOPING" and 0.0 < rel_yaw_deg < 15.0:
+        if self.phase == "HOPING" and -10.0 < rel_yaw_deg < 0.0:
             if (current_time - self.last_zero_time) > self.zero_count_cooldown:
                 self.yaw_zero_count += 1
                 self.last_zero_time = current_time
@@ -143,8 +142,11 @@ class Course1(Node):
     def lidar_callback(self, data):
         if self.current_yaw_rel is not None:
             if self.phase == "WALL":
-                self.side_margin = 30
-                self.dist_threshold = 1.4
+                self.side_margin = 20
+                if -180.0 <= self.current_yaw_rel <= -60.0:
+                    self.dist_threshold = 1.8
+                else:
+                    self.dist_threshold = 1.2
                 ranges = np.array(data.ranges)
                 start_idx, end_idx = 500, 1500
                 subset = ranges[start_idx:end_idx]
@@ -274,24 +276,6 @@ class Course1(Node):
             goal_msg.longitude = target_lon
             self.goal_publisher.publish(goal_msg)
             self.get_logger().info(f"웨이포인트 목표: {self.wp_index+1}/{len(self.waypoints)}")
-        elif self.wp_index == 3:
-            self.get_logger().info("웨이포인트 도달")
-            target_lat, target_lon = self.waypoints[self.wp_index]
-            self.current_goal_enu = self.gps_enu_converter([target_lat, target_lon, 0.0])
-            goal_msg = NavSatFix()
-            goal_msg.latitude = target_lat
-            goal_msg.longitude = target_lon
-            self.goal_publisher.publish(goal_msg)
-            self.get_logger().info(f"웨이포인트 목표: {self.wp_index+1}/{len(self.waypoints)}")
-        elif self.wp_index == 4:
-            self.get_logger().info("웨이포인트 도달")
-            target_lat, target_lon = self.waypoints[self.wp_index]
-            self.current_goal_enu = self.gps_enu_converter([target_lat, target_lon, 0.0])
-            goal_msg = NavSatFix()
-            goal_msg.latitude = target_lat
-            goal_msg.longitude = target_lon
-            self.goal_publisher.publish(goal_msg)
-            self.get_logger().info(f"웨이포인트 목표: {self.wp_index+1}/{len(self.waypoints)}")
             
     def detection_callback(self, msg):
         self.latest_det = msg
@@ -308,7 +292,7 @@ class Course1(Node):
                 self.cmd_key_degree = self.servo_neutral_deg
             else:
                 print(elapsed_time)
-                if elapsed_time >= 30.0:
+                if elapsed_time >= 40.0:
                     if self.latest_det and self.latest_det.detections:
                         for d in self.latest_det.detections:
                             c_id = int(d.results[0].hypothesis.class_id)
@@ -389,32 +373,25 @@ class Course1(Node):
         
         elif self.phase == "WALL":
             self.state_publisher.publish(String(data="Wall 모드"))
-            lat, lon = self.waypoints[self.wp_index]
+            lat, lon = self.waypoints[2]
             self.goal_publisher.publish(NavSatFix(latitude=lat, longitude=lon))
             if self.arrived_all or self.dist_to_goal_m is None or self.goal_rel_deg is None:
                 self.cmd_thruster = 20.0
                 self.cmd_key_degree = self.servo_neutral_deg
             else:
-                if self.current_waypoint_idx == 3:
-                    if self.dist_to_goal_m <= self.arrival_radii[2]:
-                        self.led_by_name("green")
-                        self.cmd_thruster = 0.0
-                        self.cmd_key_degree = self.servo_neutral_deg
-                        for _ in range(20):
-                            self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
-                            self.thruster_publisher.publish(Float64(data= -20.0))
-                            time.sleep(0.1)
+                if self.dist_to_goal_m <= self.arrival_radii[2]:
+                    self.led_by_name("green")
+                    self.cmd_thruster = 0.0
+                    self.cmd_key_degree = self.servo_neutral_deg
+                    for _ in range(20):
                         self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
-                        self.thruster_publisher.publish(Float64(data = 0.0))
-                        self.get_logger().info("웨이포인트 도달")
-                        self.destroy_node()
-                        sys.exit(0)
-                elif self.current_waypoint_idx == 2 or self.current_waypoint_idx == 1:
-                    if self.dist_to_goal_m <= self.arrival_radii[1]:
-                        self.current_waypoint_idx += 1
-                        self.wp_index += 1
-                        self.update_current_goal()
-
+                        self.thruster_publisher.publish(Float64(data= -20.0))
+                        time.sleep(0.1)
+                    self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
+                    self.thruster_publisher.publish(Float64(data = 0.0))
+                    self.get_logger().info("웨이포인트 도달")
+                    self.destroy_node()
+                    sys.exit(0)
 
                 if self.safe_angles_list:
                     safe_angles_deg = np.array(self.safe_angles_list) - 90
