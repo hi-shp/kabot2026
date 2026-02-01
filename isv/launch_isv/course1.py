@@ -27,7 +27,6 @@ class Course1(Node):
     def __init__(self):
         super().__init__("Course1")
         self.load_params_from_yaml()
-        # --- Publishers (Course 1 & 2 공통 및 개별) ---
         self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
         self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
         self.dist_publisher = self.create_publisher(Float64, "/waypoint/distance", 10)
@@ -44,15 +43,12 @@ class Course1(Node):
         self.target_angle_publisher = self.create_publisher(Float64, "/target_angle", 10)
         self.state_publisher = self.create_publisher(String, "/state", 10)
         self.zero_count_publisher = self.create_publisher(String, "/zero_count", 10)
-        # --- Subscriptions ---
         self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile_sensor_data)
         self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_callback, qos_profile_sensor_data)
         self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data)
         self.det_sub = self.create_subscription(Detection2DArray, "/detections", self.detection_callback, qos_profile_sensor_data)
-        # --- 제어 변수 (State Machine) ---
         self.course_mode = 1  # 1이면 Course1 로직, 2이면 Course2 로직 실행
         self.phase = "GPS"    # (GPS ->  HOPING -> DETECTION -> DONE -> WALL)
-        # 상태 관리
         self.origin = None
         self.origin_set = False
         self.wp_index = 0
@@ -66,13 +62,14 @@ class Course1(Node):
         self.start_time = self.get_clock().now()
         # Course 1 전용 변수
         self.safe_angles_list = []
-        self.dist_threshold = 1.5
-        self.side_margin = 30
+        self.dist_threshold = 1.4
+        self.side_margin = 35
         # Course 2 전용 변수
         self.yaw_zero_count = 0
         self.last_zero_time = 0.0
         self.zero_count_cooldown = 8.0
         self.create_timer(self.timer_period, self.timer_callback)
+        self.led_by_name("off")
         self.get_logger().info("Course 1")
 
     def load_params_from_yaml(self):
@@ -146,8 +143,8 @@ class Course1(Node):
         if self.current_yaw_rel is not None:
             if self.phase == "WALL":
                 self.side_margin == 10
-                if -180.0 <= self.current_yaw_rel <= -80.0:
-                    self.dist_threshold = 1.5
+                if -180.0 <= self.current_yaw_rel <= -30.0:
+                    self.dist_threshold = 2.0
                 else:
                     self.dist_threshold = 1.4
                 ranges = np.array(data.ranges)
@@ -165,11 +162,12 @@ class Course1(Node):
                 self.dist_180[np.isinf(self.dist_180)] = 0.0
                 danger_flags = (self.dist_180 > 0) & (self.dist_180 <= self.dist_threshold)
                 expanded_danger = np.copy(danger_flags)
-                n = self.side_margin
+                n_left = self.side_margin
+                n_right = self.side_margin - 5
                 for i in range(181):
                     if danger_flags[i]:
-                        low = max(0, i - n)
-                        high = min(181, i + n + 1)
+                        low = max(0, i - n_left)
+                        high = min(181, i + n_right + 1)
                         expanded_danger[low:high] = True
                 self.safe_angles_list = [int(deg) for deg in range(181) if not expanded_danger[deg]]
 
@@ -378,7 +376,7 @@ class Course1(Node):
                     self.cmd_key_degree = self.servo_neutral_deg
                     for _ in range(20):
                         self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
-                        self.thruster_publisher.publish(Float64(data= -10.0))
+                        self.thruster_publisher.publish(Float64(data= -20.0))
                         time.sleep(0.1)
                     self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
                     self.thruster_publisher.publish(Float64(data = 0.0))
