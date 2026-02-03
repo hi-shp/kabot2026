@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
-import os
-import yaml
-import math
-import time
-import sys
-import signal
+import os, sys, yaml, math, time, signal
 import numpy as np
 from math import degrees
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from vision_msgs.msg import Detection2DArray
-from sensor_msgs.msg import NavSatFix, Imu, LaserScan
 from std_msgs.msg import Float64, String
+from sensor_msgs.msg import NavSatFix, Imu, LaserScan
+from vision_msgs.msg import Detection2DArray
 from mechaship_interfaces.msg import RgbwLedColor
 from tf_transformations import euler_from_quaternion
 
@@ -23,9 +18,9 @@ def constrain(v, lo, hi):
 def norm_text(s):
     return " ".join(str(s).strip().lower().split())
 
-class Course1(Node):
+class ISV_2026(Node):
     def __init__(self):
-        super().__init__("Course1")
+        super().__init__("ISV_2026")
         self.load_params_from_yaml()
         self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
         self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
@@ -33,10 +28,8 @@ class Course1(Node):
         self.rel_deg_publisher = self.create_publisher(Float64, "/waypoint/rel_deg", 10)
         self.goal_publisher = self.create_publisher(NavSatFix, "/waypoint/goal", 10)
         self.curr_yaw_publisher = self.create_publisher(Float64, "/current_yaw", 10)
-        # Course 1 전용
         self.safe_angle_list_publisher = self.create_publisher(String, "/safe_angles_list", 10)
         self.safe_angle_publisher = self.create_publisher(Float64, "/safe_angle", 10)
-        # Course 2 전용
         self.led_publisher = self.create_publisher(RgbwLedColor, "/actuator/rgbwled/color", 10)
         self.led_string_publisher = self.create_publisher(String, "/led_color", 10)
         self.target_name_publisher = self.create_publisher(String, "/target_name", 10)
@@ -47,7 +40,6 @@ class Course1(Node):
         self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_callback, qos_profile_sensor_data)
         self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data)
         self.det_sub = self.create_subscription(Detection2DArray, "/detections", self.detection_callback, qos_profile_sensor_data)
-        self.course_mode = 1  # 1이면 Course1 로직, 2이면 Course2 로직 실행
         self.phase = "GPS"    # (GPS ->  HOPING -> DETECTION -> DONE -> WALL)
         self.origin = None
         self.origin_set = False
@@ -60,11 +52,9 @@ class Course1(Node):
         self.latest_det = None
         self.arrived_all = False
         self.start_time = self.get_clock().now()
-        # Course 1 전용 변수
         self.safe_angles_list = []
         self.dist_threshold = 1.6
         self.side_margin = 35
-        # Course 2 전용 변수
         self.yaw_zero_count = 0
         self.last_zero_time = 0.0
         self.zero_count_cooldown = 8.0
@@ -90,6 +80,43 @@ class Course1(Node):
         self.available_objects = v["available_objects"]
         self.hoping_target = v["hoping_target"]
         self.detection_target = v["detection_target"]
+        """
+        node_settings:
+          timer_period: 0.1
+        servo:
+          min_deg: 30.0
+          max_deg: 150.0
+          neutral_deg: 90.0
+        navigation:
+          waypoints:
+            - [35.20417994, 129.21250807]
+            - [35.20419992, 129.21243434]
+            - [35.20416613, 129.21225879]
+          arrival_radius:
+            - 0.5
+            - 2.0
+            - 1.5
+        thruster:
+          course1: 25.0
+          course2: 25.0
+          course3: 15.0
+        vision:
+          screen_width: 640
+          angle_conversion_factor: 90.0
+          available_objects:
+            - "Blue Circle"
+            - "Blue Cross"
+            - "Blue Triangle"
+            - "Green Circle"
+            - "Green Cross"
+            - "Green Triangle"
+            - "Purple Buoy"
+            - "Red Circle"
+            - "Red Cross"
+            - "Red Triangle"
+          hoping_target: "Purple Buoy"
+          detection_target: "Blue Circle"
+        """
 
     def normalize_180(self, deg):
         return (deg + 180.0) % 360.0 - 180.0
@@ -140,94 +167,49 @@ class Course1(Node):
                     self.phase = "DETECTION"
 
     def lidar_callback(self, data):
-        if self.current_yaw_rel is not None:
-            if self.phase == "WALL":
-                self.side_margin = 20
-                if -180.0 <= self.current_yaw_rel <= -60.0:
-                    self.dist_threshold = 1.8
-                else:
-                    self.dist_threshold = 1.2
-                ranges = np.array(data.ranges)
-                start_idx, end_idx = 500, 1500
-                subset = ranges[start_idx:end_idx]
-                self.dist_180 = np.full(181, np.inf)
-                for i in range(len(subset)):
-                    length = subset[i]
-                    if length <= data.range_min or length >= data.range_max or not np.isfinite(length):
-                        continue
-                    angle_index = round((len(subset) - 1 - i) * 180 / len(subset))
-                    if 0 <= angle_index <= 180:
-                        if length < self.dist_180[angle_index]:
-                            self.dist_180[angle_index] = length
-                self.dist_180[np.isinf(self.dist_180)] = 0.0
-                danger_flags = (self.dist_180 > 0) & (self.dist_180 <= self.dist_threshold)
-                expanded_danger = np.copy(danger_flags)
-                n_left = self.side_margin           # 왼쪽 마진
-                n_right = max(0, self.side_margin)  # 오른쪽 마진 (side_margin - 5)
-
-                for i in range(181):
-                    if danger_flags[i]:
-                        # 인덱스 0이 왼쪽이므로:
-                        # i보다 작은 인덱스 방향이 왼쪽 (n_left 확장)
-                        # i보다 큰 인덱스 방향이 오른쪽 (n_right 확장)
-                        
-                        low = max(0, i - n_left)      # 왼쪽으로 확장
-                        high = min(181, i + n_right + 1) # 오른쪽으로 확장
-                        
-                        expanded_danger[low:high] = True
-
-                self.safe_angles_list = [int(deg) for deg in range(181) if not expanded_danger[deg]]
-
-
-                if self.safe_angles_list is not None:
-                    list_msg = String()
-                    list_msg.data = str(self.safe_angles_list)
-                    self.safe_angle_list_publisher.publish(list_msg)
-                if self.safe_angles_list:
-                    safe_arr = np.array(self.safe_angles_list)
-                    best_angle = safe_arr[np.argmin(np.abs(safe_arr - 90))]
-                    self.safe_angle_publisher.publish(Float64(data=float(best_angle)))
-            else:
-                ranges = np.array(data.ranges)
-                start_idx, end_idx = 500, 1500
-                subset = ranges[start_idx:end_idx]
-                cumulative_distance = np.zeros(181)
-                sample_count = np.zeros(181)
-                self.dist_180 = np.zeros(181)
-                for i in range(len(subset)):
-                    length = subset[i]
-                    if length <= data.range_min or length >= data.range_max or not np.isfinite(length):
-                        continue
-                    angle_index = round((len(subset) - 1 - i) * 180 / len(subset))
+        if self.current_yaw_rel is None:
+            return
+        if self.phase == "WALL":
+            self.side_margin = 20
+            self.dist_threshold = 1.8 if -180.0 <= self.current_yaw_rel <= -60.0 else 1.2
+            n_left, n_right = self.side_margin, max(0, self.side_margin)
+        else:
+            n_left, n_right = self.side_margin, self.side_margin - 5
+        ranges = np.array(data.ranges[500:1500])
+        num_samples = len(ranges)
+        self.dist_180 = np.zeros(181)
+        if self.phase == "WALL":
+            self.dist_180.fill(np.inf)
+            for i, length in enumerate(ranges):
+                if data.range_min < length < data.range_max and np.isfinite(length):
+                    angle_index = round((num_samples - 1 - i) * 180 / num_samples)
+                    if 0 <= angle_index <= 180 and length < self.dist_180[angle_index]:
+                        self.dist_180[angle_index] = length
+            self.dist_180[np.isinf(self.dist_180)] = 0.0
+        else:
+            cumulative_distance = np.zeros(181)
+            sample_count = np.zeros(181)
+            for i, length in enumerate(ranges):
+                if data.range_min < length < data.range_max and np.isfinite(length):
+                    angle_index = round((num_samples - 1 - i) * 180 / num_samples)
                     if 0 <= angle_index <= 180:
                         cumulative_distance[angle_index] += length
                         sample_count[angle_index] += 1
-                for j in range(181):
-                    if sample_count[j] > 0:
-                        self.dist_180[j] = cumulative_distance[j] / sample_count[j]
-                    else:
-                        self.dist_180[j] = 0.0
-                
-                danger_flags = (self.dist_180 > 0) & (self.dist_180 <= self.dist_threshold)
-                expanded_danger = np.copy(danger_flags)
-                
-                n_left = self.side_margin
-                n_right = self.side_margin - 5
-                for i in range(181):
-                    if danger_flags[i]:
-                        low = max(0, i - n_left)
-                        high = min(181, i + n_right + 1)
-                        expanded_danger[low:high] = True
-                self.safe_angles_list = [int(deg) for deg in range(181) if not expanded_danger[deg]]
-
-                if self.safe_angles_list is not None:
-                    list_msg = String()
-                    list_msg.data = str(self.safe_angles_list)
-                    self.safe_angle_list_publisher.publish(list_msg)
-                if self.safe_angles_list:
-                    safe_arr = np.array(self.safe_angles_list)
-                    best_angle = safe_arr[np.argmin(np.abs(safe_arr - 90))]
-                    self.safe_angle_publisher.publish(Float64(data=float(best_angle)))
+            valid_mask = sample_count > 0
+            self.dist_180[valid_mask] = cumulative_distance[valid_mask] / sample_count[valid_mask]
+        danger_flags = (self.dist_180 > 0) & (self.dist_180 <= self.dist_threshold)
+        expanded_danger = np.copy(danger_flags)
+        for i in np.where(danger_flags)[0]:
+            low = max(0, i - n_left)
+            high = min(181, i + n_right + 1)
+            expanded_danger[low:high] = True
+        self.safe_angles_list = [int(deg) for deg in range(181) if not expanded_danger[deg]]
+        if self.safe_angles_list is not None:
+            self.safe_angle_list_publisher.publish(String(data=str(self.safe_angles_list)))
+        if self.safe_angles_list:
+            safe_arr = np.array(self.safe_angles_list)
+            best_angle = safe_arr[np.argmin(np.abs(safe_arr - 90))]
+            self.safe_angle_publisher.publish(Float64(data=float(best_angle)))
 
     def gps_callback(self, gps: NavSatFix):
         if math.isnan(gps.latitude) or math.isnan(gps.longitude) or self.initial_yaw_abs is None:
@@ -250,33 +232,19 @@ class Course1(Node):
             self.rel_deg_publisher.publish(Float64(data=float(self.goal_rel_deg)))
 
     def update_current_goal(self):
-        if self.wp_index == 0:
+        if self.wp_index < len(self.waypoints):
             target_lat, target_lon = self.waypoints[self.wp_index]
             self.current_goal_enu = self.gps_enu_converter([target_lat, target_lon, 0.0])
             goal_msg = NavSatFix()
             goal_msg.latitude = target_lat
             goal_msg.longitude = target_lon
             self.goal_publisher.publish(goal_msg)
+            if self.wp_index == 1 and self.phase == "HOPING":
+                self.get_logger().info("웨이포인트 도달")
+            elif self.wp_index == 2:
+                self.get_logger().info("웨이포인트 도달")
             self.get_logger().info(f"웨이포인트 목표: {self.wp_index+1}/{len(self.waypoints)}")
-        elif self.wp_index == 1 and self.phase == "HOPING":
-            self.get_logger().info("웨이포인트 도달")
-            target_lat, target_lon = self.waypoints[self.wp_index]
-            self.current_goal_enu = self.gps_enu_converter([target_lat, target_lon, 0.0])
-            goal_msg = NavSatFix()
-            goal_msg.latitude = target_lat
-            goal_msg.longitude = target_lon
-            self.goal_publisher.publish(goal_msg)
-            self.get_logger().info(f"웨이포인트 목표: {self.wp_index+1}/{len(self.waypoints)}")
-        elif self.wp_index == 2:
-            self.get_logger().info("웨이포인트 도달")
-            target_lat, target_lon = self.waypoints[self.wp_index]
-            self.current_goal_enu = self.gps_enu_converter([target_lat, target_lon, 0.0])
-            goal_msg = NavSatFix()
-            goal_msg.latitude = target_lat
-            goal_msg.longitude = target_lon
-            self.goal_publisher.publish(goal_msg)
-            self.get_logger().info(f"웨이포인트 목표: {self.wp_index+1}/{len(self.waypoints)}")
-            
+
     def detection_callback(self, msg):
         self.latest_det = msg
 
@@ -291,7 +259,6 @@ class Course1(Node):
                 self.cmd_thruster = 0.0
                 self.cmd_key_degree = self.servo_neutral_deg
             else:
-                print(elapsed_time)
                 if elapsed_time >= 40.0:
                     if self.latest_det and self.latest_det.detections:
                         for d in self.latest_det.detections:
@@ -300,7 +267,6 @@ class Course1(Node):
                                 self.wp_index = 1
                                 self.phase = "HOPING"
                                 self.update_current_goal()
-
                 if self.safe_angles_list:
                     safe_angles_deg = np.array(self.safe_angles_list) - 90
                     diff = np.abs(safe_angles_deg - self.goal_rel_deg)
@@ -312,7 +278,6 @@ class Course1(Node):
                 else:
                     self.cmd_thruster = 20.0
                     self.cmd_key_degree = self.servo_neutral_deg
-
             self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
             self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
 
@@ -389,10 +354,9 @@ class Course1(Node):
                         time.sleep(0.1)
                     self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
                     self.thruster_publisher.publish(Float64(data = 0.0))
-                    self.get_logger().info("웨이포인트 도달")
+                    self.get_logger().info("최종 웨이포인트 도달")
                     self.destroy_node()
                     sys.exit(0)
-
                 if self.safe_angles_list:
                     safe_angles_deg = np.array(self.safe_angles_list) - 90
                     diff = np.abs(safe_angles_deg - self.goal_rel_deg)
@@ -404,7 +368,6 @@ class Course1(Node):
                 else:
                     self.cmd_thruster = 20.0
                     self.cmd_key_degree = self.servo_neutral_deg +15
-
             self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
             self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
 
@@ -418,7 +381,7 @@ class Course1(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = Course1()
+    node = ISV_2026()
     def signal_handler(sig, frame):
         node.get_logger().warn("Stopped")
         node.send_stop_commands()
