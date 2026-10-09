@@ -1,0 +1,7 @@
+/**:
+  ros__parameters:
+    profile: outdoor
+    # More returns are a sanity gate, not a scan-matching confidence metric.
+    min_scan_fraction: 0.3
+    min_scan_sectors: 5
+    allow_unknown_covariance: false

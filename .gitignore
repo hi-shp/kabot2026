@@ -1,0 +1,10 @@
+# Field calibration build and local experimental data only
+field_calibration/**/__pycache__/
+field_calibration/.pytest_cache/
+field_calibration/*.egg-info/
+field_calibration/build/
+field_calibration/dist/
+build/
+install/
+log/
+field_data/

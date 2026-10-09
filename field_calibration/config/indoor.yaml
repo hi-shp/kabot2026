@@ -1,0 +1,5 @@
+/**:
+  ros__parameters:
+    profile: indoor
+    min_scan_fraction: 0.15
+    min_scan_sectors: 4

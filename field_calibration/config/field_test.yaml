@@ -1,0 +1,45 @@
+/**:
+  ros__parameters:
+    use_sim_time: false
+    motor_control: PASSIVE
+    automatic_drive: false
+    test_mode: manual_log
+    output_root: ~/field_data
+    scan_topic: /scan
+    imu_topic: /imu
+    odom_topic: /scan/odom
+    throttle_topic: /actuator/thruster/percentage
+    steering_topic: /actuator/key/degree
+    scan_frame: base_scan
+    imu_frame: imu_link
+    base_frame: base_footprint
+    odom_frame: odom
+    # Raw sensor conventions; do not use /imu/yaw_refined (clockwise degrees).
+    # Mounting must be planar, z up; verify physically and with TF before accepting.
+    imu_yaw_sign: 1.0
+    imu_mount_yaw: 0.0
+    imu_yaw_rate_bias: 0.0
+    max_age: 0.5
+    future_tolerance: 0.05
+    max_sensor_skew: 0.12
+    min_scan_fraction: 0.15
+    min_scan_sectors: 4
+    # RF2O in this repository publishes zero covariance. Only opt in after
+    # stationary/known-motion checks; no confidence in open-water matching implied.
+    allow_unknown_covariance: false
+    max_position_variance: 1.0
+    max_heading_variance: 0.25
+    min_dt: 0.01
+    max_dt: 0.3
+    max_speed: 3.0
+    max_yaw_rate: 1.5
+    max_yaw_disagreement: 0.6
+    prediction_hz: 4.0
+    command_max_age: 2.0
+    error_max_gap: 0.3
+    horizons: [0.5, 1.0, 2.0]
+    model_path: ''
+    fsync_interval: 1.0
+    bag_split_bytes: 268435456
+    record_topics: [/scan, /imu, /scan/odom, /odom_rf2o, /odom, /tf, /tf_static,
+                    /actuator/thruster/percentage, /actuator/key/degree, /sensor/emo/status]

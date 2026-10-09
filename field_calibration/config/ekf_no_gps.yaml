@@ -1,0 +1,25 @@
+field_ekf:
+  ros__parameters:
+    frequency: 20.0
+    sensor_timeout: 0.3
+    two_d_mode: true
+    publish_tf: false
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom
+    # Use covariance-qualified odometry. Raw RF2O zeros are not a measured noise model.
+    odom0: /field/qualified_odom
+    odom0_config: [true, true, false, false, false, true,
+                   false, false, false, false, false, false, false, false, false]
+    odom0_differential: false
+    odom0_relative: true
+    odom0_queue_size: 10
+    # No absolute magnetic yaw; yaw rate only, in REP-103 with verified mounting.
+    imu0: /imu
+    imu0_config: [false, false, false, false, false, false,
+                  false, false, false, false, false, true, false, false, false]
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 30
+    use_control: false
