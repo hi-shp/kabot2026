@@ -1,6 +1,6 @@
 # 젯슨 ROS 워크스페이스 전수 조사
 
-기준: 2026-10-29, `/home/isv/ros2_ws/src`. 삭제는 하지 않습니다. 공개 소스 백업은 [backups](../backups/README.md)에 보존했습니다. 단축 명령 설정은 백업 커밋·푸시 확인 뒤 별도 변경으로 적용합니다.
+기준: 2026-10-29, `/home/isv/ros2_ws/src`. 삭제는 하지 않습니다. 공개 소스 백업은 [backups](../backups/README.md)에 보존했습니다. 백업 커밋 `5c1e15d`의 GitHub 푸시·원격 HEAD 일치를 확인한 뒤 cb를 별도 변경으로 적용했습니다.
 
 ## 확인 범위와 근거
 
@@ -69,6 +69,8 @@ micro-ROS agent의 직렬 포트 입력 흔적은 `/dev/ttyTHS1` 5회, `/dev/tty
 현재 `.bashrc`, `.bash_aliases`, `.profile`, 시스템 bash 설정과 조회한 profile.d/fish 설정에서 `cb`의 정의를 찾지 못했습니다. 새 interactive bash에서도 `cb`는 정의되지 않았습니다. `.bashrc`는 ROS Humble과 기존 `install/setup.bash`를 source하고 있습니다.
 
 히스토리에서는 인자 없는 `colcon build` 14회, `--symlink-install --packages-up-to velodyne` 3회, `--symlink-install` 전체 빌드 1회가 확인됩니다. 단순 `cb` 입력 흔적은 1회이나 성공 증거는 없습니다. 저장소 명령 모음에는 삭제 후 symlink 빌드가 있지만 현재 요청은 삭제 금지입니다. 따라서 새 `cb`의 기본값은 기존 build/install을 유지하는 **전체 `colcon build` → 성공 시 `source install/setup.bash`**로 설정합니다. 실패하면 환경 적용을 건너뛰고 실패 코드를 반환해야 합니다.
+
+설정 후 실제 cb는 **34개 패키지 전체 빌드 10.7초, 종료 코드 0**으로 완료했고 같은 셸의 환경 적용을 확인했습니다. 별도 함수 시험에서도 실패 전파와 환경 적용 차단이 통과했습니다. 설치 위치와 사용법은 [CB_USAGE.md](CB_USAGE.md)에 기록했습니다. build/install/log를 삭제하거나 기존 소스를 정리하지 않았습니다.
 
 ## 미검증 사항
 

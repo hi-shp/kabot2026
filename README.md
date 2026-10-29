@@ -72,3 +72,7 @@
 ## 2026-10-29 수상 시험 도구
 
 젯슨의 차동 추진기 보트를 위한 [기록·역추정·MPC 모의 검증 안내](isv_water_trials/README_KO.md)를 추가했습니다. 제원은 25 kg / 1.1 m / 0.50 m / 추진기 간격 0.32 m입니다. `mechaship_bringup`의 라이다는 Velodyne으로 변경했으며 모델 기본값 VLP16은 실물 확인이 필요합니다. 기존 저장소의 GPS/IMU 구성과 젯슨 구성 차이는 [분석 문서](isv_water_trials/ANALYSIS_KO.md)에 기록했습니다. 실제 수상 시험 및 MPC 실배 적용은 미검증입니다.
+
+## 젯슨 전체 소스 백업·전수 조사·cb 설정
+
+[실제 젯슨의 정리 전 소스 백업](backups/README.md)과 [기존 실행/시험 방식 전수 조사](docs/WORKSPACE_AUDIT_2026-10-29.md)를 추가했습니다. 기존 파일은 삭제하지 않았습니다. 새 터미널에서 `cb`를 실행하면 전체 workspace를 빌드하고 성공 시 같은 셸에 환경을 적용합니다. [cb 사용법과 검증 결과](docs/CB_USAGE.md), [프로젝트 구조](PROJECT_STRUCTURE.md)를 확인하세요.
