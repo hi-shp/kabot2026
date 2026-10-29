@@ -33,38 +33,36 @@ int main() {
   assert(kabot::modeFromPwm(1000, false) == kabot::INHIBITED);
   assert(kabot::modeFromPwm(2000, true, false) == kabot::AUTOMATIC);
   kabot::ManualResponse rc;
-  auto manual = rc.update(0, 1700, 1300, true);
-  assert(manual.left == 1540 && manual.right == 1460);
-  manual = rc.update(100000, 1700, 1300, true);
-  assert(manual.left == 1540 && manual.right == 1460); // Holding never integrates speed.
-  manual = rc.update(100010, 2000, 1500, true);
-  assert(manual.left == 1580 && manual.right == 1500);
-  manual = rc.update(100159, 1988, 1500, true);
-  assert(manual.left == 1580 && manual.right == 1500);
-  manual = rc.update(100160, 1988, 1500, true);
-  assert(manual.left == 1900 && manual.right == 1500); // Left reaches maximum independently.
-  manual = rc.update(100170, 1988, 1940, true);
-  assert(manual.left == 1900 && manual.right == 1580); // Right confirmation starts separately.
-  manual = rc.update(100320, 1988, 1940, true);
-  assert(manual.left == 1900 && manual.right == 1900);
-  manual = rc.update(100321, 1899, 2000, true);
-  assert(manual.left == 1579 && manual.right == 1900); // Left release cannot change right maximum.
-  rc.update(100330, 1050, 2000, true);
-  manual = rc.update(100480, 1050, 2000, true);
-  assert(manual.left == 1100 && manual.right == 1900); // Opposite directions are independent too.
-  rc.update(100481, 1050, 1012, true);
-  manual = rc.update(100631, 1050, 1012, true);
-  assert(manual.left == 1100 && manual.right == 1100); // Endpoint tolerance in reverse too.
-  manual = rc.update(100641, 1050, 1012, false);
-  assert(manual.left == 1500 && manual.right == 1500); // RC->AUTO clears endpoint state.
-  manual = rc.update(100642, 1050, 1012, true);
-  assert(manual.left == 1420 && manual.right == 1420); // Re-entry cannot retain maximum.
-  manual = rc.update(100643, 1500, 1500, true);
+  auto manual = rc.update(1700, 1300, true);
+  assert(manual.left == 1579 && manual.right == 1421);
+  manual = rc.update(1700, 1300, true);
+  assert(manual.left == 1579 && manual.right == 1421); // No time/speed integration.
+  manual = rc.update(1988, 1500, true);
+  assert(manual.left == 1900 && manual.right == 1500); // Inexact endpoint still reaches maximum.
+  manual = rc.update(1500, 1940, true);
+  assert(manual.left == 1500 && manual.right == 1900); // Completely independent channels.
+  manual = rc.update(1899, 2000, true);
+  assert(manual.left == 1898 && manual.right == 1900); // Smooth approach, no large endpoint jump.
+  manual = rc.update(1050, 2000, true);
+  assert(manual.left == 1100 && manual.right == 1900);
+  manual = rc.update(1050, 1012, false);
+  assert(manual.left == 1500 && manual.right == 1500); // RC->AUTO gives immediate neutral.
+  manual = rc.update(1540, 1460, true);
   assert(manual.left == 1500 && manual.right == 1500);
-  kabot::ManualResponse rollover;
-  rollover.update(0xFFFFFFF0U, 2000, 2000, true);
-  manual = rollover.update(134, 2000, 2000, true);
-  assert(manual.left == 1900 && manual.right == 1900); // 150ms across millis wrap.
+  uint16_t previous = 1100;
+  for (uint16_t input = 900; input <= 2100; ++input) {
+    manual = rc.update(input, uint16_t(3000 - input), true);
+    assert(manual.left >= previous && manual.left >= 1100 && manual.left <= 1900);
+    assert(manual.left - previous <= 3); // Max adjacent step after integer rounding.
+    assert(manual.left + manual.right == 3000); // Same curve, mirrored reverse.
+    const int difference = int(input) - 1500;
+    const int magnitude = difference < 0 ? -difference : difference;
+    double normalized = magnitude <= 40 ? 0.0 : double(magnitude - 40) / 360.0;
+    if (normalized > 1) normalized = 1;
+    const uint16_t expected = uint16_t(400 * normalized * normalized + .5);
+    assert(manual.left == uint16_t(difference < 0 ? 1500 - expected : 1500 + expected));
+    previous = manual.left;
+  }
   assert(kabot::centerReferenced(1500, RC_RIGHT_CENTER_US) == 1500);
   static_assert(RC_LEFT_CENTER_US == RC_RIGHT_CENTER_US && RC_LEFT_MIN_US == RC_RIGHT_MIN_US && RC_LEFT_MAX_US == RC_RIGHT_MAX_US, "Identical RC channel settings");
   assert(kabot::crc16("123456789", 9) == 0x29B1);

@@ -34,7 +34,9 @@ constexpr uint16_t RC_RIGHT_MIN_US = RC_LEFT_MIN_US;
 constexpr uint16_t RC_RIGHT_CENTER_US = RC_LEFT_CENTER_US;
 constexpr uint16_t RC_RIGHT_MAX_US = RC_LEFT_MAX_US;
 constexpr uint16_t RC_ENDPOINT_MARGIN_US = 100;
-constexpr uint16_t RC_ENDPOINT_CONFIRM_MS = 150;
+constexpr uint16_t RC_DEADBAND_US = 40;
+static_assert(RC_ENDPOINT_MARGIN_US + RC_DEADBAND_US < RC_LEFT_MAX_US - RC_LEFT_CENTER_US, "Invalid upper RC range");
+static_assert(RC_ENDPOINT_MARGIN_US + RC_DEADBAND_US < RC_LEFT_CENTER_US - RC_LEFT_MIN_US, "Invalid lower RC range");
 constexpr bool LEFT_REVERSED = false;
 constexpr bool RIGHT_REVERSED = false;
 constexpr int ESTOP_PIN = -1;       // External EMO cuts ESC supply; no EMO input on this UNO.

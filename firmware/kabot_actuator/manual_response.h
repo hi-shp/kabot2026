@@ -6,37 +6,36 @@ inline uint16_t centerReferenced(uint16_t pulse, uint16_t center) {
   const int value = 1500 + int(pulse) - int(center);
   return value < 1100 ? 1100 : value > 1900 ? 1900 : uint16_t(value);
 }
-inline uint16_t gentleRc(uint16_t pulse, uint16_t center) {
-  int delta = int(pulse) - int(center);
-  if (delta >= -40 && delta <= 40) return 1500;
-  if (delta < -400) delta = -400;
-  if (delta > 400) delta = 400;
-  return uint16_t(1500 + delta / 5);
-}
 struct ManualOutput { uint16_t left, right; };
 
-// No speed integration. Each stick has its own independent endpoint confirmation.
-// A broad endpoint region tolerates receiver travel error; confirmation filters spikes.
+// Signed quadratic response after the neutral deadband, independently per channel.
+// Continuous at the endpoint: no separate full-power switch and no speed integration.
 class ManualResponse {
  public:
   ManualResponse(uint16_t minimum = 1000, uint16_t center = 1500,
                  uint16_t maximum = 2000, uint16_t margin = 100,
-                 uint16_t confirmMs = 150)
-      : minimum_(minimum), center_(center), maximum_(maximum), margin_(margin), confirmMs_(confirmMs) {}
-  ManualOutput update(uint32_t now, uint16_t left, uint16_t right, bool enabled) {
-    if (!enabled) { candidate_[0] = candidate_[1] = 0; return {1500, 1500}; }
-    return {side(now, left, 0), side(now, right, 1)};
+                 uint16_t deadband = 40)
+      : minimum_(minimum), center_(center), maximum_(maximum), margin_(margin), deadband_(deadband) {}
+  ManualOutput update(uint16_t left, uint16_t right, bool enabled) const {
+    if (!enabled) return {1500, 1500};
+    return {side(left), side(right)};
   }
  private:
-  uint16_t minimum_, center_, maximum_, margin_, confirmMs_;
-  uint32_t since_[2] = {};
-  int8_t candidate_[2] = {};
-  uint16_t side(uint32_t now, uint16_t pulse, uint8_t index) {
-    const int8_t direction = pulse >= maximum_ - margin_ ? 1 : pulse <= minimum_ + margin_ ? -1 : 0;
-    if (direction == 0) { candidate_[index] = 0; return gentleRc(pulse, center_); }
-    if (candidate_[index] != direction) { candidate_[index] = direction; since_[index] = now; }
-    if (uint32_t(now - since_[index]) >= confirmMs_) return direction > 0 ? 1900 : 1100;
-    return gentleRc(pulse, center_);
+  uint16_t minimum_, center_, maximum_, margin_, deadband_;
+  uint16_t side(uint16_t pulse) const {
+    const int32_t delta = int32_t(pulse) - center_;
+    const uint32_t magnitude = delta < 0 ? uint32_t(-delta) : uint32_t(delta);
+    if (magnitude <= deadband_) return 1500;
+    const int32_t span = delta > 0 ? int32_t(maximum_) - center_ : int32_t(center_) - minimum_;
+    const int32_t activeSpan = span - margin_ - deadband_;
+    if (activeSpan <= 0 || activeSpan > 500) return 1500;
+    const uint32_t denominator = uint32_t(activeSpan);
+    uint32_t input = magnitude - deadband_;
+    if (input > denominator) input = denominator;
+    const uint32_t square = denominator * denominator;
+    // Round to nearest us. At configured 360us span, numerator fits in uint32_t.
+    const uint16_t output = uint16_t((400UL * input * input + square / 2) / square);
+    return uint16_t(delta > 0 ? 1500 + output : 1500 - output);
   }
 };
 }  // namespace kabot
