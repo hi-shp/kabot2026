@@ -1,0 +1,23 @@
+ublox_gps_node:
+  ros__parameters:
+    debug: 0
+
+    device: /dev/ttyGPS
+    frame_id: gps_link
+    rate: 1.0
+    nav_rate: 1
+
+    tmode3: 1
+    sv_in:
+      reset: True
+
+      min_dur: 300
+      acc_lim: 3.0
+
+    inf:
+      all: false
+
+    publish:
+      aid:
+        all: false
+      nmea: true

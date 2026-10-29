@@ -1,0 +1,58 @@
+# vo_config.yaml — VOPlanner configuration (YAML)
+# All headings are in ENU navigation convention (North=0°, clockwise positive).
+# LiDAR x-axis orientation relative to ENU East is CCW-positive.
+vo:
+  tau: 1.0
+  v_max: 5
+  v_allow_max: 5
+  max_iters: 3
+  min_speed_mps: 0.5  # 안전 후보 우선 선택 시 요구되는 최소 속력
+  update_period_s: 1       # VO 갱신 주기(초)
+  stale_threshold_s: 1  # 이 시간보다 오래된 관측은 무시
+  
+  debug_csv_path: "/home/isv_orin2/ros2_ws/src/isv_kaboat/isv_kaboat/vo_field_debug.csv"
+  
+  range_max_for_vo_m: 2.5
+  blind_r_min: 0.0    # 270도 블라인드 구간에서 볼 최소 거리 (기본 0m)
+  blind_r_max: 1    # 270도 블라인드 구간에서 볼 최대 거리 (예: 1.5m)
+ 
+  # Cost weights
+  w_angle: 10
+  w_speed: 1
+  w_obs: 20.0             # 장애물 회피 코스트 가중치
+  obs_sigma_deg: 25.0     # 장애물 영향 각도(표준편차)
+  vo_angle_margin_deg: 5.0
+
+  # Sampling
+  heading_samples: 360
+  speed_samples: 5
+
+  # Headings (ENU-nav)
+  heading_target_deg: 0.0
+  heading_now_deg: 0.0
+
+ 
+
+  # Obstacle/model
+  ship_radius_m: 0.8
+  class_radius_m:
+    "0": 0.1
+    "1": 2.0
+    "2": 5.0
+    "3": 0.3
+  default_radius_m: 0.1
+
+  # Velocity sign convention
+  convert_from_ship_wrt_obs: true
+  lidar_heading_offset_deg: 0.0
+  lidar_sample_step: 1          # LiDAR 블라인드 계산시 샘플링 스텝
+  blind_cluster_gap_deg: 6.0    # 블라인드 각도 클러스터 간격
+  blind_cam_fov_deg: 180      # 전방 카메라 FOV (LiDAR 블라인드 제외용)
+  max_steer_deg: 90.0           # 조향 최대값 (VO 출력 제한)
+
+# 제어(스로틀/조타) 매핑 파라미터
+control:
+  neutral_pulse: 1520        # 완전 중립 (하드웨어 기준)
+  forward_lo_pulse: 1520     # 0 m/s 에 해당하는 전진 펄스
+  forward_hi_pulse: 1530     # v_allow_max 에 해당하는 전진 펄스
+  steer_clip_max: 20     # PID 조타 출력이 줄일 수 있는 최대 차감 펄스

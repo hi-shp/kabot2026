@@ -1,0 +1,15 @@
+/detect_node:
+  ros__parameters:
+    image_topic: "/image_raw/compressed"
+    model_params:
+      model: "best3.pt"
+      img_size: 640
+      conf: 0.5 # Confidence threshold
+      iou: 0.8 # IOU threshold
+      enable: True
+
+/visualize_node:
+  ros__parameters:
+    image_topic: "/image_raw/compressed"
+    detections_topic: "/detections"
+    preview: True
