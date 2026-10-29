@@ -17,6 +17,7 @@ install(DIRECTORY launch param
 # scripts 폴더 내의 imu_reformatter.py를 lib/mechaship_bringup 폴더로 복사합니다.
 install(PROGRAMS
   scripts/imu_reformatter.py
+  scripts/sensor_status.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

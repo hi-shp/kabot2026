@@ -30,6 +30,16 @@
   <exec_depend>ntrip_client</exec_depend>
   <exec_depend>nmea_navsat_driver</exec_depend>
 
+  <exec_depend>velodyne_msgs</exec_depend>
+  <exec_depend>ublox_gps</exec_depend>
+  <exec_depend>vectornav</exec_depend>
+  <exec_depend>vectornav_msgs</exec_depend>
+  <exec_depend>micro_ros_agent</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>rosidl_runtime_py</exec_depend>
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

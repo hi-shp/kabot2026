@@ -5,7 +5,7 @@ Work date: 2026-10-29 Asia/Seoul.
 - Live SSH and ROS Humble environment: observed.
 - Existing workspace includes user modifications: preserved.
 - Actual water trial, motor actuation, sensor mounting, calibrated thrust, hydrodynamic identification: NOT performed.
-- Velodyne exact model, IP, live packet/pointcloud/scan reception: NOT confirmed.
+- Velodyne live verification was completed later on the same day; see the latest checks below.
 - Existing user MPC implementation: NOT located in inspected paths; no claim of live MPC integration.
 - Added recorder is passive by default. Trial is dry-run by default. Offline MPC never calls actuator services.
 - `colcon build --packages-select isv_water_trials mechaship_bringup`: PASS on Jetson. Package manifests parsed as `ament_python` / `ament_cmake`. `ros2 pkg prefix isv_water_trials` resolves the installed package.
@@ -19,6 +19,10 @@ Work date: 2026-10-29 Asia/Seoul.
 - Test/build logs remain locally on Jetson at `/home/isv/water_trial_validation/20261029/`. Real data and device logs are not committed.
 
 ## Practical limits
+
+Latest live checks (2026-10-29, about 21:02 KST): `all_sensors.launch.py` built and running without a camera or actuator-enable nodes. GPS `/gps/fix` received at 5 Hz with valid status 0; VectorNav VN-100S-CR raw common/standard IMU at 20 Hz; Velodyne packets/scan about 9.9 Hz. A received packet product ID was 0x22 and cloud ring IDs were exactly 0 through 15. `/scan` automatically uses ring 8. Pointcloud monitor reception varied (about 7.7 Hz in one window), so lossless capture is not claimed. A 12-second passive recorder run saved actual GPS, VN, IMU and scan messages; offline report generation was checked. Battery/E-stop telemetry has no publisher yet: micro-ROS agents opened THS1, and bounded probes of USB0/THS2 received no MCU session. User reports an Arduino RC/automatic mode switch; its firmware/protocol and actuator control are not verified. Camera is intentionally disconnected. Earlier no-data entries above describe pre-connection checks, not the current GPS/IMU/LiDAR state.
+
+Bounded rosbag sensor-regex check: stopped cleanly with SIGINT (timeout exit 124), metadata readable, 9.306 seconds / 61.3 MiB / 3099 messages, including 85 pointclouds, 86 packet scans, 85 LaserScans, 42 GPS fixes and 186 standard IMUs. Source/config mirror equality, XML parsing, Python compile checks and `git diff --check` passed. Trial surge preview printed its sequence without actuator execution. These checks do not claim every advertised VectorNav topic is a supported VN-100 measurement; its GNSS/position/body-velocity outputs are not used as navigation truth.
 
 The physical boat has not been driven by these tools. Hardware E-stop wiring, MCU timeout behavior, motor direction/neutral/deadband, reverse behavior, live power state, antenna/IMU/LiDAR extrinsics, heading offset, clock alignment, propeller thrust calibration, currents/waves and actual mass loading all require field confirmation. The trial runner can only attempt a software neutral command while communication and the process remain functional.
 
