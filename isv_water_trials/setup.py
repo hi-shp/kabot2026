@@ -15,4 +15,5 @@ setup(name='isv_water_trials', version='0.1.0', packages=find_packages(),
           'preflight = isv_water_trials.preflight:main',
           'mpc_replay = isv_water_trials.mpc:main',
           'command_proxy = isv_water_trials.proxy:main',
-          'arduino_bridge = isv_water_trials.arduino_bridge:main']})
+          'arduino_bridge = isv_water_trials.arduino_bridge:main',
+          'mode_test = isv_water_trials.mode_test:main']})

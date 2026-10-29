@@ -22,6 +22,12 @@ GPS, VectorNav IMU, Velodyne VLP16, 아두이노 상태 수신을 한 번에 시
 ros2 topic list
 ros2 topic echo /actuators/status
 
+# 다른 추진 명령 프로그램을 종료한 뒤, 별도 터미널에서 RC/AUTO 전환 시험
+ros2 run isv_water_trials mode_test --seconds 60
+# AUTO + 양쪽 스틱 중립 0.5초 확인 후 좌우 1540µs(최대 PWM 편차의 10%).
+# RC 전환 시 수동 우선, AUTO 복귀 시 중립 확인 후 재개. Ctrl+C/60초 후 AUTO 해제.
+# 한쪽만 시험: --side left 또는 --side right. 통신·신호 이상은 재개 없이 종료.
+
 # 센서와 명령 기록. Ctrl+C로 종료
 mkdir -p ~/water_trials
 ros2 bag record -o ~/water_trials/bag_$(date +%Y%m%d_%H%M%S) --regex '^/(gps/.*|vectornav/.*|velodyne_packets|velodyne_points|scan|sensor/.*|sensor_status|water_trial/.*|actuators/.*)$'
