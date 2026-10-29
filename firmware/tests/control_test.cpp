@@ -4,6 +4,8 @@
 #include <string>
 #include "../kabot_actuator/control_core.h"
 #include "../kabot_actuator/protocol.h"
+#include "../kabot_actuator/board_config.h"
+#include "../kabot_actuator/manual_response.h"
 
 std::string wire(const char* payload) {
   char crc[8]; snprintf(crc, sizeof(crc), "*%04X", kabot::crc16(payload, strlen(payload)));
@@ -20,12 +22,51 @@ void ready(kabot::Controller& c, uint32_t now = 100, uint16_t seq = 10) {
   assert(c.command(now, uint16_t(seq + 1), 'A', 1500, 1500));
 }
 int main() {
-  uint16_t left, right;
-  kabot::legacyRcMix(1485, 1490, left, right); assert(left == 1500 && right == 1500);
-  kabot::legacyRcMix(1385, 1490, left, right); assert(left == 1600 && right == 1600);
-  kabot::legacyRcMix(1485, 1590, left, right); assert(left == 1600 && right == 1400);
-  kabot::legacyRcMix(1460, 1510, left, right); assert(left == 1500 && right == 1500);
-  kabot::legacyRcMix(900, 2100, left, right); assert(left == 1900 && right == 1475);
+  static_assert(RC_FIRST_PIN == 2 && RC_SECOND_PIN == 3 && RC_MODE_PIN == 4, "Operator-confirmed receiver wiring");
+  static_assert(LEFT_ESC_PIN == 9 && RIGHT_ESC_PIN == 10 && ESTOP_PIN == -1, "Operator-confirmed output wiring");
+  for (uint16_t pulse : {uint16_t(900), uint16_t(1000), uint16_t(1299)})
+    assert(kabot::modeFromPwm(pulse, true) == kabot::AUTOMATIC);
+  for (uint16_t pulse : {uint16_t(1701), uint16_t(2000), uint16_t(2100)})
+    assert(kabot::modeFromPwm(pulse, true) == kabot::MANUAL);
+  for (uint16_t pulse : {uint16_t(0), uint16_t(899), uint16_t(1300), uint16_t(1500), uint16_t(1700), uint16_t(2101)})
+    assert(kabot::modeFromPwm(pulse, true) == kabot::INHIBITED);
+  assert(kabot::modeFromPwm(1000, false) == kabot::INHIBITED);
+  assert(kabot::modeFromPwm(2000, true, false) == kabot::AUTOMATIC);
+  kabot::ManualResponse rc;
+  auto manual = rc.update(0, 1700, 1300, true);
+  assert(manual.left == 1540 && manual.right == 1460);
+  manual = rc.update(100000, 1700, 1300, true);
+  assert(manual.left == 1540 && manual.right == 1460); // Holding never integrates speed.
+  manual = rc.update(100010, 2000, 1500, true);
+  assert(manual.left == 1580 && manual.right == 1500);
+  manual = rc.update(100159, 1988, 1500, true);
+  assert(manual.left == 1580 && manual.right == 1500);
+  manual = rc.update(100160, 1988, 1500, true);
+  assert(manual.left == 1900 && manual.right == 1500); // Left reaches maximum independently.
+  manual = rc.update(100170, 1988, 1940, true);
+  assert(manual.left == 1900 && manual.right == 1580); // Right confirmation starts separately.
+  manual = rc.update(100320, 1988, 1940, true);
+  assert(manual.left == 1900 && manual.right == 1900);
+  manual = rc.update(100321, 1899, 2000, true);
+  assert(manual.left == 1579 && manual.right == 1900); // Left release cannot change right maximum.
+  rc.update(100330, 1050, 2000, true);
+  manual = rc.update(100480, 1050, 2000, true);
+  assert(manual.left == 1100 && manual.right == 1900); // Opposite directions are independent too.
+  rc.update(100481, 1050, 1012, true);
+  manual = rc.update(100631, 1050, 1012, true);
+  assert(manual.left == 1100 && manual.right == 1100); // Endpoint tolerance in reverse too.
+  manual = rc.update(100641, 1050, 1012, false);
+  assert(manual.left == 1500 && manual.right == 1500); // RC->AUTO clears endpoint state.
+  manual = rc.update(100642, 1050, 1012, true);
+  assert(manual.left == 1420 && manual.right == 1420); // Re-entry cannot retain maximum.
+  manual = rc.update(100643, 1500, 1500, true);
+  assert(manual.left == 1500 && manual.right == 1500);
+  kabot::ManualResponse rollover;
+  rollover.update(0xFFFFFFF0U, 2000, 2000, true);
+  manual = rollover.update(134, 2000, 2000, true);
+  assert(manual.left == 1900 && manual.right == 1900); // 150ms across millis wrap.
+  assert(kabot::centerReferenced(1500, RC_RIGHT_CENTER_US) == 1500);
+  static_assert(RC_LEFT_CENTER_US == RC_RIGHT_CENTER_US && RC_LEFT_MIN_US == RC_RIGHT_MIN_US && RC_LEFT_MAX_US == RC_RIGHT_MAX_US, "Identical RC channel settings");
   assert(kabot::crc16("123456789", 9) == 0x29B1);
   assert(parse(wire("K1,65535,C,1560,1500")));
   const char* bad[] = {"K1,-1,C,1500,1500", "K1,65536,C,1500,1500", "K1,1,C,1500,1500,9",
@@ -53,6 +94,9 @@ int main() {
   assert(!c.command(515, 15, 'C', 1560, 1560)); // RC priority even with serial traffic.
   assert(c.command(516, 15, 'D', 1500, 1500));
   assert(c.left == 1700 && c.right == 1300); // Host shutdown cannot cancel RC control.
+  c.inputs(517, true, false, 1500, 1500, false);
+  assert(c.mode == kabot::AUTOMATIC && !c.armed && c.left == 1500 && c.right == 1500);
+  assert(!c.command(517, 16, 'C', 1540, 1540)); // RC->AUTO must stop; no retained arming.
   c.inputs(517, true, false, 1700, 1500, false);
   assert(c.left == 1500 && !c.armed);
   assert(!c.command(518, 16, 'A', 1500, 1500)); // Sticks must be neutral to arm.

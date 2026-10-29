@@ -10,10 +10,10 @@ constexpr int RIGHT_ESC_PIN = 10;
 #define KABOT_WIRING_VERIFIED 1
 #endif
 #ifndef KABOT_RC_FIRST_PIN
-#define KABOT_RC_FIRST_PIN 3
+#define KABOT_RC_FIRST_PIN 2
 #endif
 #ifndef KABOT_RC_SECOND_PIN
-#define KABOT_RC_SECOND_PIN 2
+#define KABOT_RC_SECOND_PIN 3
 #endif
 #ifndef KABOT_RC_MODE_PIN
 #define KABOT_RC_MODE_PIN 4
@@ -21,18 +21,22 @@ constexpr int RIGHT_ESC_PIN = 10;
 #ifndef KABOT_COMPILE_ONLY
 #define KABOT_COMPILE_ONLY 0
 #endif
-constexpr int RC_FIRST_PIN = KABOT_RC_FIRST_PIN;    // Left throttle OR throttle with RC_MIX.
-constexpr int RC_SECOND_PIN = KABOT_RC_SECOND_PIN;  // Right throttle OR steering.
+constexpr int RC_FIRST_PIN = KABOT_RC_FIRST_PIN;    // Port/left receiver PWM -> D9.
+constexpr int RC_SECOND_PIN = KABOT_RC_SECOND_PIN;  // Starboard/right receiver PWM -> D10.
 constexpr int RC_MODE_PIN = KABOT_RC_MODE_PIN;
-// Recovered from the original flash: ch D3 centered 1485, D2 centered 1490,
-// 39us deadband; left=1500+(1485-D3)+(D2-1490), right=1500+(1485-D3)-(D2-1490).
-constexpr bool RC_MIX = true;
-constexpr uint16_t RC_FIRST_CENTER_US = 1485;
-constexpr uint16_t RC_SECOND_CENTER_US = 1490;
-constexpr bool RC_MODE_IS_PWM = true;
+// Latest operator wiring correction: independent left/right PWM, no mixing.
 constexpr bool RC_HIGH_IS_MANUAL = true;
+// Operator correction: identical channels; right stick has no self-centering.
+constexpr uint16_t RC_LEFT_MIN_US = 1000;
+constexpr uint16_t RC_LEFT_CENTER_US = 1500;
+constexpr uint16_t RC_LEFT_MAX_US = 2000;
+constexpr uint16_t RC_RIGHT_MIN_US = RC_LEFT_MIN_US;
+constexpr uint16_t RC_RIGHT_CENTER_US = RC_LEFT_CENTER_US;
+constexpr uint16_t RC_RIGHT_MAX_US = RC_LEFT_MAX_US;
+constexpr uint16_t RC_ENDPOINT_MARGIN_US = 100;
+constexpr uint16_t RC_ENDPOINT_CONFIRM_MS = 150;
 constexpr bool LEFT_REVERSED = false;
 constexpr bool RIGHT_REVERSED = false;
-constexpr int ESTOP_PIN = -1;       // Optional NC-to-GND circuit; HIGH/open means stop.
+constexpr int ESTOP_PIN = -1;       // External EMO cuts ESC supply; no EMO input on this UNO.
 constexpr uint16_t NEUTRAL_US = 1500;  // Provisional: must match actual ESC setup.
 constexpr uint16_t AUTO_DELTA_LIMIT_US = 100;

@@ -3,14 +3,9 @@
 
 namespace kabot {
 enum Mode : uint8_t { INHIBITED = 0, MANUAL = 1, AUTOMATIC = 2 };
-inline uint16_t pwmLimit(int value) { return value < 1100 ? 1100 : value > 1900 ? 1900 : uint16_t(value); }
-inline void legacyRcMix(uint16_t first, uint16_t second, uint16_t& left, uint16_t& right,
-                        uint16_t firstCenter = 1485, uint16_t secondCenter = 1490, uint16_t neutral = 1500) {
-  int throttle = int(firstCenter) - int(first), steering = int(second) - int(secondCenter);
-  if (throttle > -40 && throttle < 40) throttle = 0;
-  if (steering > -40 && steering < 40) steering = 0;
-  left = pwmLimit(int(neutral) + throttle + steering);
-  right = pwmLimit(int(neutral) + throttle - steering);
+inline Mode modeFromPwm(uint16_t pulse, bool fresh, bool highIsManual = true) {
+  if (!fresh || pulse < 900 || pulse > 2100 || (pulse >= 1300 && pulse <= 1700)) return INHIBITED;
+  return ((pulse > 1700) == highIsManual) ? MANUAL : AUTOMATIC;
 }
 
 class Controller {

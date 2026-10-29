@@ -5,10 +5,13 @@
 #include <avr/wdt.h>
 #include "board_config.h"
 #include "control_core.h"
+#include "manual_response.h"
 #include "protocol.h"
 
 // This firmware is an actuator/RC arbiter. Navigation and MPC run on Jetson.
 kabot::Controller controller(NEUTRAL_US, AUTO_DELTA_LIMIT_US);
+kabot::ManualResponse manualRc(RC_LEFT_MIN_US, RC_LEFT_CENTER_US, RC_LEFT_MAX_US,
+                              RC_ENDPOINT_MARGIN_US, RC_ENDPOINT_CONFIRM_MS);
 Servo leftEsc, rightEsc;
 volatile uint32_t riseUs[3] = {}, fallUs[3] = {};
 volatile uint16_t pulseUs[3] = {};
@@ -64,15 +67,15 @@ void readInputs() {
   rcValid = hardwareReady;
   for (uint8_t i = 0; i < 3; ++i)
     rcValid = rcValid && pulses[i] >= 900 && pulses[i] <= 2100 && uint32_t(now - stamps[i]) < 100000;
-  // Intermediate/unknown switch level is inhibited, never an automatic fallback.
-  rcValid = rcValid && (pulses[2] < 1300 || pulses[2] > 1700);
-  bool manual = RC_HIGH_IS_MANUAL ? pulses[2] > 1700 : pulses[2] < 1300;
-  int l = pulses[0], r = pulses[1];
-  if (RC_MIX) {
-    uint16_t ml, mr;
-    kabot::legacyRcMix(pulses[0], pulses[1], ml, mr, RC_FIRST_CENTER_US, RC_SECOND_CENTER_US, NEUTRAL_US);
-    l = ml; r = mr;
-  }
+  const kabot::Mode selected = kabot::modeFromPwm(pulses[2], rcValid, RC_HIGH_IS_MANUAL);
+  rcValid = selected != kabot::INHIBITED;
+  const bool manual = selected == kabot::MANUAL;
+  // Independent receiver channels: D2 -> left D9, D3 -> right D10.
+  // Clear endpoint confirmation on every transition away from valid RC.
+  const uint32_t nowMs = millis();
+  const kabot::ManualOutput manualOutput = manualRc.update(nowMs, pulses[0], pulses[1], rcValid && manual);
+  const int l = manual ? manualOutput.left : kabot::centerReferenced(pulses[0], RC_LEFT_CENTER_US);
+  const int r = manual ? manualOutput.right : kabot::centerReferenced(pulses[1], RC_RIGHT_CENTER_US);
   estopActive = ESTOP_PIN >= 0 && digitalRead(ESTOP_PIN) == HIGH;
   controller.inputs(millis(), rcValid, manual, limited(l), limited(r), estopActive);
 }
