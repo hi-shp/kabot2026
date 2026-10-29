@@ -22,7 +22,10 @@
   <exec_depend>iahrs_ros2_driver</exec_depend>
   <exec_depend>mechaship_description</exec_depend>
   <exec_depend>wtrtk_ros2_driver</exec_depend>
-  <exec_depend>ydlidar_ros2_driver</exec_depend>
+  <exec_depend>velodyne_driver</exec_depend>
+  <exec_depend>velodyne_pointcloud</exec_depend>
+  <exec_depend>velodyne_laserscan</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
   <exec_depend>rf2o_laser_odometry</exec_depend>
   <exec_depend>ntrip_client</exec_depend>
   <exec_depend>nmea_navsat_driver</exec_depend>

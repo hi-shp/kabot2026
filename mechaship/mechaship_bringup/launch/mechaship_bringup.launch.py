@@ -5,6 +5,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition
 from launch_ros.actions import LifecycleNode, Node
 
 
@@ -42,6 +43,7 @@ def generate_launch_description():
         "mechaship_actuator_parameter", default_value=mechaship_actuator_parameter
     )
     actuator_cfg_node = Node(
+        condition=IfCondition(LaunchConfiguration('use_actuators')),
         executable="actuator_enable_node",
         package="mechaship_system",
         name="actuator_cfg_node",
@@ -60,6 +62,7 @@ def generate_launch_description():
         "mechaship_gps_parameter", default_value=mechaship_gps_parameter
     )
     gps_driver_node = Node(
+        condition=IfCondition(LaunchConfiguration('use_gps')),
         executable="wtrtk_ros2_driver",
         package="wtrtk_ros2_driver",
         name="wtrtk_ros2_driver",
@@ -109,6 +112,7 @@ def generate_launch_description():
         "mechaship_camera_parameter", default_value=mechaship_camera_parameter
     )
     usb_camera_node = Node(
+        condition=IfCondition(LaunchConfiguration('use_camera')),
         executable="usb_cam_node_exe",
         package="usb_cam",
         name="usb_cam_node_exe",
@@ -118,22 +122,21 @@ def generate_launch_description():
         # output="screen", # debug
     )
 
-    # LiDAR 드라이버
-    mechaship_lidar_parameter = LaunchConfiguration(
-        "mechaship_lidar_parameter",
-        default=os.path.join(pkg_share_dir_param, "mechaship_lidar.yaml"),
-    )
-    lidar_driver_launch_arg = DeclareLaunchArgument(
-        "mechaship_lidar_parameter", default_value=mechaship_lidar_parameter
-    )
-    lidar_driver_node = LifecycleNode(
-        executable="ydlidar_ros2_driver_node",
-        package="ydlidar_ros2_driver",
-        name="ydlidar_ros2_driver_node",
-        namespace="",
-        parameters=[mechaship_lidar_parameter],
-        emulate_tty=True,
-        # output="screen", # debug
+    # Velodyne on this boat; YDLIDAR is not required.
+    lidar_args = [
+        DeclareLaunchArgument('use_lidar', default_value='true'),
+        DeclareLaunchArgument('velodyne_model', default_value='VLP16'),
+        DeclareLaunchArgument('velodyne_ip', default_value='192.168.1.201'),
+        DeclareLaunchArgument('velodyne_ring', default_value='-1'),
+        DeclareLaunchArgument('use_lidar_odom', default_value='false'),
+    ]
+    lidar_driver_node = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(
+            get_package_share_directory('mechaship_bringup'), 'launch',
+            'velodyne_water_trial.launch.py')),
+        condition=IfCondition(LaunchConfiguration('use_lidar')),
+        launch_arguments={key: LaunchConfiguration(key) for key in
+                          ('velodyne_model', 'velodyne_ip', 'velodyne_ring')}.items(),
     )
 
     # IMU 드라이버
@@ -145,6 +148,7 @@ def generate_launch_description():
         "mechaship_imu_parameter", default_value=mechaship_imu_parameter
     )
     imu_driver_node = Node(
+        condition=IfCondition(LaunchConfiguration('use_imu')),
         executable="iahrs_ros2_driver_node",
         package="iahrs_ros2_driver",
         name="iahrs_ros2_driver",
@@ -168,6 +172,10 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            DeclareLaunchArgument('use_actuators', default_value='true'),
+            DeclareLaunchArgument('use_gps', default_value='true'),
+            DeclareLaunchArgument('use_camera', default_value='true'),
+            DeclareLaunchArgument('use_imu', default_value='true'),
             micro_ros_node,
             imu_reformatter_node,
             actuator_cfg_launch_arg,
@@ -179,7 +187,7 @@ def generate_launch_description():
             ntrip_client_node,
             usb_camera_launch_arg,
             usb_camera_node,
-            lidar_driver_launch_arg,
+            *lidar_args,
             lidar_driver_node,
             imu_driver_launch_arg,
             imu_driver_node,
