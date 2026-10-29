@@ -1,0 +1,97 @@
+<sdf version="1.8">
+  <model name="mechabot" canonical_link='base_footprint'>
+    <static>false</static>
+
+    <!-- Robot base footprint -->
+    <link name="base_footprint" />
+
+    <!-- Robot base -->
+    <joint name="base_joint" type="fixed">
+      <pose>0 0 0 0 0 0</pose>
+      <parent>base_footprint</parent>
+      <child>base_link</child>
+    </joint>
+
+    <link name="base_link">
+      <pose>0 0 0 0 0 0</pose>
+      <visual name="base_visual">
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>package://mechaship_description/models/mechaship/meshes/body.stl</uri>
+          </mesh>
+        </geometry>
+        <!-- Dark Color -->
+        <material>
+          <ambient>0.3 0.3 0.3 1.0</ambient>
+          <diffuse>0.3 0.3 0.3 1.0</diffuse>
+          <specular>0.3 0.3 0.3 1.0</specular>
+          <emissive>0.0 0.0 0.0 1.0</emissive>
+        </material>
+      </visual>
+    </link>
+
+    <joint name="imu_joint" type="fixed">
+      <pose>0 0 0 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>imu_link</child>
+    </joint>
+
+    <link name="imu_link" />
+
+    <!-- LiDAR -->
+    <joint name="scan_joint" type="fixed">
+      <pose>0 0 0 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>base_scan</child>
+    </joint>
+
+    <link name="base_scan">
+      <pose relative_to="base_link">-0.072 0 0.207947 0 0 0</pose>
+      <visual name="scan_visual">
+        <pose>0 0 -0.022 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>package://mechaship_description/models/mechaship/meshes/ydlidar_x4.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+        <!-- White Color -->
+        <material>
+          <ambient>1.0 1.0 1.0 1.0</ambient>
+          <diffuse>1.0 1.0 1.0 1.0</diffuse>
+          <specular>1.0 1.0 1.0 1.0</specular>
+          <emissive>0.0 0.0 0.0 1.0</emissive>
+        </material>
+      </visual>
+    </link>
+
+    <!-- Camera -->
+    <joint name="camera_joint" type="fixed">
+      <pose>0 0 0 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>camera_link</child>
+    </joint>
+
+    <link name="camera_link">
+      <pose relative_to="base_link">0.228391 0 0.148972 -1.5708 0.0680678 0</pose>
+      <visual name="scan_visual">
+        <pose>-0.0067 0.00255 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>package://mechaship_description/models/mechaship/meshes/rpi_camera_v2.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+        <!-- White Color -->
+        <material>
+          <ambient>1.0 1.0 1.0 1.0</ambient>
+          <diffuse>1.0 1.0 1.0 1.0</diffuse>
+          <specular>1.0 1.0 1.0 1.0</specular>
+          <emissive>0.0 0.0 0.0 1.0</emissive>
+        </material>
+      </visual>
+    </link>
+
+  </model>
+</sdf>

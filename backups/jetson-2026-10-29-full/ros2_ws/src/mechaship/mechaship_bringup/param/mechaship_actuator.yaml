@@ -1,0 +1,10 @@
+actuator_cfg_node:
+  ros__parameters:
+    key_min_degree: 30.0
+    key_max_degree: 150.0
+
+    key_pulse_0_degree: 500
+    key_pulse_180_degree: 2500
+
+    thruster_pulse_0_percentage: 1500
+    thruster_pulse_100_percentage: 2000
