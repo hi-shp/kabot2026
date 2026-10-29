@@ -12,7 +12,7 @@
   "vectornav_topic": "/vectornav/raw/common",
   "imu_topic": "/vectornav/imu",
   "battery_topic": "/sensor/battery/voltage",
-  "estop_topic": "/sensor/emo/status",
+  "estop_topic": "/actuators/stop_requested",
   "left_service": "/actuators/throttle_left/set_pulse_width",
   "right_service": "/actuators/throttle_right/set_pulse_width",
   "frame_confirmed": false,
@@ -32,5 +32,5 @@
   "current_east_m_s": 0.0,
   "current_north_m_s": 0.0,
   "thrust_calibration_csv": null,
-  "notes": "Raw VectorNav NED heading -> ENU CCW; mounting must be checked. Thrust and inertia unknown."
+  "notes": "Raw VectorNav NED heading -> ENU CCW; mounting must be checked. Thrust and inertia unknown. Stop topic is the Arduino RC/arm/watchdog interlock, NOT an independent wired emergency-stop circuit."
 }
