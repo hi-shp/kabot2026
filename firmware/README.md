@@ -1,35 +1,10 @@
-# 아두이노 정상 운용 기준
+# 현재 아두이노 펌웨어
 
-사용자가 정상 확인한 **2026-10-30 설정**입니다. 전체 명령·토픽·운용 방식은 [정상 운용 안내](../docs/BOAT_BASELINE_2026-10-30.md)를 참고합니다.
+`kabot_actuator/`는 젯슨 `/home/isv/boat_firmware/kabot_actuator/`에서 가져온 UNO R3 운용 소스입니다. 8개 파일의 SHA-256을 젯슨 원본과 비교했습니다.
 
-| 항목 | 현재 값 |
-|---|---|
-| 보드 / ESC | UNO R3 / Blue Robotics Basic ESC 500 |
-| 좌현 입력 / 출력 | 수신기 CH2 → UNO D2 / UNO D9 → 좌현 ESC |
-| 우현 입력 / 출력 | 수신기 CH3 → UNO D3 / UNO D10 → 우현 ESC |
-| 모드 입력 | **수신기 CH5 → UNO D4**, UNO D5 사용 안 함 |
-| RC 선택 | D4 >1700µs, 세 채널 모두 유효·최신 |
-| RC 입력 중심 / 중립 범위 | 양쪽1496µs / 1446~1546µs |
-| RC 입력 대칭 폭 | ±496µs, 공통 유효 끝점1000/1992µs |
-| RC 방향 반전 | 좌현true, 우현false |
-| AUTO 방향 반전 | 좌현true, 우현true |
-| ROS/시리얼 논리 명령 | 1100=후진, 1500=정지, 1900=직진 |
-| ESC 실제 정지·초기화 | **양쪽1480µs** |
-| 물리 출력 범위 / 주파수 | 1100~1900µs / Timer1 하드웨어400Hz |
-| 초기화 / RC→AUTO 중립 | 7초 / 20ms |
-| AUTO 명령 감시 / MCU watchdog | 400ms / 250ms |
-| EMO 감지 입력 | 없음(`ESTOP_PIN=-1`), 외부 EMO가 ESC 전원 차단 |
+- 입력: D2 좌현, D3 우현, D4 RC/AUTO 모드
+- 출력: D9 좌현, D10 우현
+- ESC: Blue Robotics Basic ESC 500, 정지·초기화 1480µs
+- 논리 명령: 1100~1900, 중립 1500
 
-실제 설정 기준은 [`board_config.h`](kabot_actuator/board_config.h)입니다. `actuators.json`은 참고 사본이며 `generate_config.py`는 현재 빌드에 자동 적용되지 않습니다.
-
-사용자 편의 표현인 **1000/1500/2000**은 현재 ROS API의 **1100/1500/1900**으로 변환해 사용합니다. 현재 API에1000/2000을 그대로 보내지 않습니다. 퍼센트는 PWM 폭 비율입니다.
-
-RC는 좌우 독립이며 중립 구간 밖에서 `round(400u²)`로 출력합니다. 최소 출력3배 보정·속도 누적·끝점 점프는 없습니다. 전후 최대값은 유지합니다. RC의 반전과 AUTO 반전은 서로 독립입니다.
-
-전원이 공급되면 펌웨어는 계속 실행됩니다. 부팅·브리지 USB 재연결·수신기 신규 연결 때 양쪽1480µs를7초 유지합니다. RC 단독 운용에는 ROS가 필요 없습니다. 초기화 중 AUTO A/C 요청은 거절하고 송신 노드는 재시도합니다.
-
-RC→AUTO는 이전 출력을 버리고20ms 중립 후 새 명령을 반영합니다. AUTO→RC는 RC가 우선합니다. 수신기 PWM이 유효하지 않으면 AUTO이며, 신호 소실 시 이전 명령을 해제합니다. 수신기가 계속 유효 PWM을 내보내면 무선 단절 자체는 판별하지 못합니다.
-
-시리얼은115200baud, `K1,seq,operation,left,right*CRC16`입니다. I=초기화, A=무장, C=좌우 명령, D=무장 해제, S=중립 정지, R=호환 해제 요청입니다. S 이후 RC는 양쪽 중립0.5초로 복귀합니다. 영구 정지 잠금은 없으며 지속 송신기는 새 무장으로 AUTO를 재개할 수 있습니다.
-
-[`jetson_upload.sh`](jetson_upload.sh)는 젯슨에서 실행합니다. 기본은 빌드만 수행하고 `--flash`는 포트 점유 검사, 기존 flash 이중 읽기·EEPROM 백업, 새 이미지 업로드·검증을 수행합니다. 상세 경로와 명령은 정상 운용 안내에 있습니다. 이 기준 저장 작업에서 펌웨어를 새로 업로드하거나 모터를 시험하지 않았습니다.
+설정은 [`board_config.h`](kabot_actuator/board_config.h)를 기준으로 합니다. 상세 동작과 업로드 방법은 [펌웨어 안내](../codex/firmware/README.md), 빌드·업로드 도구는 [`codex/firmware/jetson_upload.sh`](../codex/firmware/jetson_upload.sh)에 있습니다.

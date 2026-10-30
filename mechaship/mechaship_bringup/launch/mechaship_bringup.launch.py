@@ -15,25 +15,6 @@ def generate_launch_description():
         get_package_share_directory("mechaship_bringup"), "param"
     )
 
-    imu_reformatter_node = Node(
-        package="mechaship_bringup",
-        executable="imu_reformatter.py", # CMake에서 설치한 파일명과 일치해야 함
-        name="imu_reformatter",
-        output="screen",
-        emulate_tty=True,
-    )
-
-    # micro-ros
-    micro_ros_node = Node(
-        executable="micro_ros_agent",
-        package="micro_ros_agent",
-        name="micro_ros_agent",
-        namespace="",
-        arguments=["serial", "--dev", "/dev/ttyUROS"],
-        emulate_tty=True,
-        # output="screen", # debug
-    )
-
     # 액추에이터
     mechaship_actuator_parameter = LaunchConfiguration(
         "mechaship_actuator_parameter",
@@ -49,8 +30,9 @@ def generate_launch_description():
         name="actuator_cfg_node",
         namespace="",
         parameters=[mechaship_actuator_parameter],
+        # debug
+        output="screen",
         emulate_tty=True,
-        # output="screen", # debug
     )
 
     # GPS 드라이버
@@ -63,44 +45,19 @@ def generate_launch_description():
     )
     gps_driver_node = Node(
         condition=IfCondition(LaunchConfiguration('use_gps')),
-        executable="wtrtk_ros2_driver",
-        package="wtrtk_ros2_driver",
-        name="wtrtk_ros2_driver",
+        executable="ublox_gps_node",
+        package="ublox_gps",
+        name="ublox_gps_node",
         namespace="",
         parameters=[mechaship_gps_parameter],
+        remappings=[
+            ("diagnostics", "gps/diagnostics"),
+            ("fix", "gps/fix"),
+            ("fix_velocity", "gps/fix_velocity"),
+        ],
+        # debug
+        output="screen",
         emulate_tty=True,
-        # output="screen", # debug
-    )
-
-    # GPS NMEA 파서
-    gps_nmea_parser_node = Node(
-        executable="nmea_topic_driver",
-        package="nmea_navsat_driver",
-        name="nmea_topic_driver",
-        namespace="",
-        parameters=[],
-        remappings=[("fix", "gps/fix")],
-        emulate_tty=True,
-        # output="screen", # debug
-    )
-
-    # GPS NTRIP 클라이언트
-    ntrip_parameter = LaunchConfiguration(
-        "ntrip_parameter",
-        default=os.path.join(pkg_share_dir_param, "ntrip_info.yaml"),
-    )
-    ntrip_client_launch_arg = DeclareLaunchArgument(
-        "ntrip_parameter", default_value=ntrip_parameter
-    )
-    ntrip_client_node = Node(
-        executable="ntrip_ros.py",
-        package="ntrip_client",
-        name="ntrip_client",
-        namespace="",
-        parameters=[ntrip_parameter],
-        remappings=[("fix", "gps/fix")],
-        emulate_tty=True,
-        # output="screen", # debug
     )
 
     # USB 카메라 드라이버
@@ -118,8 +75,9 @@ def generate_launch_description():
         name="usb_cam_node_exe",
         namespace="",
         parameters=[mechaship_camera_parameter],
+        # debug
+        output="screen",
         emulate_tty=True,
-        # output="screen", # debug
     )
 
     # Velodyne on this boat; YDLIDAR is not required.
@@ -155,8 +113,9 @@ def generate_launch_description():
         namespace="",
         parameters=[mechaship_imu_parameter],
         remappings=[("imu/data", "imu"), ("imu/mag", "mag")],
+        # debug
+        output="screen",
         emulate_tty=True,
-        # output="screen", # debug
     )
 
     # 로봇 형상 정보 publish
@@ -170,21 +129,40 @@ def generate_launch_description():
         )
     )
 
+    # LiDAR 기반 Odometry publish
+    rf2o_laser_odometry_node = Node(
+        condition=IfCondition(LaunchConfiguration('use_lidar_odom')),
+        executable="rf2o_laser_odometry_node",
+        package="rf2o_laser_odometry",
+        name="rf2o_laser_odometry",
+        namespace="",
+        parameters=[
+            {
+                "laser_scan_topic": "scan",
+                "odom_topic": "odom",
+                "publish_tf": True,
+                "base_frame_id": "base_footprint",
+                "odom_frame_id": "odom",
+                "init_pose_from_topic": "",
+                "freq": 10.0,
+            }
+        ],
+        arguments=["--ros-args", "--log-level", "warn"],
+        # debug
+        output="screen",
+        emulate_tty=True,
+    )
+
     return LaunchDescription(
         [
             DeclareLaunchArgument('use_actuators', default_value='true'),
             DeclareLaunchArgument('use_gps', default_value='true'),
             DeclareLaunchArgument('use_camera', default_value='true'),
             DeclareLaunchArgument('use_imu', default_value='true'),
-            micro_ros_node,
-            imu_reformatter_node,
             actuator_cfg_launch_arg,
             actuator_cfg_node,
             gps_driver_launch_arg,
             gps_driver_node,
-            gps_nmea_parser_node,
-            ntrip_client_launch_arg,
-            ntrip_client_node,
             usb_camera_launch_arg,
             usb_camera_node,
             *lidar_args,
@@ -192,5 +170,6 @@ def generate_launch_description():
             imu_driver_launch_arg,
             imu_driver_node,
             robot_state_publisher,
+            rf2o_laser_odometry_node,
         ]
     )

@@ -28,8 +28,9 @@ def generate_launch_description():
         name="detect_node",
         namespace="",
         parameters=[yolov8_params],
+        # debug
+        output="screen",
         emulate_tty=True,
-        # output="screen", # debug
     )
 
     return LaunchDescription([yolov8_params_arg, yolov8_detect_node])

@@ -1,0 +1,45 @@
+# 깃허브에 커밋하는 법
+cd /home/ubuntu/ros2_ws/src
+git add .
+git commit -m "자율운항 최종코드"
+git push
+
+# foxglove on
+ros2 launch foxglove_bridge foxglove_bridge_launch.xml address:=0.0.0.0
+
+# gps 맵 띄우기
+/bin/python3 /home/ubuntu/ros2_ws/src/isv/launch_isv/test_code/test_GPS.py
+
+# gps 퍼블리시
+/bin/python3 /home/ubuntu/ros2_ws/src/isv/launch_isv/gps_publish.py
+
+# RTK 아이디 비번 바꾸기
+nano ~/ros2_ws/src/mechaship/mechaship_bringup/param/ntrip_info.yaml
+
+tmux new -s isv
+tmux attach -t isv
+tmux kill-session -t isv
+
+# 기타 명령어
+
+# 기존 ros2 프로세스 모두 종료
+sudo pkill -9 -f ros2
+
+# 남아있는 모든 pub 프로세스 제거
+sudo pkill -9 -f "ros2 topic pub"
+
+# 꼬인 통신 정보를 관리하는 데몬 초기화
+ros2 daemon stop
+ros2 daemon start
+
+# ros2와 관련된 모든 프로세스를 강제로 종료
+ps aux | grep ros | awk '{print $2}' | xargs kill -9
+
+# 테스트용 gps좌표 임의값 한 번 주기
+ros2 topic pub -1 /gps/fix sensor_msgs/msg/NavSatFix "{latitude: 35.2316117, longitude: 129.08254347}"
+
+# 기존 빌드 삭제하고 cb
+cd ~/ros2_ws
+rm -rf build/ install/ log/
+colcon build --symlink-install
+source install/setup.bash

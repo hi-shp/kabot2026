@@ -1,9 +1,11 @@
 import os
+import yaml
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.substitutions import LaunchConfiguration
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 
 
@@ -12,29 +14,32 @@ def generate_launch_description():
     pkg_share_dir_param = os.path.join(
         get_package_share_directory("mechaship_system"), "param"
     )
-
-    mechaship_actuator_parameter = LaunchConfiguration(
-        "mechaship_actuator_parameter",
-        default=os.path.join(pkg_share_dir_param, "actuator.yaml"),
+    actuator_params = LaunchConfiguration(
+        "actuator_params",
+        default=os.path.join(
+            get_package_share_directory("mechaship_system"),
+            "param",
+            "actuator.yaml",
+        ),
     )
-    actuator_enable_launch_arg = DeclareLaunchArgument(
-        "mechaship_actuator_parameter",
-        default_value=mechaship_actuator_parameter,
+    actuator_params_arg = DeclareLaunchArgument(
+        "actuator_params",
+        default_value=actuator_params,
     )
 
     actuator_enable_node = Node(
-        executable="actuator_enable_node",
         package="mechaship_system",
+        executable="actuator_enable_node",
         name="actuator_enable_node",
         namespace="",
-        parameters=[mechaship_actuator_parameter],
+        output="screen",
         emulate_tty=True,
-        # output="screen", # debug
+        parameters=[actuator_params],
     )
 
     return LaunchDescription(
         [
-            actuator_enable_launch_arg,
+            actuator_params_arg,
             actuator_enable_node,
         ]
     )

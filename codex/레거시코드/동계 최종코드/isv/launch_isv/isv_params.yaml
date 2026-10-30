@@ -1,0 +1,45 @@
+# 1. ROS 노드 기본 설정
+node_settings:
+  timer_period: 0.1  # 10Hz
+
+# 2. 서보 모터(Key) 설정
+servo:
+  min_deg: 30.0
+  max_deg: 150.0
+  neutral_deg: 90.0
+
+# 3. GPS 및 주행 목표
+navigation:
+  waypoints:
+    - [35.20417994, 129.21250807]   # WP 0: 호핑 구간 진입점
+    - [35.20419992, 129.21243434]
+    - [35.20416613, 129.21225879]
+  arrival_radius: # 지점별 도달 판정 범위 (m)
+    - 0.5
+    - 2.0
+    - 1.5
+
+# 4. 코스별 쓰러스터 출력
+thruster:
+  course1: 25.0  # Course 1
+  course2: 25.0  # Course 2
+  course3: 15  # Course 3
+
+# 5. 객체 인식
+vision:
+  screen_width: 640
+  angle_conversion_factor: 90.0
+  available_objects: # 인식 가능한 객체 후보
+    - "Blue Circle"
+    - "Blue Cross"
+    - "Blue Triangle"
+    - "Green Circle"
+    - "Green Cross"
+    - "Green Triangle"
+    - "Purple Buoy"
+    - "Red Circle"
+    - "Red Cross"
+    - "Red Triangle"
+  hoping_target: "Purple Buoy"
+  detection_target: "Blue Circle"
+  

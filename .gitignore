@@ -8,6 +8,7 @@ AGENTS.md
 CLAUDE.md
 GEMINI.md
 .cursor/rules/
+**/.cursor/rules/
 **/__pycache__/
 *.py[cod]
 build/

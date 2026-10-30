@@ -3,7 +3,7 @@ usb_cam_node_exe:
     video_device: /dev/videoRGBCAMERA0
     framerate: 30.0
     io_method: mmap
-    frame_id: camera_link
+    frame_id: camera_frame
     pixel_format: mjpeg2rgb
     av_device_format: YUV422P
     image_width: 640

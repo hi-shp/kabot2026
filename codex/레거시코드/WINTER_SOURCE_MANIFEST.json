@@ -1,0 +1,1484 @@
+{
+  "commit": "d31054800c28b6a8372cae9fb7c96ee1bfd0d09e",
+  "title": "자율운항 최종코드",
+  "git_commit_date_kst": "2026-02-03T17:32:19+09:00",
+  "files": [
+    {
+      "path": "codex/레거시코드/동계 최종코드/README.md",
+      "original_path": "README.md",
+      "mode": "100644",
+      "git_blob": "c1e606c68ef6f21563be64358e74847e6afa5160",
+      "sha256": "971181c8968d00146b3f03375cfa889a5016685d31943c4e7ed8aec0a4dac780"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/images/image01.png",
+      "original_path": "images/image01.png",
+      "mode": "100644",
+      "git_blob": "dfdec5dde0d97dcc4d7393b6e4b9a7eb3e0284f6",
+      "sha256": "dce38d0d747eb07e06cf6ffdac3b91c831139bb274fa541dc9c5054d9f5282c9"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/images/image02.png",
+      "original_path": "images/image02.png",
+      "mode": "100644",
+      "git_blob": "99ef4d7bf7783868bbf8b4269d930c86437d4ae1",
+      "sha256": "0690f830493006e5aa98a92193b5da211f3fcd22b59515fe4a39f9bc3390dc15"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/images/image03.png",
+      "original_path": "images/image03.png",
+      "mode": "100644",
+      "git_blob": "563b20357ecb5cb8a5ec90bada3fefaaa009ae16",
+      "sha256": "97ecb7ea506b16543865a6cfd8fc49f91f5a7b2bd784a20e84bd6be0302cb85f"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/images/image04.png",
+      "original_path": "images/image04.png",
+      "mode": "100644",
+      "git_blob": "bc8e3365c2c0ca3ebc4d98c39b367f0b7c64e835",
+      "sha256": "84a9cbfeafe7d9e529790c3b140eec4d5792bd1d2238f39c30443f0d99e713ba"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__init__.py",
+      "original_path": "isv/launch_isv/__init__.py",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/Lidar_Preprocess.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/Lidar_Preprocess.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "3a1d60587994dbf564b6c8ae92fa7ec095fdef98",
+      "sha256": "e9abce648148890c53e401d5eb879439d17aa7b4e6d2de705765fc10bed98f04"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/__init__.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/__init__.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "c92befa725da4a7380c28cf611e06dddc77613cd",
+      "sha256": "688274f661d428c3bad4ac157d6025623e5f3684081811da46f6ad9be3fdfe0d"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/control_panel.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/control_panel.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "b7dd897e95649df1dff9a000dbfe9a4d91e6f25d",
+      "sha256": "d39417972570a607b2bc47063772db36fd53ee4792b30841dcb0466adf89e506"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/course1.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/course1.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "f0a32647137de530a4939002aeaee9dddbc8256b",
+      "sha256": "c06456d83c865b5a36ffcea015522fd4d37e80e6c6c958fddf5196a0ca8d7606"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/course2.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/course2.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "b2d5048010c7c376c0dfd8780c161a6457dca2b0",
+      "sha256": "b677426725b9be25c4af68b9aabd9600688cd6647cf6bc159cb2407b019d5768"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/course3.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/course3.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "7b6ea8e3c7ec6eb8d7e76a672ac520d774ecced2",
+      "sha256": "a2e1decd4f96d4cdda371b3b51da97d9b0cea6761a848cfa635c799faf161db7"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/get_gps.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/get_gps.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "92a50948a4a0a01fa04a0f4aed428502f5646f24",
+      "sha256": "3a3839b0d7e1b8bf2dbe85cfd589733cc45decfe70cf603b27204f16fb4d632f"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/gps_pursue.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/gps_pursue.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "43130c25078afcd021645502ec2cec5098c94d81",
+      "sha256": "115f7853fe43d13a98650f9a6235f6a4cc25ddc8ad80be012616044bd126e716"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/isv_2026.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/isv_2026.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "bc70cbf15e8d9e895a0e5ebd9e8ddad3bc30295d",
+      "sha256": "34aa54baefe738663cb2b95c66c8213e92796f72ec7a4babd8d4ef3a0aa4f52e"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/lidar_process.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/lidar_process.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "432935a7df897200d9ea8ed219f350f2da28b86c",
+      "sha256": "e9e6f3288d3cae47ba4a3f39cf01b556ec613b6c403a3cffec1839467bf8af9a"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/obstacle_isv.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/obstacle_isv.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "98daec21e1aad495256d9d069fa8dfdc68af2ceb",
+      "sha256": "d0a3212f6ec8af14ea08cb7fafc9ba628f54fc3c25e26e34ac05418ab58215cf"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/__pycache__/status3_test.cpython-312.pyc",
+      "original_path": "isv/launch_isv/__pycache__/status3_test.cpython-312.pyc",
+      "mode": "100644",
+      "git_blob": "6bbb484e8af8498af246a4052d455e30a62cfa40",
+      "sha256": "03fa420a5dc3c8c9918eb6e5f4beaa5476478a7d5da6a2984f1121bd429e664b"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/course1.py",
+      "original_path": "isv/launch_isv/course1.py",
+      "mode": "100644",
+      "git_blob": "99453d8eec0c14e7dbdeb088a85bb95d082c8d97",
+      "sha256": "fb6c9ae8f3675fd7383827c441e63598e2735bd620df5af0b6312ca62376544d"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/course2.py",
+      "original_path": "isv/launch_isv/course2.py",
+      "mode": "100644",
+      "git_blob": "81fec6f81d203c2b6426de3d6ed4de0e50f6e7e7",
+      "sha256": "7234de1434023724cb26ae4d86427e4673358b8ed1d1c000c195a4cd77a2ef57"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/course3.py",
+      "original_path": "isv/launch_isv/course3.py",
+      "mode": "100644",
+      "git_blob": "46c429a6ab533bc79e0d1336e9d649604adc0320",
+      "sha256": "87bc4c15f355efbd3d640d05e793ed727655b91c955422201a10c80b5748b866"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/gps.py",
+      "original_path": "isv/launch_isv/gps.py",
+      "mode": "100644",
+      "git_blob": "2ec366c790ab0371a787471e539cc83f11f61673",
+      "sha256": "ca5141569b1fccf97d2d2ab269bccee2562f22baad6480f1fe14fb675112533e"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/gps_publish.py",
+      "original_path": "isv/launch_isv/gps_publish.py",
+      "mode": "100644",
+      "git_blob": "700eecc9791e4b927e135e5348325c8953326566",
+      "sha256": "2d3fa1892d6531e3f928226e9c836d505e503bb951853f1dd889bfdbdbb52252"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/isv_2026.py",
+      "original_path": "isv/launch_isv/isv_2026.py",
+      "mode": "100644",
+      "git_blob": "317919bc1f6371ac0bfe0b36a048a39b69f029dc",
+      "sha256": "a27f8f3e8c898c8c75f3793605cbdfb7d9d6998cca0ce9561f7efbd178c5ee49"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/isv_params.yaml",
+      "original_path": "isv/launch_isv/isv_params.yaml",
+      "mode": "100644",
+      "git_blob": "3f9c6448db8d0ae16b4e0c78cee9ae0f0115bb58",
+      "sha256": "693200b0e51be09a3445e542394c70e48326c1825f332a0a00e5eb394a2020f2"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/test_code/test_EMO.py",
+      "original_path": "isv/launch_isv/test_code/test_EMO.py",
+      "mode": "100644",
+      "git_blob": "23a43bfcbaf5634a67ba722367a70dcd4cfe8834",
+      "sha256": "41cdf1c0809717eaad1407bc7c68080bf9f695d340023d29938fcc164502f589"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/test_code/test_GPS.py",
+      "original_path": "isv/launch_isv/test_code/test_GPS.py",
+      "mode": "100644",
+      "git_blob": "398612121cb9466771aab0cdc90b905b29817b49",
+      "sha256": "08ff0038baa0a8eb3e444b55e3690449f6dd7f90f0bc1310b6ce5c8ab2ac7f3c"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/test_code/test_IMU.py",
+      "original_path": "isv/launch_isv/test_code/test_IMU.py",
+      "mode": "100644",
+      "git_blob": "ee9607dbd66ee3ea7dd4c07a0c82a8ada6b93590",
+      "sha256": "7dc9887aed3706b0390270a792f75b2a88e394ae23649195c2b430c5122dbe37"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/test_code/test_LED.py",
+      "original_path": "isv/launch_isv/test_code/test_LED.py",
+      "mode": "100644",
+      "git_blob": "b5387628bc68a5a5fc7badefdac39c9a2f678111",
+      "sha256": "f024470047fbe5127946a30ab2717a3937d9f3086b1284e0404166832e3eca93"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/test_code/test_LiDAR.py",
+      "original_path": "isv/launch_isv/test_code/test_LiDAR.py",
+      "mode": "100644",
+      "git_blob": "79fdf95336c9392ea82ccd4940c8003cb19bbf07",
+      "sha256": "bc925d38029707c5136aa85aa88d09aef4d4876a000ec08112be98df2efc4de4"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/test_code/test_buzzer.py",
+      "original_path": "isv/launch_isv/test_code/test_buzzer.py",
+      "mode": "100644",
+      "git_blob": "0307bb6d40732834beff270ac1f3d6f9f88fc5c0",
+      "sha256": "44c7fc34f11437dc57730e1b4b2a899241ec951af57ec275f1f14cc9e97988f9"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/test_code/test_key.py",
+      "original_path": "isv/launch_isv/test_code/test_key.py",
+      "mode": "100644",
+      "git_blob": "7bdf62ae5ff63dfc98bad972938fd9de7ce035ec",
+      "sha256": "e90f2a66b2e4057c79bd55491bd0b8f96bb55486eb811ee99cfae89531e646eb"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/launch_isv/test_code/test_thruster.py",
+      "original_path": "isv/launch_isv/test_code/test_thruster.py",
+      "mode": "100644",
+      "git_blob": "c3af62a832fc24f1985c266f9e636bd7d9f7e5e8",
+      "sha256": "6f32443841a45e8a79eb292808f954a30e07063c8a6a2a00377f84da73dd349d"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/package.xml",
+      "original_path": "isv/package.xml",
+      "mode": "100644",
+      "git_blob": "308ef0a49c69dfa057570a6d85fe80688e88c68f",
+      "sha256": "69d007ba6e6a12a69bee09ec7fd4b9f6667a433e47f8fe0b90209e8f26de23e2"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/resource/isv",
+      "original_path": "isv/resource/isv",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/setup.cfg",
+      "original_path": "isv/setup.cfg",
+      "mode": "100644",
+      "git_blob": "6b63baf3be8ce0bc041aff20952a4c32b12b07c1",
+      "sha256": "9ef4b3afedf9589f0ea2f3e14f938a4eba7bf0397fc2240fc97ee1e8d61367ea"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/isv/setup.py",
+      "original_path": "isv/setup.py",
+      "mode": "100644",
+      "git_blob": "a57ab67664bdc0b5ee8b51040a0820e78bc519df",
+      "sha256": "8b3964557b2608bb3b2dd502b88a07c2f1205ab5dd2fdd772813d1d9176818ab"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/.gitignore",
+      "original_path": "mechaship/.gitignore",
+      "mode": "100644",
+      "git_blob": "c62e40a5b5cb4b67425cd27184f74489154a014c",
+      "sha256": "aeae021fbf90e3c8524606cabe7fa4d28625f492a19ff48dd0eedad36d06bce1"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/.gitmodules",
+      "original_path": "mechaship/.gitmodules",
+      "mode": "100644",
+      "git_blob": "06c3274721e7510ef4ade74da64227cfb3281d91",
+      "sha256": "7950d24d8f07fabbd6952114277e36fe800e80b8298274897513785cdd6f8919"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/.gitignore",
+      "original_path": "mechaship/iahrs_ros2_driver/.gitignore",
+      "mode": "100644",
+      "git_blob": "600d2d33badf45cc068e01d2e3c837e11c417bc4",
+      "sha256": "27bf025903b14c7d22e5415f78b31443828f0a7ecff34a2d7e722624550282d6"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/LICENSE",
+      "original_path": "mechaship/iahrs_ros2_driver/LICENSE",
+      "mode": "100644",
+      "git_blob": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/CMakeLists.txt",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/CMakeLists.txt",
+      "mode": "100644",
+      "git_blob": "02a85ad44e0a7f148e8b11d17aa88792ce03d7f7",
+      "sha256": "8af197225d7f37692926dd6f030c127b19df26db5a3ef9d6f90678fcceb23481"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/include/iahrs_ros2_driver/iahrs_driver.hpp",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/include/iahrs_ros2_driver/iahrs_driver.hpp",
+      "mode": "100644",
+      "git_blob": "6cacc13a9365709f7c014954f66a7ca7b438f1d8",
+      "sha256": "1e49fd165708e9bb9b73ef7c4afa275fbf5688ce9c4b6c5022690c21eef2321d"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/include/iahrs_ros2_driver/iahrs_obj.hpp",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/include/iahrs_ros2_driver/iahrs_obj.hpp",
+      "mode": "100644",
+      "git_blob": "565684682957f7fa463c4e2e7945e3b387927b7a",
+      "sha256": "b7959e19bfd62d44661350de560110d1dfa6914e139b19b9892638d41a609135"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/include/iahrs_ros2_driver/iahrs_ros2_driver_node.hpp",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/include/iahrs_ros2_driver/iahrs_ros2_driver_node.hpp",
+      "mode": "100644",
+      "git_blob": "85b6446facc28c131196f861a94eac841d8bad10",
+      "sha256": "09985b62f7f0f06cdec99f3e3fbb7bda3a4f40bc09aadd2573a7bc01ba05972b"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/include/iahrs_ros2_driver/serial.hpp",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/include/iahrs_ros2_driver/serial.hpp",
+      "mode": "100644",
+      "git_blob": "41d6a06e14263e8c1a7061c832465b02bbdf86d1",
+      "sha256": "081954f23bfbae9e9216ba6fbe295ff3646e55063fffc9f321b4cf9b0a643c5a"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/launch/iahrs_driver.launch.py",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/launch/iahrs_driver.launch.py",
+      "mode": "100644",
+      "git_blob": "70c16d969824f2820c56982249adba4a4720f0e1",
+      "sha256": "c629850be24c846d1043fd4a38431a39c6ef748a0002dc77a98a94a189d646e6"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/package.xml",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/package.xml",
+      "mode": "100644",
+      "git_blob": "1b6bec5c34c52b6d3271c54419c01e570b75c38a",
+      "sha256": "79cb4fa6dd15b9a8feaa3e6765598b8c67505233024083f86c39503aa2b05a45"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/param/config.yaml",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/param/config.yaml",
+      "mode": "100644",
+      "git_blob": "923410d744b72ce3244e0c84240ad7d0edb2d900",
+      "sha256": "ecdf13f9543be2d4c0649f7f8c989a231f9d2b4ea103c12d916c43569be6032e"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/src/iahrs_driver.cpp",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/src/iahrs_driver.cpp",
+      "mode": "100644",
+      "git_blob": "0ce5d7c5e4ffc8e9e1aa56f8dabe0adda41f0a13",
+      "sha256": "d8851b0d36fb556c6e47aa2d5a0b862d05f72d20524e92f81e832229ae828d60"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/src/iahrs_ros2_driver_node.cpp",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/src/iahrs_ros2_driver_node.cpp",
+      "mode": "100644",
+      "git_blob": "45034855539b9233ee4bf304832b24a65ecb4667",
+      "sha256": "4878a1dc43478a025f3dde1e613cf83859bcae6411492170a54b693af436aa63"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/src/serial.cpp",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/src/serial.cpp",
+      "mode": "100644",
+      "git_blob": "e6530fa89b84f18fd287dd3a7d6ed40f1ef00025",
+      "sha256": "44d1ab0fa6e52785bc18955a984781cd4fd631edfe0facb77e1b6b6395c8b907"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/srv/ResetOrientation.srv",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/srv/ResetOrientation.srv",
+      "mode": "100644",
+      "git_blob": "2969a95308ad815fc1204dd475ce36dd7391b25b",
+      "sha256": "f7b7d4dc8f765f074820b4a9adca60d1dbb042b009fc153140971161bb9eb1ef"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver/srv/Restart.srv",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver/srv/Restart.srv",
+      "mode": "100644",
+      "git_blob": "2969a95308ad815fc1204dd475ce36dd7391b25b",
+      "sha256": "f7b7d4dc8f765f074820b4a9adca60d1dbb042b009fc153140971161bb9eb1ef"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver_msgs/CMakeLists.txt",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver_msgs/CMakeLists.txt",
+      "mode": "100644",
+      "git_blob": "422f79a2f57286058715f59e4d8eab68885a3251",
+      "sha256": "3d378452964083f1151603958174ab89745c9cae1e972c6ab3c8dddd6d9bcf14"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver_msgs/package.xml",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver_msgs/package.xml",
+      "mode": "100644",
+      "git_blob": "57d5a7d1c66ff1a16d71009e0f30278d1c0cbcb7",
+      "sha256": "5be4183ef4d368e51b3f1a006dbea5286e6b0a7fc921817b71620a954b62e690"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver_msgs/srv/ResetOrientation.srv",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver_msgs/srv/ResetOrientation.srv",
+      "mode": "100644",
+      "git_blob": "2969a95308ad815fc1204dd475ce36dd7391b25b",
+      "sha256": "f7b7d4dc8f765f074820b4a9adca60d1dbb042b009fc153140971161bb9eb1ef"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/iahrs_ros2_driver/iahrs_ros2_driver_msgs/srv/Restart.srv",
+      "original_path": "mechaship/iahrs_ros2_driver/iahrs_ros2_driver_msgs/srv/Restart.srv",
+      "mode": "100644",
+      "git_blob": "2969a95308ad815fc1204dd475ce36dd7391b25b",
+      "sha256": "f7b7d4dc8f765f074820b4a9adca60d1dbb042b009fc153140971161bb9eb1ef"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/CMakeLists.txt",
+      "original_path": "mechaship/mechaship_bringup/CMakeLists.txt",
+      "mode": "100644",
+      "git_blob": "5953fca6b182d9ddbd2658aee2ea727f9486852b",
+      "sha256": "60e6adacd17a3a049cd67732e3f5341f257929c9dd9941787d348facdbf6673b"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/hooks/mechaship_bringup.sh.in",
+      "original_path": "mechaship/mechaship_bringup/hooks/mechaship_bringup.sh.in",
+      "mode": "100644",
+      "git_blob": "1039d46947d5c715bdde2b0f4d60fcb15aa71744",
+      "sha256": "80f3c54597a8234011720849a059f807a1a31339e8c36b4f0c52acf5910092ad"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/launch/mechaship_bringup.launch.py",
+      "original_path": "mechaship/mechaship_bringup/launch/mechaship_bringup.launch.py",
+      "mode": "100644",
+      "git_blob": "dfedbbd730cd7a0be92a248af1d03a02f0924e79",
+      "sha256": "298a37cd09b1309ca30506bee3da661f209a74ceb9a5c08f433444c8b92ce262"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/package.xml",
+      "original_path": "mechaship/mechaship_bringup/package.xml",
+      "mode": "100644",
+      "git_blob": "6614a4fff208cb4b0c924f78e863310ec045d221",
+      "sha256": "82af5568e1ba75db0dbb02121eb7d501766c4e357fe51d97e618011e1be04cbe"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/param/camera_info.yaml",
+      "original_path": "mechaship/mechaship_bringup/param/camera_info.yaml",
+      "mode": "100644",
+      "git_blob": "3ecb775c308969ffe709af6e7576cc3a509a8832",
+      "sha256": "b9908878d86b98dfb8dda3e3cb724409da7e0bfc5dcbc295667d15eb136da54a"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/param/mechaship_actuator.yaml",
+      "original_path": "mechaship/mechaship_bringup/param/mechaship_actuator.yaml",
+      "mode": "100644",
+      "git_blob": "487e651a53c35019bf71dc539019a6bfa350194f",
+      "sha256": "0c37d8689f2c06ba97f130ee164c7de69e0e701faa9a38214e7cc15b777e14aa"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/param/mechaship_camera.yaml",
+      "original_path": "mechaship/mechaship_bringup/param/mechaship_camera.yaml",
+      "mode": "100644",
+      "git_blob": "09307ffc4819e04515dadc9c780a1e0048f3c482",
+      "sha256": "4319dfcc95b0bdcc280217d6ef0e6833b6eaa95fce2ce9ea274d39c87bbe2b3a"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/param/mechaship_gps.yaml",
+      "original_path": "mechaship/mechaship_bringup/param/mechaship_gps.yaml",
+      "mode": "100644",
+      "git_blob": "0c19d574c0139512931c672a9a622db1dc0e4d6b",
+      "sha256": "dd0ff11b4cb3b8eb5f3837dd8e49879381c3f94e8e113e5b3d0221a4dce8b7e9"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/param/mechaship_imu.yaml",
+      "original_path": "mechaship/mechaship_bringup/param/mechaship_imu.yaml",
+      "mode": "100644",
+      "git_blob": "7db2898f6474ac0fc1f0abf50ce9c1121ca1287b",
+      "sha256": "4cce73395e19df1694473992063104d4f74f918194a099b61bb032bc1faecafe"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/param/mechaship_lidar.yaml",
+      "original_path": "mechaship/mechaship_bringup/param/mechaship_lidar.yaml",
+      "mode": "100644",
+      "git_blob": "8d76adc520cd1c7f671d8b5a677e1dd47818ae00",
+      "sha256": "918c70d76edecd3dbfa0240d5e0c08c2153062c171d0aabf82d785e3898eba25"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/param/ntrip_info.yaml",
+      "original_path": "mechaship/mechaship_bringup/param/ntrip_info.yaml",
+      "mode": "100644",
+      "git_blob": "859ec14d5626cba80c0bd6ee0ff0723629150700",
+      "sha256": "a73fe0c405b304d5bd5aa14007c24b8a8cb9ed3941b3f775777afd6290af86da",
+      "disposition": "credential_values_redacted_in_public_copy",
+      "published_sha256": "4651c34d3d9960c3734961b50b2a4d90cb2687597865cd6c5a14539223585a5b",
+      "published_git_blob": "701fc5d5dc78f3686199a6f3cfb0164dff0fe7c1"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/param/ntrip_info.yamlyyyyy",
+      "original_path": "mechaship/mechaship_bringup/param/ntrip_info.yamlyyyyy",
+      "mode": "100644",
+      "git_blob": "1ff20649514412e4cd6074c4859c73e228c7101e",
+      "sha256": "13d7eb06f7f8c8f346b07fb0f09cc2e352af3f75bdd43a57d988b568ecaa48c0",
+      "disposition": "credential_values_redacted_in_public_copy",
+      "published_sha256": "92dc275416ec1688a0ac37ad1ddd9c471e1f416984adff6ff8647fe248972ac0",
+      "published_git_blob": "9fe081b5cda7fd3ba11017fb3e4f62c79962905e"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/scripts/imu_reformatter.py",
+      "original_path": "mechaship/mechaship_bringup/scripts/imu_reformatter.py",
+      "mode": "100755",
+      "git_blob": "1e4bf9647fb152aceeef1aa575e787ec05d68e8a",
+      "sha256": "7d20268635c75529946730265953a29c3969faca245802f0bde474f6bf1fd713"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_description/CMakeLists.txt",
+      "original_path": "mechaship/mechaship_description/CMakeLists.txt",
+      "mode": "100644",
+      "git_blob": "c47c00e46e72db7c1d43b8a33f64c5c81881b970",
+      "sha256": "a6f24c82a8b28be498622e5c98df84cbc5e9c35d337d1cae94df80296df95742"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_description/hooks/mechaship_description.dsv.in",
+      "original_path": "mechaship/mechaship_description/hooks/mechaship_description.dsv.in",
+      "mode": "100644",
+      "git_blob": "39a150188c4e24523d76e137a8fc03288e5ba4eb",
+      "sha256": "764f06dbea2b44a68d6363d7580ae652b525abb59831ad2abb5c693993c76425"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_description/launch/mechaship_state_publisher.launch.py",
+      "original_path": "mechaship/mechaship_description/launch/mechaship_state_publisher.launch.py",
+      "mode": "100644",
+      "git_blob": "0baa7e54499ea42559c0185d071ef0c520c49f4e",
+      "sha256": "d4a66154d6b0cf2a90a6054bd4be76a84d62ccb2d96a02301763e68b2127b229"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_description/models/mechaship/meshes/BASE.stl",
+      "original_path": "mechaship/mechaship_description/models/mechaship/meshes/BASE.stl",
+      "mode": "100644",
+      "git_blob": "9f9c483941d3c23cab0e0c88710663ffea69dab4",
+      "sha256": "1ecaf779ef753e2ae6e016b2a56e7dde598d6e7aba3982ed39ac7048519f1619"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_description/models/mechaship/meshes/CAMERA.stl",
+      "original_path": "mechaship/mechaship_description/models/mechaship/meshes/CAMERA.stl",
+      "mode": "100644",
+      "git_blob": "9f60d67c91f808ae24c1e470f8de3dc453e7f152",
+      "sha256": "6f038c2f85f26948f947558ef0c8bdaaa3bfed549ffad6435516c1f132f5dd1d"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_description/models/mechaship/meshes/KEY.stl",
+      "original_path": "mechaship/mechaship_description/models/mechaship/meshes/KEY.stl",
+      "mode": "100644",
+      "git_blob": "aa1e21ffcdc204b4d27b4b64b8ca880aa333bfd4",
+      "sha256": "c0030613f4c6ea0f4862ed77c4f404d4804b6be7719c70734a4e86732736c8c4"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_description/models/mechaship/meshes/LiDAR.stl",
+      "original_path": "mechaship/mechaship_description/models/mechaship/meshes/LiDAR.stl",
+      "mode": "100644",
+      "git_blob": "ff56334f4b3b6f5e8d49cb1253d4d59ab9405325",
+      "sha256": "db85dcae034b4eb206402717c6d862d260e52640aa575b8eed25b03222269e68"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_description/models/mechaship/meshes/THRUSTER.stl",
+      "original_path": "mechaship/mechaship_description/models/mechaship/meshes/THRUSTER.stl",
+      "mode": "100644",
+      "git_blob": "537027d59812fe243063878951456094a239f7df",
+      "sha256": "9a84bfc3d022ad1193ac4f3f1eaab9873903004bd02871b2c0fa49363f151044"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_description/models/mechaship/model.config",
+      "original_path": "mechaship/mechaship_description/models/mechaship/model.config",
+      "mode": "100644",
+      "git_blob": "573550c3630cd4615724db0d5ebbcd1b9786c6a3",
+      "sha256": "687c0c8c71217e2c53a07d151725c6968c8424ae4b7cf98a3b35bca96c7d337e"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_description/models/mechaship/model.sdf",
+      "original_path": "mechaship/mechaship_description/models/mechaship/model.sdf",
+      "mode": "100644",
+      "git_blob": "08a3ed7520c06795a0106763cd6406ce91626896",
+      "sha256": "43f8501096e0743b0b04d83195f20fd0c320c778355775295a2d8e50c6a402f4"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_description/package.xml",
+      "original_path": "mechaship/mechaship_description/package.xml",
+      "mode": "100644",
+      "git_blob": "24f12227d7cf54f1880f10911bc41dfacee703e4",
+      "sha256": "6ccf4dc9126e0986c2a92fed8cfe52dbbed5adafbf3ff0313f9bbee85fc4d20f"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_interfaces/CMakeLists.txt",
+      "original_path": "mechaship/mechaship_interfaces/CMakeLists.txt",
+      "mode": "100644",
+      "git_blob": "3c97bb685ce3b297e62299a6fbb1a03cd9831765",
+      "sha256": "eb99787dc65e8dfb540e867de1bce04d2b8b98d48604a6e3da895b90c2f83777"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_interfaces/action/Key.action",
+      "original_path": "mechaship/mechaship_interfaces/action/Key.action",
+      "mode": "100644",
+      "git_blob": "ec1b55296774f204d56745b23c30e413f2fe49a3",
+      "sha256": "0d22bc539b52bdca8077cc0ba03ab4cce0a307b9aa6c195bdd5d1e0506cb1115"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_interfaces/action/Thruster.action",
+      "original_path": "mechaship/mechaship_interfaces/action/Thruster.action",
+      "mode": "100644",
+      "git_blob": "45c72c735ececf7c02b2061e3bbe1fc960c0367d",
+      "sha256": "e0b4a86d845cb539088ac77ea70397f77327e32d0a37d71bccccd351f66c87c4"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_interfaces/msg/RgbwLedColor.msg",
+      "original_path": "mechaship/mechaship_interfaces/msg/RgbwLedColor.msg",
+      "mode": "100644",
+      "git_blob": "af684ba2cc62af67f962395867b25e9dc488c149",
+      "sha256": "ba6f8312c54d39a24bc10fd5b36ef3a4a42deb14eaba3b62735ca27850ac9a21"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_interfaces/msg/ToneTopic.msg",
+      "original_path": "mechaship/mechaship_interfaces/msg/ToneTopic.msg",
+      "mode": "100644",
+      "git_blob": "1dc9174bfd4012a8559d6264d53f32a2ab8b91e4",
+      "sha256": "d42433133f897c903529b81603053f51c787115e321d1544915454d6bf41ecda"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_interfaces/package.xml",
+      "original_path": "mechaship/mechaship_interfaces/package.xml",
+      "mode": "100644",
+      "git_blob": "d9f9580ab657cce2268fbb552666a827d576f9a1",
+      "sha256": "94e764e34695b542a70ea88664b6e2068398236a42ca38e29b83104ba9f73249"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_interfaces/srv/ActuatorDisable.srv",
+      "original_path": "mechaship/mechaship_interfaces/srv/ActuatorDisable.srv",
+      "mode": "100644",
+      "git_blob": "e637707fc915a88e3244920ecd954b3f06f64482",
+      "sha256": "d655ae3d9af0061e9863ba37ec1175cf7d61351c1f5226fab5a674bd1d41624a"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_interfaces/srv/ActuatorEnable.srv",
+      "original_path": "mechaship/mechaship_interfaces/srv/ActuatorEnable.srv",
+      "mode": "100644",
+      "git_blob": "911ee27354dc8014568f18982b8b30ad12e30392",
+      "sha256": "edfafb461fe3494bcb789e2fdc73530b014bc431da372a8d86f2f4bdb9ffe879"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_interfaces/srv/Tone.srv",
+      "original_path": "mechaship/mechaship_interfaces/srv/Tone.srv",
+      "mode": "100644",
+      "git_blob": "8cbcf356b8003576bf985191179a7f89207660ff",
+      "sha256": "89d5c6aa29326dd03aa2c5c8a927218b5cbf0326ef27bb35e6c84cb31bced421"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_simulation/CMakeLists.txt",
+      "original_path": "mechaship/mechaship_simulation/CMakeLists.txt",
+      "mode": "100644",
+      "git_blob": "79060dbeafcf3ea236de32880e19dd2cbe2c6c39",
+      "sha256": "edb4cc5f8735989479072403a2b55228bec23475c23b645b4b67eafe39a7acbe"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_simulation/hooks/mechaship_simulation.dsv.in",
+      "original_path": "mechaship/mechaship_simulation/hooks/mechaship_simulation.dsv.in",
+      "mode": "100644",
+      "git_blob": "25c41b1aae692e987f7fd109ca487fc29c43f456",
+      "sha256": "1e587cdfa20b93f1231f8ddeb7c325a0b0a10a2c5a3153175f80ce96bce9cd11"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_simulation/launch/gazebo.launch.py",
+      "original_path": "mechaship/mechaship_simulation/launch/gazebo.launch.py",
+      "mode": "100644",
+      "git_blob": "2e8f7f08d855d0538e8c80827a62dc390fc6ed7f",
+      "sha256": "98fef25523bce29bd2f0d09b47d1c1a6e66d0741bdccd29b8725a553470f6c9e"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_simulation/launch/spawn.launch.py",
+      "original_path": "mechaship/mechaship_simulation/launch/spawn.launch.py",
+      "mode": "100644",
+      "git_blob": "ed0b9afe80c1cabfc658add9f1b435b3d5ec4a89",
+      "sha256": "278938167e05cc3726baddb7ac71da54e2c774c664b004706fcfc43181e4db49"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_simulation/package.xml",
+      "original_path": "mechaship/mechaship_simulation/package.xml",
+      "mode": "100644",
+      "git_blob": "c98ad776a70ae70ecfbd683a4ef04452c845608e",
+      "sha256": "d0a2fdf09f7fa8a506d3d72f86cf911eef97a2035d278cdd191b1be61e5186b4"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_simulation/param/mechaship_bridge.yaml",
+      "original_path": "mechaship/mechaship_simulation/param/mechaship_bridge.yaml",
+      "mode": "100644",
+      "git_blob": "f22157260222e9b9907c5c5b46ab94e16a8a1a85",
+      "sha256": "cefe3badd9431e25e33e66a84785fabe6ed35625fe98487852d969997ea0258e"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_simulation/worlds/empty.world",
+      "original_path": "mechaship/mechaship_simulation/worlds/empty.world",
+      "mode": "100644",
+      "git_blob": "27af85e73d0579ce9cfb319600fa11bf3d1f2fb2",
+      "sha256": "f253f4fdd5c19e8331491bb79f93250bdca3d3284129666413296c8996dced85"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_simulation/worlds/training_arena.world",
+      "original_path": "mechaship/mechaship_simulation/worlds/training_arena.world",
+      "mode": "100644",
+      "git_blob": "88aad9cdcc5de0d81db12211727de84cdffe2af8",
+      "sha256": "ac885333049bfbedb5c4a532b714424b4e8385be9cb16a84ea5b81734df41b20"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_slam/CMakeLists.txt",
+      "original_path": "mechaship/mechaship_slam/CMakeLists.txt",
+      "mode": "100644",
+      "git_blob": "b6b06b7213ea2025c494d5ddfdf2acac9ef33ff6",
+      "sha256": "0a7aa0327d4b921d0bbd40ec35f73eefe959e1b35fa66f5f2c733d306ec63fda"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_slam/launch/ekf.launch.py",
+      "original_path": "mechaship/mechaship_slam/launch/ekf.launch.py",
+      "mode": "100644",
+      "git_blob": "8d14794051d2fc73577f3f185ba783354fa444fb",
+      "sha256": "f9d16aed298c6e2fb1be9ae185c9099404c6b4bb5f3ae70a001a447d49ac61fd"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_slam/launch/slam_toolbox.launch.py",
+      "original_path": "mechaship/mechaship_slam/launch/slam_toolbox.launch.py",
+      "mode": "100644",
+      "git_blob": "9f2645892e5de84435bc03f74c17a2250a415b6d",
+      "sha256": "40bee40c2515ec6d5670f517ffd05980f52ef2e0abf60febd2c7a52ef6d95811"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_slam/package.xml",
+      "original_path": "mechaship/mechaship_slam/package.xml",
+      "mode": "100644",
+      "git_blob": "e03394cda72309e817ab567d57afe9f225afee1c",
+      "sha256": "0f7c586af414ecfe7c25eede804a6dc85aded1c9ed2048fd37652f8943b2550b"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_slam/param/ekf.yaml",
+      "original_path": "mechaship/mechaship_slam/param/ekf.yaml",
+      "mode": "100644",
+      "git_blob": "2f0fbe6da116f466847ced3a198db5d2f6ac4ecc",
+      "sha256": "e7ac6090489bf213218a42bc1d5fcb6792be7ba9335a38f4d5b6737b752cae16"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_slam/param/navsat_transform.yaml",
+      "original_path": "mechaship/mechaship_slam/param/navsat_transform.yaml",
+      "mode": "100644",
+      "git_blob": "9257b5a4bce747062cbec8524be576b140a1592d",
+      "sha256": "e247224cbb8d23bbc90020655c65373821edadc080c88d4d3eb424c0d5a6acd8"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_slam/param/slam_toolbox.yaml",
+      "original_path": "mechaship/mechaship_slam/param/slam_toolbox.yaml",
+      "mode": "100644",
+      "git_blob": "3a34d5fbc007863fc7316c7159f4c0da1f8c569a",
+      "sha256": "c5ca61f43af4c6464c937807ab9f2b915494c6045d8ab18114e5f45728204c00"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_system/launch/mechaship_system_actuator_enable.launch.py",
+      "original_path": "mechaship/mechaship_system/launch/mechaship_system_actuator_enable.launch.py",
+      "mode": "100644",
+      "git_blob": "4c0ea00c4a9beabc239e65208eedebcf25aa30b0",
+      "sha256": "15dd275a248191cb01dde4d298f7692805edddecff1f35e755c6d61e8482cdbc"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_system/mechaship_system/__init__.py",
+      "original_path": "mechaship/mechaship_system/mechaship_system/__init__.py",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_system/mechaship_system/actuator_enable_node.py",
+      "original_path": "mechaship/mechaship_system/mechaship_system/actuator_enable_node.py",
+      "mode": "100644",
+      "git_blob": "faa8fb3790f7f13079f4d1863fd3b0097de96476",
+      "sha256": "115465e1df1a575d31163c6f08411106db8c74fe4c87842a9df33aee6c1cce72"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_system/package.xml",
+      "original_path": "mechaship/mechaship_system/package.xml",
+      "mode": "100644",
+      "git_blob": "e09b37e25713fd3a110c69af673df67b2bad52e6",
+      "sha256": "6476aacc94402fabb1ccdbd7b4f5f2e5a2c87847d1d0ff9723492fadd8413cc6"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_system/param/actuator.yaml",
+      "original_path": "mechaship/mechaship_system/param/actuator.yaml",
+      "mode": "100644",
+      "git_blob": "2c58335d6aed9078d3771d03e87529d8d0f14162",
+      "sha256": "856cc338185c8d5c097b897bbe8190c29f11d0b6fad0b527184cb3f033746d64"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_system/resource/mechaship_system",
+      "original_path": "mechaship/mechaship_system/resource/mechaship_system",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_system/setup.cfg",
+      "original_path": "mechaship/mechaship_system/setup.cfg",
+      "mode": "100644",
+      "git_blob": "5319ef7fc675c88ef5710f73f3b66523179fa1e3",
+      "sha256": "5e9a976f0712787a55fac99a67e845a261c0131d4acee67c4bd7262712823d99"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_system/setup.py",
+      "original_path": "mechaship/mechaship_system/setup.py",
+      "mode": "100644",
+      "git_blob": "06aa2fa2e7f450ea2b439e191f810bfab95123a7",
+      "sha256": "2796299fe94a48a8fea276bea084a302c1d2b90ce426ce0c868c8a3f55c574c6"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_teleop/launch/mechaship_teleop_joystick.launch.py",
+      "original_path": "mechaship/mechaship_teleop/launch/mechaship_teleop_joystick.launch.py",
+      "mode": "100644",
+      "git_blob": "75f6712f49b49385f995bde2c1ee2fd2fcf22b00",
+      "sha256": "e94f3175286187624c097ebb92658c3d9b66ffda16da974f00733c0b0dd0b268"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_teleop/mechaship_teleop/__init__.py",
+      "original_path": "mechaship/mechaship_teleop/mechaship_teleop/__init__.py",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_teleop/mechaship_teleop/mechaship_teleop_joystick.py",
+      "original_path": "mechaship/mechaship_teleop/mechaship_teleop/mechaship_teleop_joystick.py",
+      "mode": "100644",
+      "git_blob": "13c0a864ddfff062e50ad4c1f1a00a8ed0b2e31f",
+      "sha256": "13772d6bf0ed50c0136ec63da2ce0769450fa41d696968ac5d86cf30949a471e"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_teleop/mechaship_teleop/mechaship_teleop_keyboard.py",
+      "original_path": "mechaship/mechaship_teleop/mechaship_teleop/mechaship_teleop_keyboard.py",
+      "mode": "100644",
+      "git_blob": "3b0cc719977d32637085fe30542e13610785155b",
+      "sha256": "cf53bf3b0624d8d3a827d08d76fe25563204486767fe4285e7d9cac3c4efcb85"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_teleop/package.xml",
+      "original_path": "mechaship/mechaship_teleop/package.xml",
+      "mode": "100644",
+      "git_blob": "98da854116cc88e19543cbd4c18ab17173d9afbe",
+      "sha256": "92475f7da5712a3d108cf3f3642ed842fa09c3cc0f293cb85b84d547614fe38d"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_teleop/resource/mechaship_teleop",
+      "original_path": "mechaship/mechaship_teleop/resource/mechaship_teleop",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_teleop/setup.cfg",
+      "original_path": "mechaship/mechaship_teleop/setup.cfg",
+      "mode": "100644",
+      "git_blob": "3264e99eab2bd2acdad439cf029d408f9afb1f2b",
+      "sha256": "9fe52b8083da9ada019a3c3b096a181d3a6132226b237cf5f3e2fd8443a1de09"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_teleop/setup.py",
+      "original_path": "mechaship/mechaship_teleop/setup.py",
+      "mode": "100644",
+      "git_blob": "ced8b95b88065bf4824083c18ff0366449a998ae",
+      "sha256": "4bd2a81f81e275eec7fb4a6bce9bc60c41f1c0b473bfa4f7d9cc2ef99e26664f"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/launch/detect.launch.py",
+      "original_path": "mechaship/mechaship_yolov8/launch/detect.launch.py",
+      "mode": "100644",
+      "git_blob": "92e852c0ad65de2bfbab5bc695878d49d32ec3ef",
+      "sha256": "3ee5c3adb683d22278bd64e06a95437cc7e6f8b4154964149e8b56c72e89d5c8"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/launch/visualize.launch.py",
+      "original_path": "mechaship/mechaship_yolov8/launch/visualize.launch.py",
+      "mode": "100644",
+      "git_blob": "f32cc32440abb333ba28740f98f3f8b54cd06060",
+      "sha256": "6668cbd9811bbee13ca52b1925a44b045f17eb4406a50e5619ca8ce1563ba324"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/mechaship_yolov8/__init__.py",
+      "original_path": "mechaship/mechaship_yolov8/mechaship_yolov8/__init__.py",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/mechaship_yolov8/detect_node.py",
+      "original_path": "mechaship/mechaship_yolov8/mechaship_yolov8/detect_node.py",
+      "mode": "100644",
+      "git_blob": "3aa7bd28296f889b400c190fdd3093568606ffa1",
+      "sha256": "3eb4b6cf527470287101e310789bfac3a5ec7b8819a9299fab74fde9612489eb"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/mechaship_yolov8/visualize_node.py",
+      "original_path": "mechaship/mechaship_yolov8/mechaship_yolov8/visualize_node.py",
+      "mode": "100644",
+      "git_blob": "00957b7ac3a849ef806f1e3cee4d63400357ccda",
+      "sha256": "4500511a88d10497e0e08fbeb4495827476bae81eec8295570a2e208ab4b3758"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/model/best.rknn",
+      "original_path": "mechaship/mechaship_yolov8/model/best.rknn",
+      "mode": "100644",
+      "git_blob": "15c0339f992e533f72cc75ecaa721d7f43da8216",
+      "sha256": "931f06a1434948e263c37e828978839939fd8df9a287890a9d58206e96b8aa79"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/model/labels.txt",
+      "original_path": "mechaship/mechaship_yolov8/model/labels.txt",
+      "mode": "100644",
+      "git_blob": "38d7c749e9ad06a1cebe505d01fb0f79ab1d3d78",
+      "sha256": "88fa27390b0f8d303ba1b9acd4187eb8b749509fd099d89b2630f00386873143"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/model/yolov8.rknn",
+      "original_path": "mechaship/mechaship_yolov8/model/yolov8.rknn",
+      "mode": "100644",
+      "git_blob": "34291607f990c03634e53e7079947d48fd6df268",
+      "sha256": "d578dfcbf59503587b5e29b497a7ad72c0c6c2bfed6beefefe6f28ff50ab6557"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/package.xml",
+      "original_path": "mechaship/mechaship_yolov8/package.xml",
+      "mode": "100644",
+      "git_blob": "eeb12f6f74d5fac26e9e924da35d6f4a4552f1dc",
+      "sha256": "5bf05033425ae2753758aaa971eff33232b6d3c24cdfc551bce02d0f8dbbdfe8"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/param/yolov8_params.yaml",
+      "original_path": "mechaship/mechaship_yolov8/param/yolov8_params.yaml",
+      "mode": "100644",
+      "git_blob": "602cf8791cf8f9fad941a73c430cc3f84a4446b7",
+      "sha256": "68e37db681272d62f791e68a1d6eb4849588a5636d1f8aa854053ff10548439d"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/resource/mechaship_yolov8",
+      "original_path": "mechaship/mechaship_yolov8/resource/mechaship_yolov8",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/setup.cfg",
+      "original_path": "mechaship/mechaship_yolov8/setup.cfg",
+      "mode": "100644",
+      "git_blob": "5fb83468340ef4a5866e59ce2bc0d6e8f4d6a943",
+      "sha256": "3ff440bcb5f9bf75923bd755f2899c29004fcf49159df9fbcbaaebefaaf47d00"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/setup.py",
+      "original_path": "mechaship/mechaship_yolov8/setup.py",
+      "mode": "100644",
+      "git_blob": "612076c6e3e020157a4c1ba05ac0e8106b1ec944",
+      "sha256": "35be14655ab34c65e2aa12bb914e6633271e47e5af2eee3d770a4969736ace90"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/mechaship_yolov8/utils/rknn_helper.py",
+      "original_path": "mechaship/mechaship_yolov8/utils/rknn_helper.py",
+      "mode": "100644",
+      "git_blob": "f0eceb4d1d68c761067257cd77c9819a34e227d0",
+      "sha256": "63ea94437e5cd7831d3828b15b198994febea078497fe6c3bb025930c5dd069d"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/.devcontainer/.gitignore",
+      "original_path": "mechaship/ntrip_client/.devcontainer/.gitignore",
+      "mode": "100644",
+      "git_blob": "63038bc297b8692895df425fa4079e11098d05f3",
+      "sha256": "877563f819725d7d1fbbc07af62a2ec882ef2059d13815c17bb5a7ca525793be"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/.devcontainer/.vscode-docker/c_cpp_properties.json",
+      "original_path": "mechaship/ntrip_client/.devcontainer/.vscode-docker/c_cpp_properties.json",
+      "mode": "100644",
+      "git_blob": "ad6963db441694f9a28d691de38bd8b3c1985b90",
+      "sha256": "bcb87ee23f5c08fc77f6ceb352f5c11526e6a85eed0c3be4b8facbd4c9ce7d78"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/.devcontainer/.vscode-docker/settings.json",
+      "original_path": "mechaship/ntrip_client/.devcontainer/.vscode-docker/settings.json",
+      "mode": "100644",
+      "git_blob": "00524e6836ba05e6f90b353015f74ae593d55467",
+      "sha256": "37781ae52940f5a218361522c21dde317eb37b16cbe2d4c7555b7b72320c6169"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/.devcontainer/Dockerfile.dev",
+      "original_path": "mechaship/ntrip_client/.devcontainer/Dockerfile.dev",
+      "mode": "100644",
+      "git_blob": "f97bca9f2cf82215ea61e55a0a0d2fe003a0eb6c",
+      "sha256": "1cd7f4fa084d79b61b652cc4eea723a93f0833b155773ebbd8efe784511cfd2d"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/.devcontainer/Makefile",
+      "original_path": "mechaship/ntrip_client/.devcontainer/Makefile",
+      "mode": "100644",
+      "git_blob": "f1b4160a677dc1421be120f127fe4aa3384c77e7",
+      "sha256": "f12ea6ab04992fc2fa48175cb4eab58dc9f50f2a851f029ba6a9e98f2a841b18"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/.devcontainer/devcontainer.json",
+      "original_path": "mechaship/ntrip_client/.devcontainer/devcontainer.json",
+      "mode": "100644",
+      "git_blob": "0d75871c1296e32fec9879342810d4419dbc9f56",
+      "sha256": "d030d6aff8f89f654c4409a00f8abbf5c37a8f940c81d263da49eb369788dfd5"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/.gitignore",
+      "original_path": "mechaship/ntrip_client/.gitignore",
+      "mode": "100644",
+      "git_blob": "c1118c55d05071b8d4a6865cbfb61bce6ab49985",
+      "sha256": "d93cf1d46541a5d3f56eeffbc27b341dbf9b652f43eebab1380e5c46dd6c9716"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/CHANGELOG.rst",
+      "original_path": "mechaship/ntrip_client/CHANGELOG.rst",
+      "mode": "100644",
+      "git_blob": "07b06afc527fc6e07ca569a7f96bc5ad2a9dd66d",
+      "sha256": "cc023a35b0c0fe1a9c2904adc81e25476a17d7b8feab46ab907eeafffd4eedfd"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/LICENSE",
+      "original_path": "mechaship/ntrip_client/LICENSE",
+      "mode": "100644",
+      "git_blob": "2bdbc27e87e9fb6fcaf73cab10ba3d7017500a9e",
+      "sha256": "eab5ccfd530c7b9475490f0c01506300adcf0286bf63e3b3b72866a71086d0d2"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/README.md",
+      "original_path": "mechaship/ntrip_client/README.md",
+      "mode": "100644",
+      "git_blob": "48b53bf1418d5352740e54201fb75e55faacf7dc",
+      "sha256": "ff64689866843a9f24ea905bf5e14d1b75c0468c2bc90327c3c54f73d1c0c3aa"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/launch/ntrip_client_launch.py",
+      "original_path": "mechaship/ntrip_client/launch/ntrip_client_launch.py",
+      "mode": "100644",
+      "git_blob": "5bcb97d3879bab8ff38b1111265f7691903c38d6",
+      "sha256": "b713d9f5fd7cbb6862b5952a2f8a9dd31b17b03445a820e061cedfc81b30411b"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/launch/ntrip_serial_device_launch.py",
+      "original_path": "mechaship/ntrip_client/launch/ntrip_serial_device_launch.py",
+      "mode": "100644",
+      "git_blob": "9d63e444d021d8c30409f8e99d90c4ef85507479",
+      "sha256": "7f57d1cc8d93eb0dec3eec787564117324d37b1976bd65d56cb6225cb61e4c87"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/package.xml",
+      "original_path": "mechaship/ntrip_client/package.xml",
+      "mode": "100644",
+      "git_blob": "922b4e74d4513618a979e990cae0c1c37befc104",
+      "sha256": "7c80c60da736df798c9d433fc65f5102094a0aeb1632084677f18f7d2725dc61"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/resource/ntrip_client",
+      "original_path": "mechaship/ntrip_client/resource/ntrip_client",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/scripts/ntrip_ros.py",
+      "original_path": "mechaship/ntrip_client/scripts/ntrip_ros.py",
+      "mode": "100755",
+      "git_blob": "38927e2ef0dcc34c393dc14572920ea299bcd7ab",
+      "sha256": "a37b3c6b4d9ae556bc2a1819d34ad67118d1b39a71844fd5853c9f4eaf29ce77"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/scripts/ntrip_ros_base.py",
+      "original_path": "mechaship/ntrip_client/scripts/ntrip_ros_base.py",
+      "mode": "100755",
+      "git_blob": "1bb3c7b946715755868575c6873fc4c0fca83bf0",
+      "sha256": "91f9ff97ee38221658785782a2abcaf24efb43198c829f0200894470bdfe0861"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/scripts/ntrip_serial_device_ros.py",
+      "original_path": "mechaship/ntrip_client/scripts/ntrip_serial_device_ros.py",
+      "mode": "100644",
+      "git_blob": "170f3a5e1f28b01ee473be61a2d0941a814303b8",
+      "sha256": "2a0ee37ded2b9fefba39bb6c4643e94b16b8e07ed755dd0e6a01119f9c1871ff"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/setup.cfg",
+      "original_path": "mechaship/ntrip_client/setup.cfg",
+      "mode": "100644",
+      "git_blob": "6eba9e89df650509cc9eab624ea30cc2104ce04d",
+      "sha256": "6c00c0a21fb6acd343847255012c277b6487ceeb0408016415e5221865da5e46"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/setup.py",
+      "original_path": "mechaship/ntrip_client/setup.py",
+      "mode": "100644",
+      "git_blob": "f2141f919a14ea8647113ab7800067e952c19caa",
+      "sha256": "3ffdd601badec72cd669c3fa5a0ef3892a1a3f3599d2496d2caa7649a96d83e8"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/src/ntrip_client/__init__.py",
+      "original_path": "mechaship/ntrip_client/src/ntrip_client/__init__.py",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/src/ntrip_client/nmea_parser.py",
+      "original_path": "mechaship/ntrip_client/src/ntrip_client/nmea_parser.py",
+      "mode": "100644",
+      "git_blob": "d02ce66d74e554306e4d83ebba447f6fc581828d",
+      "sha256": "2dc0b207dc6c366014a518656875ea1eedc43953f8e9ac76cb1b6f7f24e9c5bc"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/src/ntrip_client/ntrip_base.py",
+      "original_path": "mechaship/ntrip_client/src/ntrip_client/ntrip_base.py",
+      "mode": "100644",
+      "git_blob": "f353018366d3ee1505d7f209c972865ec17b5e22",
+      "sha256": "03c20ecfc21dea4d99b76f907930cb37c2db1ecdeca89b418dcd0eed744cf79e"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/src/ntrip_client/ntrip_client.py",
+      "original_path": "mechaship/ntrip_client/src/ntrip_client/ntrip_client.py",
+      "mode": "100644",
+      "git_blob": "c439e9bc2dc1c7316fc2ca671497d7aa19d7bf90",
+      "sha256": "dba01416cedde20df9783099bff8703b64b0b9df0d2a621e6af38aa5d627e1f5"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/src/ntrip_client/ntrip_serial_device.py",
+      "original_path": "mechaship/ntrip_client/src/ntrip_client/ntrip_serial_device.py",
+      "mode": "100644",
+      "git_blob": "9ad9c8c1679845669d69c2a7b1ef41030c633aa9",
+      "sha256": "1c0a704810ae5be02ec98b8697f509737a1c057ef15f9f00437c14bcdfb6b9cf"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ntrip_client/src/ntrip_client/rtcm_parser.py",
+      "original_path": "mechaship/ntrip_client/src/ntrip_client/rtcm_parser.py",
+      "mode": "100644",
+      "git_blob": "6989f5b9c54c0622408a4e2ffe51f1ea9689266b",
+      "sha256": "f9c9645d1b4bc60f2de09d0ed73248b556544dd4823b6715fbd3433c7e53f0cf"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/rf2o_laser_odometry/CMakeLists.txt",
+      "original_path": "mechaship/rf2o_laser_odometry/CMakeLists.txt",
+      "mode": "100644",
+      "git_blob": "d3d37fd1e31f4ab9a820450e177d1bbc43a70e55",
+      "sha256": "8f54ad484d655d25afcf6cd9ae8575146eff05f45320cf80efd53e3955b3c362"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/rf2o_laser_odometry/LICENSE",
+      "original_path": "mechaship/rf2o_laser_odometry/LICENSE",
+      "mode": "100644",
+      "git_blob": "9cecc1d4669ee8af2ca727a5d8cde10cd8b2d7cc",
+      "sha256": "589ed823e9a84c56feb95ac58e7cf384626b9cbf4fda2a907bc36e103de1bad2"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/rf2o_laser_odometry/README.md",
+      "original_path": "mechaship/rf2o_laser_odometry/README.md",
+      "mode": "100644",
+      "git_blob": "bf613ce7bda0a8db3d117d3cf188ad2933059f0e",
+      "sha256": "374e7e5e0dd9196bc29d26f98497a534edc94345d1c09f664f04a36b4af48fdc"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/rf2o_laser_odometry/include/rf2o_laser_odometry/CLaserOdometry2D.hpp",
+      "original_path": "mechaship/rf2o_laser_odometry/include/rf2o_laser_odometry/CLaserOdometry2D.hpp",
+      "mode": "100644",
+      "git_blob": "cec6fb6f097958fdb91e30d003397bb2fc92ca5c",
+      "sha256": "474d3e2fcc28d84f35be0ff45b1f853bcaaae47b2f55d2034944ee2e12f6cc87"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/rf2o_laser_odometry/include/rf2o_laser_odometry/CLaserOdometry2DNode.hpp",
+      "original_path": "mechaship/rf2o_laser_odometry/include/rf2o_laser_odometry/CLaserOdometry2DNode.hpp",
+      "mode": "100644",
+      "git_blob": "3d0cd2ae4fa47303a649764ce2b061ed883d8f19",
+      "sha256": "29462f79f60a4cd9acb1e79b753bacf455aa235c576d507e8b8a6d74b7ec6e62"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/rf2o_laser_odometry/launch/rf2o_laser_odometry.launch.py",
+      "original_path": "mechaship/rf2o_laser_odometry/launch/rf2o_laser_odometry.launch.py",
+      "mode": "100644",
+      "git_blob": "c8fee447e57f74dc91d43db6ca5386a8bdce42d2",
+      "sha256": "f8374116124b7e4d7b5fc0d2e8ca2c4aa6e049b9d8e03ddadf7f8790adfb1696"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/rf2o_laser_odometry/package.xml",
+      "original_path": "mechaship/rf2o_laser_odometry/package.xml",
+      "mode": "100644",
+      "git_blob": "ee790ac3c7bf498f125b81a4ead28bf8120b9800",
+      "sha256": "a708ec5eb368c156c1a5e8aeb4b30a353a7f30865248d033179c9ae60dbe1d69"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/rf2o_laser_odometry/src/CLaserOdometry2D.cpp",
+      "original_path": "mechaship/rf2o_laser_odometry/src/CLaserOdometry2D.cpp",
+      "mode": "100644",
+      "git_blob": "210bc049e29e01d380b3397020157073354eb122",
+      "sha256": "d194cff722f01a53621f6ea550fb32bda68e76ee0bcc21bff6ddb2bd436ac1a7"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/rf2o_laser_odometry/src/CLaserOdometry2DNode.cpp",
+      "original_path": "mechaship/rf2o_laser_odometry/src/CLaserOdometry2DNode.cpp",
+      "mode": "100644",
+      "git_blob": "066e6c6bcdc54fb173d39604c99dc631e1ca333b",
+      "sha256": "506593d87549e5a050d95466d00aa4348a6f112a6cf8d0c9564c68f5af1b0e74"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/wtrtk_ros2_driver/.gitignore",
+      "original_path": "mechaship/wtrtk_ros2_driver/.gitignore",
+      "mode": "100644",
+      "git_blob": "c62e40a5b5cb4b67425cd27184f74489154a014c",
+      "sha256": "aeae021fbf90e3c8524606cabe7fa4d28625f492a19ff48dd0eedad36d06bce1"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/wtrtk_ros2_driver/launch/rtk_with_ntrip_example.launch.py",
+      "original_path": "mechaship/wtrtk_ros2_driver/launch/rtk_with_ntrip_example.launch.py",
+      "mode": "100644",
+      "git_blob": "7d9eb9cfc2b414089be1c1c1336f89520317f583",
+      "sha256": "e3ef1ec4666a7d275b3a5020dc887c3a7da59bb3836f0fed7d3e7ed50d304767"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/wtrtk_ros2_driver/launch/wtrtk.launch.py",
+      "original_path": "mechaship/wtrtk_ros2_driver/launch/wtrtk.launch.py",
+      "mode": "100644",
+      "git_blob": "1118e44fa4762e29d241ee44f5fdd02e62516684",
+      "sha256": "33f7d1c9cea59e51fd6261e1aebccd9724fabc4183ed9d8c3aaac6d85c9549fc"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/wtrtk_ros2_driver/package.xml",
+      "original_path": "mechaship/wtrtk_ros2_driver/package.xml",
+      "mode": "100644",
+      "git_blob": "9039f4b26e65999b001699c9a34085d2e256cede",
+      "sha256": "37a85a1bb85138f728b15c686ed54308870d2a535746159be386a4cb526d3fcb"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/wtrtk_ros2_driver/param/WTRTK-960.yaml",
+      "original_path": "mechaship/wtrtk_ros2_driver/param/WTRTK-960.yaml",
+      "mode": "100644",
+      "git_blob": "c3865462a28ee3ee8acc0fc4349ac7f415620f66",
+      "sha256": "2501a1d0ca74aad1fbc0ae6d7522381f7eb920f39c7f5fa68e2d98bc3e3e8d48"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/wtrtk_ros2_driver/resource/wtrtk_ros2_driver",
+      "original_path": "mechaship/wtrtk_ros2_driver/resource/wtrtk_ros2_driver",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/wtrtk_ros2_driver/setup.cfg",
+      "original_path": "mechaship/wtrtk_ros2_driver/setup.cfg",
+      "mode": "100644",
+      "git_blob": "7d405421391c533b9aa0db957108b6505e107752",
+      "sha256": "c82a839ce1135b53467631e259abca925e7e6116e2b22d5c93da18016eb213ff"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/wtrtk_ros2_driver/setup.py",
+      "original_path": "mechaship/wtrtk_ros2_driver/setup.py",
+      "mode": "100644",
+      "git_blob": "8658ca713c341ac57063c8cdb917871672bc1db0",
+      "sha256": "914245861d162ea939066a431e4b066ce06221ef12a2e2df6f68ca8a4c52e369"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/wtrtk_ros2_driver/wtrtk_ros2_driver/__init__.py",
+      "original_path": "mechaship/wtrtk_ros2_driver/wtrtk_ros2_driver/__init__.py",
+      "mode": "100644",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/wtrtk_ros2_driver/wtrtk_ros2_driver/wtrtk_ros2_driver.py",
+      "original_path": "mechaship/wtrtk_ros2_driver/wtrtk_ros2_driver/wtrtk_ros2_driver.py",
+      "mode": "100644",
+      "git_blob": "d7a0d6291a2304b5120bae37c97b3f0aa444b48a",
+      "sha256": "836c7db2d8f557f710f6e1b6db3adcb4d47727749163532853d0f9653943c28c"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/CMakeLists.txt",
+      "original_path": "mechaship/ydlidar_ros2_driver/CMakeLists.txt",
+      "mode": "100755",
+      "git_blob": "a4bb7d6dbc9ad04e1a9fb109b68fc093ed283633",
+      "sha256": "5f5d293f6f8075dfb40e757b2de76bbf3d40e80a031497e7f05b35dd5bfc41fc"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/LICENSE.txt",
+      "original_path": "mechaship/ydlidar_ros2_driver/LICENSE.txt",
+      "mode": "100755",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/README.md",
+      "original_path": "mechaship/ydlidar_ros2_driver/README.md",
+      "mode": "100755",
+      "git_blob": "9b5d49ba9e0d57a8568a39fe6a6cad7d6e86ac4c",
+      "sha256": "244a4a6e31c29722a9a646ca99c1a585ffdc31043fccb00bf0eb078e7756ca15"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/config/ydlidar.rviz",
+      "original_path": "mechaship/ydlidar_ros2_driver/config/ydlidar.rviz",
+      "mode": "100755",
+      "git_blob": "7c9e799531f1e89303d369d649e755c1cb6591ab",
+      "sha256": "916e56313c5232f515cad3f45e710c23276dc3a017fbc5ee4e4981c1d783c05b"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/details.md",
+      "original_path": "mechaship/ydlidar_ros2_driver/details.md",
+      "mode": "100755",
+      "git_blob": "04b1edba820b85427d5cff79cd292bcc01331d90",
+      "sha256": "f6ba18c1b417d2018811545663ef6c503736289eaeaece79be97afa05e492f2c"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/images/EAI.png",
+      "original_path": "mechaship/ydlidar_ros2_driver/images/EAI.png",
+      "mode": "100755",
+      "git_blob": "5dee9e2b3658c03529d30bc85cbbe186c94b1fef",
+      "sha256": "b5cf671fb4dad4172c5aebfcc3d3c041b1851bb11e3f5768eca10d0886c135c1"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/images/YDLidar.jpg",
+      "original_path": "mechaship/ydlidar_ros2_driver/images/YDLidar.jpg",
+      "mode": "100755",
+      "git_blob": "d7641653430d5f5af27a1b42d450c2317223cdd5",
+      "sha256": "a92dc1560e33da5f75265eb6312c4cbfad4c05c5525f41af5542c382b4210edb"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/images/cmake_error.png",
+      "original_path": "mechaship/ydlidar_ros2_driver/images/cmake_error.png",
+      "mode": "100755",
+      "git_blob": "169970ab699184e3a11d6b88ebdbd0c4a503b52d",
+      "sha256": "ae7012d3cea1711f03ffafb1d642de640e22e1e50e97d6ada7fd4c1466c0b89d"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/images/finished.png",
+      "original_path": "mechaship/ydlidar_ros2_driver/images/finished.png",
+      "mode": "100755",
+      "git_blob": "260c306a451fd5493d42f73d0566b550affe371b",
+      "sha256": "8a11def8e7a402cd5708c796df045fd0478060742d075fe7225a2f9c1113dbe9"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/images/rviz.png",
+      "original_path": "mechaship/ydlidar_ros2_driver/images/rviz.png",
+      "mode": "100755",
+      "git_blob": "c2a016b27d266eb9ec35dfacaaf2d37b40698940",
+      "sha256": "5ebf34a74ff5d92f275bdcabc593b2d362f39df49aaaca07f1c563a60d49c615"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/images/view.png",
+      "original_path": "mechaship/ydlidar_ros2_driver/images/view.png",
+      "mode": "100755",
+      "git_blob": "ad821de7d9e88b9223dae2cc71302e2bae0b438d",
+      "sha256": "e4283d902436697f59143adbe683a893577814b7d91d666229c87a4ede1d3d6f"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/launch/ydlidar.py",
+      "original_path": "mechaship/ydlidar_ros2_driver/launch/ydlidar.py",
+      "mode": "100755",
+      "git_blob": "3a80766e8eecea8a8991c9d8bcddf821ab2a418d",
+      "sha256": "30794c3f82d6cb31b36785aeddf0c8c743736dd291ba244b622e52a31572fa35"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/launch/ydlidar_launch.py",
+      "original_path": "mechaship/ydlidar_ros2_driver/launch/ydlidar_launch.py",
+      "mode": "100755",
+      "git_blob": "201163023f492c163f664f73c00cce6ca0706757",
+      "sha256": "220519d4d4cdd95002f6c585ecc07c2668d83334c5b03e500f5e0b3c7300d10a"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/launch/ydlidar_launch_view.py",
+      "original_path": "mechaship/ydlidar_ros2_driver/launch/ydlidar_launch_view.py",
+      "mode": "100755",
+      "git_blob": "ede6764bd3aa7d3c1e34ea672be48b51ac3f18f0",
+      "sha256": "df9b3fcd224513a1ae5a83b82831472a3acb317fee581401a0a4c5b9d29c610a"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/package.xml",
+      "original_path": "mechaship/ydlidar_ros2_driver/package.xml",
+      "mode": "100755",
+      "git_blob": "d2f73ccb6cb357210ddc120e8bb8dd9e206046b0",
+      "sha256": "ed44a708d8de55f456c60ef7995e9fe70835c09698c757b46b200b32826ddc4d"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/params/G1.yaml",
+      "original_path": "mechaship/ydlidar_ros2_driver/params/G1.yaml",
+      "mode": "100755",
+      "git_blob": "5366f271c4ff508b5115aab2a0a4c8d752f498b8",
+      "sha256": "ebf583014e38bf34f9ffbf9f579260e30d07486364fdffed4f15d96e80757965"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/params/G2.yaml",
+      "original_path": "mechaship/ydlidar_ros2_driver/params/G2.yaml",
+      "mode": "100755",
+      "git_blob": "7a286626b5da6b7d83680c0fe6d36fc8d786a84b",
+      "sha256": "2c7f1c76ff5bec7f098ec9519e87ca6faa9bd03dd3d33d64676dd3b9cf112cf9"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/params/G6.yaml",
+      "original_path": "mechaship/ydlidar_ros2_driver/params/G6.yaml",
+      "mode": "100755",
+      "git_blob": "da6d3db8a8de4603835e6d08d98103657898c76c",
+      "sha256": "bc424055a17ce46d632e13b06e760d22dca4829386887ced8194f785b1d2c142"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/params/GS2.yaml",
+      "original_path": "mechaship/ydlidar_ros2_driver/params/GS2.yaml",
+      "mode": "100755",
+      "git_blob": "8dea53f02dcdf652b7867732be525e250a784bd7",
+      "sha256": "46847eb21295aec72a91b07e799c86641c864a77d9b6ec3ad1d5b56962b6b850"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/params/TEA.yaml",
+      "original_path": "mechaship/ydlidar_ros2_driver/params/TEA.yaml",
+      "mode": "100644",
+      "git_blob": "da25c8b49ebf688e74585002f32b14de32657388",
+      "sha256": "e9239bdcc39fb6462a07a1ceec09abcd3656233d579e7a82047e90331b2d0b0b"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/params/TG.yaml",
+      "original_path": "mechaship/ydlidar_ros2_driver/params/TG.yaml",
+      "mode": "100755",
+      "git_blob": "099d10ba0ac7ebdbf7ea4aca0f5f7e3ca5e15201",
+      "sha256": "c6095a422b27b0ae04b9fda0801927f7dd4c23dbcec831c8d3811afaab27e88a"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/params/TminiPro.yaml",
+      "original_path": "mechaship/ydlidar_ros2_driver/params/TminiPro.yaml",
+      "mode": "100755",
+      "git_blob": "e7e70a6853226a977565c96fa34182dd1ea82da4",
+      "sha256": "755afa662db6dc122435cd92285491f608823fabbf9fc66e8de3f576d1c73cc2"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/params/X2.yaml",
+      "original_path": "mechaship/ydlidar_ros2_driver/params/X2.yaml",
+      "mode": "100755",
+      "git_blob": "961a45176eeb003b3f349ca75faa26fa3cc79675",
+      "sha256": "495df0439f1d1be5917a6cc8d00841ed7942d415f5386426bffa764c9f19cef2"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/params/X4-Pro.yaml",
+      "original_path": "mechaship/ydlidar_ros2_driver/params/X4-Pro.yaml",
+      "mode": "100755",
+      "git_blob": "8e49fb9ba798300bca9280b556fd23336f5da2a4",
+      "sha256": "da2377594a768b70904f431d56666f9def130948ab00f547b638e61e68d80c94"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/params/X4.yaml",
+      "original_path": "mechaship/ydlidar_ros2_driver/params/X4.yaml",
+      "mode": "100755",
+      "git_blob": "716f2f8df1300a4f510da50c602fc056f11da38b",
+      "sha256": "ed4f4527eb80aa57d77f5cec3f04d5f28c806df3e7001b7029c1927b4156d0bf"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/params/ydlidar.yaml",
+      "original_path": "mechaship/ydlidar_ros2_driver/params/ydlidar.yaml",
+      "mode": "100755",
+      "git_blob": "c576896dcad2ab2e2129eccadf0f77dee3f423ca",
+      "sha256": "2a6d6381e2972e1afb161e992be28a8df927bdea23c10f6b03fb92494ab233b8"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/src/ydlidar_ros2_driver_client.cpp",
+      "original_path": "mechaship/ydlidar_ros2_driver/src/ydlidar_ros2_driver_client.cpp",
+      "mode": "100755",
+      "git_blob": "7bac433496b0e6a5449fbf700334f1c9217bdd59",
+      "sha256": "56cb0f5c4106a8a5e04cc828977717aea49a6d70d1e96e2893adf21c709b6cfb"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp",
+      "original_path": "mechaship/ydlidar_ros2_driver/src/ydlidar_ros2_driver_node.cpp",
+      "mode": "100755",
+      "git_blob": "80002fc2949fd2cc92e16c8a0212cc0981bb63d3",
+      "sha256": "1b04d932b180f386a16b3c84bd3c66d33f2ebb4898be675f2238b5686af0a9b8"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/mechaship/ydlidar_ros2_driver/startup/initenv.sh",
+      "original_path": "mechaship/ydlidar_ros2_driver/startup/initenv.sh",
+      "mode": "100755",
+      "git_blob": "9b5c1d05ac87465af39781ae5ebb43cca49d802f",
+      "sha256": "e018aa70e8ffe3cc8fedf935e5223517498a73a2beb63c29b947014780a7545a"
+    },
+    {
+      "path": "codex/레거시코드/동계 최종코드/명령어 모음.txt",
+      "original_path": "명령어 모음.txt",
+      "mode": "100644",
+      "git_blob": "23a47113069b88ab1f74848ea182eeae68fd67e0",
+      "sha256": "6d8f2cddbe86933d77108d3608d35796ea0e92678e0a8620f2c3da4171c2b8e7"
+    }
+  ],
+  "public_copy_note": "208 files are byte-identical; only username/password values in two NTRIP configuration files are redacted. Original commit and private local originals are preserved."
+}

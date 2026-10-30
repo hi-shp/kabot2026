@@ -1,0 +1,12 @@
+{
+  "reason": "NTRIP account credentials in historical source",
+  "changed_paths": [
+    "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/param/ntrip_info.yaml",
+    "codex/레거시코드/동계 최종코드/mechaship/mechaship_bringup/param/ntrip_info.yamlyyyyy",
+    "codex/로컬보관/mechaship/mechaship_bringup/param/ntrip_info.yaml",
+    "codex/로컬보관/mechaship/mechaship_bringup/param/ntrip_info.yamlyyyyy"
+  ],
+  "scope": "username/password field values only; no change to current Jetson source or firmware",
+  "original_commit": "d31054800c28b6a8372cae9fb7c96ee1bfd0d09e",
+  "local_originals": "Preserved outside the Git repository"
+}

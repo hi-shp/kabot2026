@@ -45,11 +45,5 @@ public:
   // CallBacks
   void LaserCallBack(const sensor_msgs::msg::LaserScan::SharedPtr new_scan);
   void initPoseCallBack(const nav_msgs::msg::Odometry::SharedPtr new_initPose);
-
-private:
-  rclcpp::Time node_start_time;         // 노드 시작 시간
-  rclcpp::Time last_warning_time;       // 마지막 경고 출력 시간
-  rclcpp::Time last_tf_error_time;      // 마지막 TF 에러 출력 시간
-  rclcpp::Time last_scan_received_time; // 마지막 스캔 수신 시간
 };
 

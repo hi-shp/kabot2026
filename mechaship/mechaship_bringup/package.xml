@@ -2,42 +2,32 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>mechaship_bringup</name>
-  <version>1.0.0</version>
-  <description>ROS 2 launch files to initialize and run Mechaship.</description>
+  <version>0.1.0</version>
+  <description>ROS 2 launch scripts for starting the MechaShip</description>
   <maintainer email="techms5499@gmail.com">Mechasolution</maintainer>
-  <license>Apache-2.0</license>
+  <license>Apache 2.0</license>
   <author email="max@mechasolution.com">Max Cha</author>
 
-  <!-- Buildtool Dependency -->
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- Launch dependencies -->
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
-
-  <!-- Other ROS package dependencies -->
-  <exec_depend>mechaship_system</exec_depend>
-  <exec_depend>usb_cam</exec_depend>
-  <exec_depend>iahrs_ros2_driver</exec_depend>
-  <exec_depend>mechaship_description</exec_depend>
-  <exec_depend>wtrtk_ros2_driver</exec_depend>
   <exec_depend>velodyne_driver</exec_depend>
   <exec_depend>velodyne_pointcloud</exec_depend>
   <exec_depend>velodyne_laserscan</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
-  <exec_depend>rf2o_laser_odometry</exec_depend>
-  <exec_depend>ntrip_client</exec_depend>
-  <exec_depend>nmea_navsat_driver</exec_depend>
 
   <exec_depend>velodyne_msgs</exec_depend>
   <exec_depend>ublox_gps</exec_depend>
+  <exec_depend>usb_cam</exec_depend>
   <exec_depend>vectornav</exec_depend>
   <exec_depend>vectornav_msgs</exec_depend>
   <exec_depend>micro_ros_agent</exec_depend>
-  <exec_depend>rclpy</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
   <exec_depend>rosidl_runtime_py</exec_depend>
   <exec_depend>isv_water_trials</exec_depend>
 

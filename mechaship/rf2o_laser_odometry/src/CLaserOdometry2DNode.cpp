@@ -23,12 +23,6 @@ CLaserOdometry2DNode::CLaserOdometry2DNode(): Node("CLaserOdometry2DNode")
 {
   RCLCPP_INFO(get_logger(), "Initializing RF2O node...");
 
-  // 시작 시간 및 경고 시간 초기화
-  node_start_time = this->now();
-  last_warning_time = node_start_time;
-  last_tf_error_time = node_start_time;
-  last_scan_received_time = node_start_time;
-
   // Read Parameters
   //----------------
   this->declare_parameter<std::string>("laser_scan_topic", "/scan");
@@ -92,9 +86,6 @@ void CLaserOdometry2DNode::LaserCallBack(const sensor_msgs::msg::LaserScan::Shar
     // Keep in memory the last received laser_scan
     last_scan = *new_scan;
     rf2o_ref.current_scan_time = last_scan.header.stamp;
-
-    // 스캔 수신 시간 갱신
-    last_scan_received_time = this->now();
     
     if (rf2o_ref.first_laser_scan == false)
     {
@@ -131,17 +122,9 @@ bool CLaserOdometry2DNode::setLaserPoseFromTf()
   }
   catch (tf2::TransformException &ex)
   {
-    // 5초마다 1번만 에러 출력
-    rclcpp::Duration since_last_error = this->now() - last_tf_error_time;
-    if (since_last_error.seconds() > 5.0)
-    {
-      RCLCPP_ERROR(get_logger(), "%s", ex.what());
-      last_tf_error_time = this->now();
-    }
+    RCLCPP_ERROR(get_logger(), "%s",ex.what());
     retrieved = false;
   }
-
-  if (!retrieved) return false;
 
   // Keep this transform as Eigen Matrix3d
   tf2::Transform transform;
@@ -193,15 +176,7 @@ void CLaserOdometry2DNode::process()
   else
   {
     // This is a warning. We depend on laser scans, so no meaning running faster than scan freq.
-    // 5초 이상 스캔 수신이 없을 때만 경고 출력
-    rclcpp::Duration since_last_scan = this->now() - last_scan_received_time;
-    rclcpp::Duration since_last_warning = this->now() - last_warning_time;
-
-    if (since_last_scan.seconds() > 5.0 && since_last_warning.seconds() > 5.0)
-    {
-      RCLCPP_WARN(get_logger(), "Waiting for laser_scans....");
-      last_warning_time = this->now();
-    }
+    RCLCPP_WARN(get_logger(), "Waiting for laser_scans....");
   }
 }
 

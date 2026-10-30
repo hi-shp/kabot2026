@@ -7,7 +7,7 @@ package_name = "mechaship_teleop"
 
 setup(
     name=package_name,
-    version="1.0.0",
+    version="0.1.0",
     packages=find_packages(exclude=["test"]),
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
@@ -23,8 +23,8 @@ setup(
     author_email="max@mechasolution.com",
     maintainer="Mechasolution",
     maintainer_email="techms5499@gmail.com",
-    description="ROS 2 package for MechaShip teleoperation.",
-    license="Apache-2.0",
+    description="Teleoperation node for MechaShip",
+    license="Apache 2.0",
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [

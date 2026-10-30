@@ -1,0 +1,20 @@
+image_width: 640
+image_height: 480
+camera_name: ""
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: []
+distortion_model: ""
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: []
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: []
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: []

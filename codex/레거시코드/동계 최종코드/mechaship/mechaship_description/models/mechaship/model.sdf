@@ -1,0 +1,542 @@
+<?xml version="1.0"?>
+<!-- http://sdformat.org/spec?ver=1.8&elem=sdf -->
+<sdf version="1.8">
+  <model name="mechaship" canonical_link='base_footprint'>
+    <static>false</static>
+
+    <!-- Robot base footprint -->
+    <link name="base_footprint">
+      <inertial>
+        <mass>0</mass>
+      </inertial>
+    </link>
+
+    <!-- Robot base -->
+    <joint name="base_joint" type="fixed">
+      <parent>base_footprint</parent>
+      <child>base_link</child>
+    </joint>
+
+    <link name="base_link">
+      <enable_wind>true</enable_wind>
+      <pose>0 0 0.139 0 0 0</pose>
+      <inertial>
+        <mass>8.0</mass>
+        <inertia>
+          <ixx>0.1519</ixx>
+          <ixy>-0.0001741</ixy>
+          <ixz>-0.0003762</ixz>
+          <iyy>0.3672</iyy>
+          <iyz>-0.000030368681</iyz>
+          <izz>0.4475</izz>
+        </inertia>
+      </inertial>
+      <collision name="base_collision">
+        <pose>0.016 0 0.0771 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.56 0.258 0.085</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="left_hull_collision">
+        <pose>0.0355 0.14 -0.06 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.09</radius>
+            <length>0.751</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <collision name="right_hull_collision">
+        <pose>0.0355 -0.14 -0.06 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.09</radius>
+            <length>0.751</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="base_visual">
+        <!-- Dark Color -->
+        <material>
+          <ambient>0.3 0.3 0.3 1.0</ambient>
+          <diffuse>0.3 0.3 0.3 1.0</diffuse>
+          <specular>0.3 0.3 0.3 1.0</specular>
+          <emissive>0.0 0.0 0.0 1.0</emissive>
+        </material>
+        <geometry>
+          <mesh>
+            <uri>package://mechaship_description/models/mechaship/meshes/BASE.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <!-- GPS -->
+    <joint name="gps_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>gps_link</child>
+    </joint>
+
+    <link name="gps_link">
+      <pose relative_to="base_link">0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>0</mass>
+      </inertial>
+      <sensor name="mechaship_gps" type="navsat">
+        <always_on>true</always_on>
+        <update_rate>1</update_rate>
+        <visualize>true</visualize>
+        <topic>gps/fix</topic>
+        <gz_frame_id>gps_link</gz_frame_id>
+        <navsat>
+          <position_sensing>
+            <horizontal>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>1.0</stddev>
+              </noise>
+            </horizontal>
+            <vertical>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>1.0</stddev>
+              </noise>
+            </vertical>
+          </position_sensing>
+          <velocity_sensing>
+            <horizontal>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>1.0</stddev>
+              </noise>
+            </horizontal>
+            <vertical>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>1.0</stddev>
+              </noise>
+            </vertical>
+          </velocity_sensing>
+        </navsat>
+      </sensor>
+    </link>
+
+    <!-- IMU -->
+    <joint name="imu_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>imu_link</child>
+    </joint>
+
+    <link name="imu_link">
+      <pose relative_to="base_link">0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>0</mass>
+      </inertial>
+      <sensor name="mechaship_imu" type="imu">
+        <always_on>true</always_on>
+        <update_rate>33</update_rate>
+        <visualize>true</visualize>
+        <topic>imu</topic>
+        <gz_frame_id>imu_link</gz_frame_id>
+        <imu>
+          <angular_velocity>
+            <x>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.0005</stddev>
+              </noise>
+            </x>
+            <y>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.0005</stddev>
+              </noise>
+            </y>
+            <z>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.0005</stddev>
+              </noise>
+            </z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.015</stddev>
+              </noise>
+            </x>
+            <y>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.015</stddev>
+              </noise>
+            </y>
+            <z>
+              <noise type="gaussian">
+                <mean>0.0</mean>
+                <stddev>0.015</stddev>
+              </noise>
+            </z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+    </link>
+
+    <!-- LiDAR -->
+    <joint name="scan_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>base_scan</child>
+    </joint>
+
+    <link name="base_scan">
+      <pose relative_to="base_link">0.034159 0 0.20588 0 0 0</pose>
+      <inertial>
+        <mass>0.045</mass>
+        <pose>0 0 -0.0093 0 0 0</pose>
+        <inertia>
+          <ixx>0.000012807</ixx>
+          <ixy>-0.0000001067</ixy>
+          <ixz>0.00000001141</ixz>
+          <iyy>0.000012664</iyy>
+          <iyz>-0.0000001136</iyz>
+          <izz>0.000015284</izz>
+        </inertia>
+      </inertial>
+      <collision name="base_collision">
+        <pose>0 0 -0.0093 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.039 0.039 0.034</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="scan_visual">
+        <!-- White Color -->
+        <material>
+          <ambient>1.0 1.0 1.0 1.0</ambient>
+          <diffuse>1.0 1.0 1.0 1.0</diffuse>
+          <specular>1.0 1.0 1.0 1.0</specular>
+          <emissive>0.0 0.0 0.0 1.0</emissive>
+        </material>
+        <geometry>
+          <mesh>
+            <uri>package://mechaship_description/models/mechaship/meshes/LiDAR.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+      </visual>
+      <sensor name="mechaship_lidar" type="gpu_lidar">
+        <always_on>true</always_on>
+        <update_rate>7</update_rate>
+        <visualize>true</visualize>
+        <topic>scan</topic>
+        <gz_frame_id>base_scan</gz_frame_id>
+        <pose>0 0 0 0 0 0</pose>
+        <lidar>
+          <scan>
+            <horizontal>
+              <samples>512</samples>
+              <resolution>1.0</resolution>
+              <min_angle>-3.14</min_angle>
+              <max_angle>3.14</max_angle>
+            </horizontal>
+          </scan>
+          <range>
+            <min>0.05</min>
+            <max>15.0</max>
+            <resolution>0.01</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </lidar>
+      </sensor>
+    </link>
+
+    <!-- Camera -->
+    <joint name="camera_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>camera_link</child>
+    </joint>
+
+    <link name="camera_link">
+      <pose relative_to="base_link">0.077413 -0.0165 0.17319 1.5708 0 1.5708</pose>
+      <inertial>
+        <mass>0.075</mass>
+        <pose>0.0165 0 -0.007813 -1.5708 -1.5708 0</pose>
+        <inertia>
+          <ixx>0.00003181</ixx>
+          <ixy>-0.00000011</ixy>
+          <ixz>0.00000005</ixz>
+          <iyy>0.00000701</iyy>
+          <iyz>-0.00000001</iyz>
+          <izz>0.000029</izz>
+        </inertia>
+      </inertial>
+      <collision name="camera_collision">
+        <pose>0.0165 0 -0.007813 -1.5708 -1.5708 0</pose>
+        <geometry>
+          <box>
+            <size>0.027 0.071 0.031</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="camera_visual">
+        <!-- White Color -->
+        <material>
+          <ambient>1.0 1.0 1.0 1.0</ambient>
+          <diffuse>1.0 1.0 1.0 1.0</diffuse>
+          <specular>1.0 1.0 1.0 1.0</specular>
+          <emissive>0.0 0.0 0.0 1.0</emissive>
+        </material>
+        <geometry>
+          <mesh>
+            <uri>package://mechaship_description/models/mechaship/meshes/CAMERA.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+      </visual>
+      <sensor name="mechaship_camera" type="camera">
+        <always_on>true</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+        <topic>image_raw</topic>
+        <gz_frame_id>camera_link</gz_frame_id>
+        <pose>0 0 0 -1.5708 -1.5708 0</pose>
+        <camera>
+          <camera_info_topic>camera_info</camera_info_topic>
+          <optical_frame_id>camera_link</optical_frame_id>
+          <horizontal_fov>0.8344</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.1</near>
+            <far>100.0</far>
+          </clip>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.007</stddev>
+          </noise>
+        </camera>
+      </sensor>
+    </link>
+
+    <!-- Key -->
+    <joint name="key_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>key_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>1.0472</lower>
+          <upper>2.0944</upper>
+          <effort>1.962</effort>
+          <velocity>4.0</velocity>
+        </limit>
+      </axis>
+    </joint>
+
+    <link name="key_link">
+      <pose relative_to="base_link">-0.294365 0 0 0 0 -1.5708</pose>
+      <inertial>
+        <mass>0.161</mass>
+        <pose>0 0 -0.067933 0 0 0</pose>
+        <inertia>
+          <ixx>0.0008057</ixx>
+          <ixy>0.0</ixy>
+          <ixz>0.000002977199</ixz>
+          <iyy>0.0008111</iyy>
+          <iyz>0.0</iyz>
+          <izz>0.000023761354</izz>
+        </inertia>
+      </inertial>
+      <collision name="key_collision">
+        <pose>0 0 -0.0328 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.005</radius>
+            <length>0.18</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <collision name="thruster_collision">
+        <pose>0 0 -0.163 0 1.5708 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.04</radius>
+            <length>0.055</length>
+          </cylinder>
+        </geometry>
+      </collision>
+      <visual name="key_visual">
+        <!-- White Color -->
+        <material>
+          <ambient>1.0 1.0 1.0 1.0</ambient>
+          <diffuse>1.0 1.0 1.0 1.0</diffuse>
+          <specular>1.0 1.0 1.0 1.0</specular>
+          <emissive>0.0 0.0 0.0 1.0</emissive>
+        </material>
+        <geometry>
+          <mesh>
+            <uri>package://mechaship_description/models/mechaship/meshes/KEY.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <!-- Thruster -->
+    <joint name="thruster_joint" type="revolute">
+      <!-- Asked to construct a joint of sdf::JointType [2], but that is not supported yet.
+       Creating a FIXED joint instead (continuous >> revolute)-->
+      <parent>key_link</parent>
+      <child>thruster_link</child>
+      <axis>
+        <xyz>1 0 0</xyz>
+        <dynamics>
+          <damping>0.1</damping>
+        </dynamics>
+      </axis>
+    </joint>
+
+    <link name="thruster_link">
+      <pose relative_to="key_link">0 0 -0.16471 0 0 0</pose>
+      <inertial>
+        <mass>0.006</mass>
+        <inertia>
+          <ixx>0.000000708093</ixx>
+          <ixy>0.000000000302</ixy>
+          <ixz>0.0</ixz>
+          <iyy>0.00000047356</iyy>
+          <iyz>0.0</iyz>
+          <izz>0.000000473564</izz>
+        </inertia>
+      </inertial>
+      <visual name="thruster_visual">
+        <!-- White Color -->
+        <material>
+          <ambient>1.0 1.0 1.0 1.0</ambient>
+          <diffuse>1.0 1.0 1.0 1.0</diffuse>
+          <specular>1.0 1.0 1.0 1.0</specular>
+          <emissive>0.0 0.0 0.0 1.0</emissive>
+        </material>
+        <geometry>
+          <mesh>
+            <uri>package://mechaship_description/models/mechaship/meshes/THRUSTER.stl</uri>
+            <scale>0.001 0.001 0.001</scale>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+
+    <!-- Joint Position Controller -->
+    <!-- https://gazebosim.org/api/sim/9/classgz_1_1sim_1_1systems_1_1JointPositionController.html -->
+    <plugin filename="gz-sim-joint-position-controller-system"
+      name="gz::sim::systems::JointPositionController">
+      <joint_name>key_joint</joint_name>
+      <use_actuator_msg>false</use_actuator_msg>
+      <cmd_max>3.1415</cmd_max>
+      <use_velocity_commands>true</use_velocity_commands>
+      <topic>actuator/key/radian</topic>
+      <initial_position>1.5708</initial_position>
+    </plugin>
+
+    <!-- Thruster -->
+    <!-- https://gazebosim.org/api/sim/9/classgz_1_1sim_1_1systems_1_1Thruster.html -->
+    <plugin filename="gz-sim-thruster-system"
+      name="gz::sim::systems::Thruster">
+      <namespace />
+      <topic>actuator/thruster/percentage</topic>
+      <joint_name>thruster_joint</joint_name>
+      <use_angvel_cmd>false</use_angvel_cmd>
+      <fluid_density>1000</fluid_density>
+      <propeller_diameter>0.06</propeller_diameter>
+      <thrust_coefficient>1.0</thrust_coefficient>
+      <velocity_control>true</velocity_control>
+      <max_thrust_cmd>100</max_thrust_cmd>
+      <min_thrust_cmd>-100</min_thrust_cmd>
+      <deadband>10.0</deadband>
+    </plugin>
+
+    <!-- Joint state publisher -->
+    <!-- https://gazebosim.org/api/sim/9/classgz_1_1sim_1_1systems_1_1JointStatePublisher.html -->
+    <plugin filename="gz-sim-joint-state-publisher-system"
+      name="gz::sim::systems::JointStatePublisher">
+      <topic>joint_states</topic>
+      <joint_name>key_joint</joint_name>
+      <joint_name>thruster_joint</joint_name>
+    </plugin>
+
+    <!-- Left hull -->
+    <plugin filename="libSurface.so" name="vrx::Surface">
+      <link_name>base_link</link_name>
+      <hull_length>0.751</hull_length>
+      <hull_radius>0.09</hull_radius>
+      <fluid_level>0.03</fluid_level>
+      <points>
+        <point>0.411 0.24 -0.06</point>
+        <point>-0.34 0.06 -0.06</point>
+      </points>
+      <wavefield>
+        <topic>/vrx/wavefield/parameters</topic>
+      </wavefield>
+    </plugin>
+
+    <!-- Right hull -->
+    <plugin filename="libSurface.so" name="vrx::Surface">
+      <link_name>base_link</link_name>
+      <hull_length>0.751</hull_length>
+      <hull_radius>0.09</hull_radius>
+      <fluid_level>0.03</fluid_level>
+      <points>
+        <point>0.411 -0.06 -0.06</point>
+        <point>-0.34 -0.24 -0.06</point>
+      </points>
+      <wavefield>
+        <topic>/vrx/wavefield/parameters</topic>
+      </wavefield>
+    </plugin>
+
+    <!-- Hydrodynamic -->
+    <plugin filename="libSimpleHydrodynamics.so"
+      name="vrx::SimpleHydrodynamics">
+      <link_name>base_link</link_name>
+      <!-- Added mass -->
+      <xDotU>0.4</xDotU>
+      <yDotV>0.1</yDotV>
+      <zDotW>8.0</zDotW>
+
+      <kDotP>0.0</kDotP>  <!-- Roll (X)-->
+      <mDotQ>0.0</mDotQ>  <!-- Pitch (y)-->
+      <nDotR>0.5</nDotR>  <!-- Yaw (z)-->
+
+      <!-- Linear drag -->
+      <xU>4.0</xU>
+      <yV>40.0</yV>
+      <zW>20.0</zW>
+
+      <kP>7.0</kP>  <!-- Roll (X)-->
+      <mQ>10.0</mQ> <!-- Pitch (y)-->
+      <nR>2.0</nR>  <!-- Yaw (z)-->
+
+      <!-- Quadratic drag -->
+      <xUU>0.5</xUU>
+      <yVV>100.0</yVV>
+
+      <kPP>4.0</kPP> <!-- Roll (X)-->
+      <mQQ>3.0</mQQ> <!-- Pitch (y)-->
+      <nRR>0.1</nRR> <!-- Yaw (z)-->
+    </plugin>
+
+  </model>
+</sdf>
