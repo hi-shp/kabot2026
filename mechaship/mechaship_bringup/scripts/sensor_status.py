@@ -9,6 +9,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from rosidl_runtime_py.utilities import get_message
 from std_msgs.msg import String
+from rcl_interfaces.msg import ParameterDescriptor
 
 
 class SensorStatus(Node):
@@ -16,6 +17,7 @@ class SensorStatus(Node):
         super().__init__('sensor_status')
         self.start=time.monotonic()
         self.receipts={};self.last={};self.subscriptions_owned=[]
+        self.last_missing=None
         self.publisher=self.create_publisher(String,'/sensor_status',10)
         specs={
             '/gps/fix':'sensor_msgs/msg/NavSatFix',
@@ -28,8 +30,12 @@ class SensorStatus(Node):
             '/sensor/battery/voltage':'std_msgs/msg/Float32',
             '/sensor/emo/status':'std_msgs/msg/Bool',
             '/smc_2000/fix':'sensor_msgs/msg/NavSatFix',
+            '/actuators/status':'std_msgs/msg/String',
         }
+        expected=self.declare_parameter('expected_topics',list(specs),
+                                        ParameterDescriptor(dynamic_typing=True)).value
         for topic,type_name in specs.items():
+            if topic not in expected:continue
             self.receipts[topic]=deque(maxlen=500)
             def receive(msg,topic=topic):
                 self.receipts[topic].append(time.monotonic());self.last[topic]=msg
@@ -45,13 +51,22 @@ class SensorStatus(Node):
             item={'receiving':age is not None and age<3.,'age_s':round(age,2) if age is not None else None,
                   'hz':round(hz,2),'publishers':self.count_publishers(topic)}
             msg=self.last.get(topic)
+            if topic=='/actuators/status' and msg is not None:
+                try:
+                    actuator=json.loads(msg.data)
+                    item['receiving']=item['receiving'] and actuator.get('receiving') is True
+                except (ValueError,AttributeError):item['receiving']=False
             if topic.endswith('/fix') and msg is not None:
                 item['fix_status']=int(msg.status.status)
                 item['valid_position']=msg.status.status>=0 and math.isfinite(msg.latitude) and math.isfinite(msg.longitude)
             topics[topic]=item
         self.publisher.publish(String(data=json.dumps({'uptime_s':round(now-self.start,1),'topics':topics})))
         missing=[topic for topic,item in topics.items() if not item['receiving']]
-        self.get_logger().info('Receiving: '+', '.join(topic for topic,item in topics.items() if item['receiving'])+'; no recent data: '+', '.join(missing))
+        state=tuple(missing)
+        if state!=self.last_missing:
+            self.get_logger().info('Receiving: '+', '.join(topic for topic,item in topics.items() if item['receiving'])+
+                                   ('; no recent data: '+', '.join(missing) if missing else '; all enabled streams receiving'))
+            self.last_missing=state
 
 
 def main():

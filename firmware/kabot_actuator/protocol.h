@@ -45,7 +45,8 @@ inline bool parse(char* line, Command& cmd) {
   const char* p = line + 3;
   if (!number(p, cmd.sequence, ',')) return false;
   cmd.operation = *p++;
-  if ((cmd.operation != 'A' && cmd.operation != 'C' && cmd.operation != 'D') || *p++ != ',') return false;
+  if ((cmd.operation != 'A' && cmd.operation != 'C' && cmd.operation != 'D' &&
+       cmd.operation != 'S' && cmd.operation != 'R' && cmd.operation != 'I') || *p++ != ',') return false;
   return number(p, cmd.left, ',') && number(p, cmd.right, 0) &&
       cmd.left >= 1100 && cmd.left <= 1900 && cmd.right >= 1100 && cmd.right <= 1900;
 }

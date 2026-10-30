@@ -16,4 +16,8 @@ setup(name='isv_water_trials', version='0.1.0', packages=find_packages(),
           'mpc_replay = isv_water_trials.mpc:main',
           'command_proxy = isv_water_trials.proxy:main',
           'arduino_bridge = isv_water_trials.arduino_bridge:main',
-          'mode_test = isv_water_trials.mode_test:main']})
+          'mode_test = isv_water_trials.mode_test:main',
+          'stop_thrusters = isv_water_trials.stop_thrusters:main',
+          'reinitialize_esc = isv_water_trials.reinitialize_esc:main',
+          'gps_track = isv_water_trials.gps_track:main',
+          'avoid_preview = isv_water_trials.avoid_preview:main']})

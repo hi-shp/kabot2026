@@ -18,7 +18,7 @@ def packet(payload):
 
 
 def command(sequence, operation, left=1500, right=1500):
-    if type(sequence) is not int or not 0 <= sequence <= 65535 or operation not in ('A', 'C', 'D'):
+    if type(sequence) is not int or not 0 <= sequence <= 65535 or operation not in ('A', 'C', 'D', 'S', 'R', 'I'):
         raise ValueError('Invalid sequence/operation')
     if any(type(p) is not int or not 1100 <= p <= 1900 for p in (left, right)):
         raise ValueError('PWM must be integer microseconds in 1100..1900')
@@ -37,18 +37,26 @@ class Status:
     rc_valid: bool
     estop_known: bool
     estop_active: bool
+    stop_latched: bool = False
+    protocol_version: int = 1
 
 
 def status(line):
     if len(line) > 64 or not line.endswith(b'\n'):
         raise ValueError('Invalid line length/terminator')
-    match = re.fullmatch(rb'(S1,([0-9]{1,5}),([012]),([01]),([0-9]{4}),([0-9]{4}),([01]),([01]),([01]))\*([0-9A-F]{4})\r?\n', line)
-    if not match or crc16(match[1]) != int(match[10], 16):
+    match = re.fullmatch(rb'(S[13],[0-9,]+)\*([0-9A-F]{4})\r?\n', line)
+    if not match or crc16(match[1]) != int(match[2], 16):
         raise ValueError('Invalid status format/checksum')
-    seq, mode, armed, left, right, rc, known, active = (int(match[i]) for i in range(2, 10))
-    if seq > 65535 or not 1100 <= left <= 1900 or not 1100 <= right <= 1900:
+    fields=match[1].decode().split(',');version=int(fields[0][1])
+    if len(fields)!=(10 if version==3 else 9) or any(not p or len(p)>5 for p in fields[1:]):
+        raise ValueError('Invalid status fields')
+    values=list(map(int,fields[1:]));seq,mode,armed,left,right,rc,known,active=values[:8]
+    stopped=values[8] if version==3 else 0
+    if seq > 65535 or mode not in (0,1,2) or any(v not in (0,1) for v in (armed,rc,known,active,stopped)) or not 1100 <= left <= 1900 or not 1100 <= right <= 1900:
         raise ValueError('Invalid status range')
-    return Status(seq, mode, bool(armed), left, right, bool(rc), bool(known), bool(active))
+    if stopped and (mode!=0 or armed or (left,right)!=(1500,1500)):
+        raise ValueError('Invalid stopped state')
+    return Status(seq, mode, bool(armed), left, right, bool(rc), bool(known), bool(active),bool(stopped),version)
 
 
 def raw_status(line):

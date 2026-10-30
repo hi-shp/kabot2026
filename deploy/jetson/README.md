@@ -1,42 +1,58 @@
-# 젯슨 수상 시험 실행
+# 젯슨 필수 명령
+
+현재 배선·방향·실제 중립값·토픽·기록 명령의 기준은 [정상 운용 안내](../../docs/BOAT_BASELINE_2026-10-30.md)입니다. 사용자가 말하는1000/1500/2000과 실제 ROS API1100/1500/1900을 구분합니다. 실제 ESC 정지 출력은 양쪽1480µs입니다.
+
+각 ROS 터미널에서:
 
 ```bash
+source /opt/ros/humble/setup.bash
 source ~/ros2_ws/install/setup.bash
-ros2 launch mechaship_bringup all_sensors.launch.py use_arduino:=true
+export ROS_DOMAIN_ID=50 ROS_LOCALHOST_ONLY=0
 ```
 
-GPS, VectorNav IMU, Velodyne VLP16, 아두이노 상태 수신을 한 번에 시작합니다. 카메라는 연결할 때만 `use_camera:=true`를 추가합니다. 시작 시 자율운항은 무장되지 않으며, 조종기가 RC 모드이면 RC 조작을 유지합니다. `use_arduino:=false`로 아두이노 연결만 끌 수 있습니다. 기존 `cb`는 전체 ROS 작업 공간을 빌드하고 현재 셸에 적용합니다.
+전체 빌드와 현재 셸 적용은 `cb`입니다. 터미널1에서 기본 GPS·IMU·Velodyne·아두이노를 켭니다.
 
-| 확인 항목 | 토픽 |
+```bash
+ros2 launch mechaship_bringup all_sensors.launch.py
+```
+
+카메라 연결 시 `use_camera:=true`를 추가합니다. Ctrl+C는 해당 브링업의 센서·브리지 하위 프로세스까지 정리합니다. 남은 세션의 수동 정리는 `~/bin/stop_bringup`이며 독립 시험 프로세스도 정리합니다.
+
+터미널2에서 **아래 중 하나만** 실행합니다.
+
+```bash
+ros2 run isv_water_trials mode_test --side left --percent 50
+ros2 run isv_water_trials mode_test --side right --percent 50
+ros2 run isv_water_trials mode_test --side both --percent 50
+```
+
+후진은 `--percent -50`, 30%는 `--percent 30`입니다. 시험은 Ctrl+C까지 계속 송신하며 `--seconds`는 무시합니다. RC/AUTO 선택은 MCU가 처리하고, 서비스/USB 단절 시 호스트는 재시도합니다. SSH SIGHUP·SIGTERM은 무시하며 Ctrl+C에서는 중립 ACK 후 종료합니다. 전원 차단과 SIGKILL까지 생존하는 것은 아닙니다.
+
+```bash
+# 일회 중립 요청: 계속 실행 중인 시험은 새 명령을 보내므로 지속 정지는 시험의 Ctrl+C 사용
+ros2 run isv_water_trials stop_thrusters
+# EMO 해제 후 필요 시: 실행 중 시험을 유지하고 중립7초 후 원래 출력을 자동 재개
+ros2 run isv_water_trials reinitialize_esc
+```
+
+UNO에는 물리 EMO 감지 입력이 없습니다. 외부 stop 요청은 현재 mode_test를 일시정지시키지 않습니다. 초기화 요청은 유지보수용 명시 요청이며 노드를 종료하지 않습니다.
+
+| 데이터 | 주요 토픽 |
 |---|---|
 | GPS 위치·속도 | `/gps/fix`, `/gps/fix_velocity` |
-| VectorNav IMU | `/vectornav/raw/common`, `/vectornav/imu` |
-| 라이다 16층·기본 단면 | `/velodyne_points`, `/scan` |
-| 아두이노 모드·명령·RC 입력·D9/D10 출력 펄스 | `/actuators/status` |
-| 자율운항 정지 요청 | `/actuators/stop_requested` |
+| IMU | `/vectornav/raw/common`, `/vectornav/imu` |
+| 라이다 원시·3D·선택 ring | `/velodyne_packets`, `/velodyne_points`, `/scan` |
+| MCU 상태·원시 RC·핀 PWM | `/actuators/status` |
+| 명령 기록 | `/water_trial/command` |
 
-`/scan`은 VLP16의 ring 8(0부터 세면 9번째)입니다. `/actuators/stop_requested`는 RC 모드·미무장·통신 단절 등을 포함하는 소프트웨어 정지 요청이며, 별도 배선된 물리 비상정지가 아닙니다. 배터리 전압과 물리 비상정지 신호는 아직 확인된 센서 토픽이 없습니다. VN-100의 GNSS·위치·속도 출력은 이 배의 실제 GNSS 측정값으로 사용하지 않습니다.
+라이다는 VLP16 설정의16개 ring 점군이며 `/scan`은 선택한 한 층입니다. 카메라는 기본 비활성이고 기존 MCU 배터리·EMO·SMC GPS 토픽은 기본 UNO 구성에서 수신하지 않습니다.
+
+전체 센서 기록과 지도용 GPS 파일:
 
 ```bash
-# 현재 토픽과 아두이노 상태 확인
-ros2 topic list
-ros2 topic echo /actuators/status
-
-# 다른 추진 명령 프로그램을 종료한 뒤, 별도 터미널에서 RC/AUTO 전환 시험
-ros2 run isv_water_trials mode_test --seconds 60
-# AUTO + 양쪽 스틱 중립 0.5초 확인 후 좌우 1540µs(최대 PWM 편차의 10%).
-# RC 전환 시 수동 우선, AUTO 복귀 시 중립 확인 후 재개. Ctrl+C/60초 후 AUTO 해제.
-# 한쪽만 시험: --side left 또는 --side right. 통신·신호 이상은 재개 없이 종료.
-
-# 센서와 명령 기록. Ctrl+C로 종료
 mkdir -p ~/water_trials
-ros2 bag record -o ~/water_trials/bag_$(date +%Y%m%d_%H%M%S) --regex '^/(gps/.*|vectornav/.*|velodyne_packets|velodyne_points|scan|sensor/.*|sensor_status|water_trial/.*|actuators/.*)$'
-
-# 물리량 추정용 기록 및 분석
-ros2 run isv_water_trials record --config ~/ros2_ws/src/isv_water_trials/config/boat_live.json
-ros2 run isv_water_trials analyze SESSION
+ros2 bag record -o ~/water_trials/bag_$(date +%Y%m%d_%H%M%S) --regex '^/(gps/.*|vectornav/.*|velodyne_packets|velodyne_points|scan|actuators/.*|water_trial/.*|camera/.*|tf|tf_static|diagnostics)$'
+ros2 run isv_water_trials gps_track --output ~/water_trials/gps_$(date +%Y%m%d_%H%M%S)
 ```
 
-무게 25 kg, 길이 1.1 m, 폭 0.50 m, 추진기 중심 간격 0.32 m는 `boat_live.json`에 저장했습니다. 추력 보정값·관성모멘트·IMU 설치 방향·라이다 설치 각도는 아직 측정하지 않았습니다. `trial` 실행은 프레임 확인과 별도 운전자 확인을 요구합니다. 모터 전원이 분리된 상태에서 아두이노 RC 입력과 D9/D10 중립 PWM까지만 확인했으며, 빵판·ESC·스러스터의 실제 회전은 확인하지 못했습니다.
-
-아두이노 배선·원본 백업·RC/AUTO 전환 절차는 [펌웨어 안내](../../firmware/README.md)를 참고하세요.
+각 기록은 별도 터미널에서 실행합니다. `gps_latest_url.txt`의 지도 링크, `gps_track.csv`, `gps_track.geojson`을 사용합니다. 추가 JSON 기록·구간 표시·오프라인 분석은 정상 운용 안내에 정리했습니다.

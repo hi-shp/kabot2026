@@ -6,6 +6,7 @@ import math
 import time
 
 from .common import load_config
+from .shutdown import ExitSignals, neutralize
 
 
 @dataclass(frozen=True)
@@ -61,7 +62,6 @@ def main(argv=None):
     if not (args.operator_confirmed and args.exclusive_control_confirmed and cfg['frame_confirmed']):
         parser.error('Execution requires operator/exclusive-control flags and frame_confirmed=true')
     import rclpy
-    import signal
     from rclpy.node import Node
     from rclpy.qos import qos_profile_sensor_data
     from sensor_msgs.msg import NavSatFix
@@ -71,9 +71,7 @@ def main(argv=None):
     from rclpy.signals import SignalHandlerOptions
     # Retain a working ROS context for the best-effort stop in finally on Ctrl+C.
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
-    def terminate(signum,frame):
-        raise KeyboardInterrupt
-    signal.signal(signal.SIGTERM,terminate)
+    exits = ExitSignals()
     node=Node('water_trial_runner')
     command=node.create_publisher(String,'/water_trial/command',100)
     marker=node.create_publisher(String,'/water_trial/mark',100)
@@ -87,6 +85,8 @@ def main(argv=None):
                    [(NavSatFix,cfg['gps_topic'],'gps'),(CommonGroup,cfg['vectornav_topic'],'vn'),(Bool,cfg['estop_topic'],'estop')]]
 
     def healthy():
+        if exits.requested:
+            raise KeyboardInterrupt
         now=time.monotonic()
         if any(key not in seen or now-seen[key][0]>cfg['max_sensor_gap_s'] for key in ('gps','vn','estop')):
             return False
@@ -131,10 +131,11 @@ def main(argv=None):
     except KeyboardInterrupt:
         print('Operator interrupted trial')
     finally:
-        # Not a hardware watchdog: power/process/network failure may prevent delivery.
-        for _ in range(3):
-            try: send(cfg['neutral_pwm_us'],cfg['neutral_pwm_us'],'end',stop=True)
-            except Exception as exc: print('STOP_UNCONFIRMED:',str(exc))
-        marker.publish(String(data=json.dumps({'label':'end'})))
-        node.destroy_node()
-        if rclpy.ok(): rclpy.shutdown()
+        try:
+            if not neutralize(node, (left, right)):
+                print('STOP_UNCONFIRMED: use physical EMO', flush=True)
+            marker.publish(String(data=json.dumps({'label':'end'})))
+        finally:
+            node.destroy_node()
+            if rclpy.ok(): rclpy.shutdown()
+            exits.restore()

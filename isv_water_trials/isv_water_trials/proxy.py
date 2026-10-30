@@ -8,6 +8,7 @@ import json
 import threading
 import time
 from .common import load_config
+from .shutdown import ExitSignals, neutralize
 
 
 def main(argv=None):
@@ -21,7 +22,9 @@ def main(argv=None):
     from rclpy.executors import MultiThreadedExecutor
     from std_msgs.msg import String
     from mechaship_interfaces.srv import ThrottlePulseWidth
-    rclpy.init()
+    from rclpy.signals import SignalHandlerOptions
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
+    exits = ExitSignals()
     node=Node('water_trial_command_proxy')
     pub=node.create_publisher(String,'/water_trial/command',100)
     group=ReentrantCallbackGroup()
@@ -36,7 +39,7 @@ def main(argv=None):
 
     def callback(side):
         def handle(request,response):
-            if not 1100<=request.pulse_width<=1900:
+            if exits.requested or not 1100<=request.pulse_width<=1900:
                 response.status=False
                 return response
             with lock:
@@ -64,9 +67,20 @@ def main(argv=None):
     executor=MultiThreadedExecutor(num_threads=4)
     executor.add_node(node)
     print('Logging proxy ready. Only explicitly remapped upstream requests are forwarded.')
-    try:executor.spin()
+    try:
+        while not exits.requested and rclpy.ok():
+            executor.spin_once(timeout_sec=.05)
     except KeyboardInterrupt:pass
     finally:
+        exits.requested = True
+        for service in services:
+            node.destroy_service(service)
         executor.shutdown()
-        node.destroy_node()
-        if rclpy.ok():rclpy.shutdown()
+        executor.remove_node(node)
+        try:
+            if not neutralize(node, tuple(clients.values())):
+                print('STOP_UNCONFIRMED: use physical EMO', flush=True)
+        finally:
+            node.destroy_node()
+            if rclpy.ok():rclpy.shutdown()
+            exits.restore()

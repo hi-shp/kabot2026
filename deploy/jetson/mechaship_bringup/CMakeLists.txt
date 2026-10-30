@@ -27,6 +27,10 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-install(PROGRAMS scripts/sensor_status.py DESTINATION lib/${PROJECT_NAME})
+# Track script changes so incremental builds refresh the executable copy.
+configure_file(scripts/sensor_status.py ${CMAKE_CURRENT_BINARY_DIR}/sensor_status.py COPYONLY)
+file(COPY scripts/sensor_status.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR}
+  FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/sensor_status.py DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

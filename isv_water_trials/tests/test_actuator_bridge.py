@@ -16,6 +16,15 @@ class ProtocolTests(unittest.TestCase):
         m = status(packet('S1,65535,2,1,1560,1530,1,0,0'))
         self.assertEqual((m.sequence, m.left, m.right, m.armed, m.estop_known), (65535, 1560, 1530, True, False))
 
+    def test_global_stop_status(self):
+        m=status(packet('S3,7,0,0,1500,1500,1,0,0,1'))
+        self.assertTrue(m.stop_latched)
+        self.assertEqual(m.protocol_version,3)
+        self.assertTrue(command(8,'S').startswith(b'K1,8,S,1500,1500*'))
+        self.assertTrue(command(9,'R').startswith(b'K1,9,R,1500,1500*'))
+        for invalid in ('S3,7,1,0,1500,1500,1,0,0,1','S3,7,0,1,1500,1500,1,0,0,1','S3,7,0,0,1600,1500,1,0,0,1'):
+            with self.assertRaises(ValueError):status(packet(invalid))
+
     def test_raw_pulse_observation(self):
         raw = raw_status(packet('R1,1485,1490,2016,1508,1492'))
         self.assertEqual(raw['rc_mode_us'], 2016)
@@ -35,6 +44,8 @@ class ProtocolTests(unittest.TestCase):
                 status(packet(payload))
 
     def test_commands(self):
+        self.assertTrue(command(0, 'I').startswith(b'K1,0,I,1500,1500*'))
+        with self.assertRaises(ValueError):command(0, 'I', 1620, 1500)
         self.assertTrue(command(0, 'C', 1500, 1560).startswith(b'K1,0,C,1500,1560*'))
         for values in [(0, 'Z', 1500, 1500), (0, 'A', 1560, 1500), (65536, 'D', 1500, 1500),
                        (0, 'C', 0, 1500), (True, 'C', 1500, 1500), (0, 'C', 1500., 1500)]:
@@ -64,6 +75,10 @@ class PairTests(unittest.TestCase):
         self.assertEqual(self.sent, [('C', 1560, 1530)])
         self.assertEqual([row[0] for row in self.logged], ['requested', 'acknowledged'])
 
+    def test_fifty_and_full_percent_are_not_capped(self):
+        self.assertEqual(self.both(1700, 1700), [True, True])
+        self.assertEqual(self.both(1900, 1100), [True, True])
+
     def test_one_side_never_drives(self):
         self.assertFalse(self.pair.submit('left', 1560))
         self.assertEqual(self.sent, [])
@@ -80,7 +95,7 @@ class PairTests(unittest.TestCase):
         self.assertEqual(self.logged[-1][0], 'failed')
 
     def test_unsupported_values(self):
-        for side, value in [('left', 1900), ('right', 1300), ('left', True), ('x', 1500)]:
+        for side, value in [('left', 1901), ('right', 1099), ('left', True), ('x', 1500)]:
             self.assertFalse(self.pair.submit(side, value))
         self.assertEqual(self.sent, [])
 

@@ -1,9 +1,14 @@
 # 프로젝트 구조와 실제 젯슨 경로
 
+현재 배의 확정 배선·방향·중립, 실행 명령과 토픽은 [정상 운용 기준](docs/BOAT_BASELINE_2026-10-30.md)을 참고합니다.
+
 현재 실제 운용/빌드 workspace는 젯슨의 `/home/isv/ros2_ws`입니다. 이 저장소 전체를 그대로 src에 중첩하여 복제하는 것과 같은 구성이 아닙니다.
 
 | 경로 | 용도 |
 |---|---|
+| `docs/BOAT_BASELINE_2026-10-30.md` | 사용자 정상 확인 상태, 필수 명령·토픽·논리값 변환·복원 기준 |
+| `docs/BASELINE_RUNTIME_SHA256.json` | 재접속 시 주요 소스36개 SHA-256 비교 결과(실좌표·비밀번호 제외) |
+| `firmware/kabot_actuator/` | 현재 UNO 운용 펌웨어. board_config.h가 실제 빌드 설정 기준 |
 | `isv/` | 기존 저장소의 자율운항 코드. 실제 젯슨의 `isv_kaboat`과 세대/인터페이스가 다름 |
 | `mechaship/` | 기존 저장소의 장치/launch 코드. GPS 구성은 실제 젯슨과 차이가 있음 |
 | `isv_water_trials/` | 실제 젯슨에 추가한 수상 시험/분석 ROS 패키지 |

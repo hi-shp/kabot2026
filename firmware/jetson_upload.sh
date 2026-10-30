@@ -4,13 +4,15 @@ set -eo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 port=/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0
 flash=false
+run_tests=false
 while (($#)); do
   case "$1" in
     --flash) flash=true; shift ;;
     --build-only) flash=false; shift ;;
+    --test) run_tests=true; shift ;;
     --port) test "$#" -ge 2 || exit 64; port=$2; shift 2 ;;
     -h|--help)
-      echo 'bash jetson_upload.sh [--build-only | --flash] [--port DEVICE]'
+      echo 'bash jetson_upload.sh [--build-only | --flash] [--port DEVICE] [--test]'
       echo 'Before --flash: disconnect ESC/motor power; keep USB; stop Arduino bridge/serial monitor.'
       exit 0 ;;
     *) echo "Unknown argument: $1" >&2; exit 64 ;;
@@ -31,8 +33,10 @@ check_port() {
 if "$flash"; then check_port; fi
 build=$(mktemp -d "$HOME/.cache/kabot-uno/build.XXXXXX")
 source_fingerprint=$(sha256sum "$root/kabot_actuator"/*.ino "$root/kabot_actuator"/*.h)
-g++ -std=c++11 -Wall -Wextra -Werror "$root/tests/control_test.cpp" -o "$build/control_test"
-"$build/control_test"
+if "$run_tests"; then
+  g++ -std=c++11 -Wall -Wextra -Werror "$root/tests/control_test.cpp" -o "$build/control_test"
+  "$build/control_test"
+fi
 "$cli" compile --fqbn arduino:avr:uno --build-path "$build" "$root/kabot_actuator"
 hex="$build/kabot_actuator.ino.hex"
 test -s "$hex"

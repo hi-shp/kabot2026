@@ -18,16 +18,17 @@ def nodes(context):
         transform = yaml.safe_load(f)['velodyne_transform_node']['ros__parameters']
     transform['calibration'] = os.path.join(share, 'params', calibration_names[model])
     transform.update(fixed_frame='', target_frame='', min_range=0.4)
+    recovery={'respawn':True,'respawn_delay':4.0,'sigterm_timeout':'2','sigkill_timeout':'1'}
     return [LogInfo(msg='Velodyne model=' + model + '; model/IP/ring and mounting require hardware confirmation'),
             Node(package='velodyne_driver', executable='velodyne_driver_node', name='velodyne_driver_node', output='screen',
                  parameters=[{'device_ip': LaunchConfiguration('velodyne_ip').perform(context),
                               'model': model, 'frame_id': 'velodyne', 'port': 2368, 'rpm': 600.0,
-                              'gps_time': False, 'enabled': True}]),
+                              'gps_time': False, 'enabled': True}],**recovery),
             Node(package='velodyne_pointcloud', executable='velodyne_transform_node', name='velodyne_transform_node',
-                 output='screen', parameters=[transform]),
+                 output='screen', parameters=[transform],**recovery),
             Node(package='velodyne_laserscan', executable='velodyne_laserscan_node', name='velodyne_laserscan_node',
                  output='screen', parameters=[{'ring': int(LaunchConfiguration('velodyne_ring').perform(context)),
-                                               'resolution': 0.007}])]
+                                               'resolution': 0.007}],**recovery)]
 
 
 def generate_launch_description():

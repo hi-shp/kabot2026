@@ -11,6 +11,8 @@ from .common import load_config, dump_json, clean_json
 
 
 def main(argv=None):
+    from .shutdown import keep_terminal_loss
+    keep_terminal_loss()
     parser = argparse.ArgumentParser()
     parser.add_argument('--config')
     parser.add_argument('--output', default=str(Path.home() / 'water_trials'))

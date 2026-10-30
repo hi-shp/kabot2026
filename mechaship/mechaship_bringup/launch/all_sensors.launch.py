@@ -1,21 +1,49 @@
 """Sensor-only bringup. No actuator enable/configuration or control nodes."""
 import os
+import signal
+import runpy
 from pathlib import Path
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, LogInfo, EmitEvent, RegisterEventHandler
+from launch.events import Shutdown
+from launch.event_handlers import OnProcessStart, OnShutdown
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
+
+_session = None
+
+
 def nodes(context):
+    global _session
+    session_class = runpy.run_path(str(Path(__file__).with_name('process_lifecycle.py')))['BringupSession']
+    _session = session_class()
+    try:
+        _session.acquire()
+    except RuntimeError as exc:
+        return [LogInfo(msg=str(exc)), EmitEvent(event=Shutdown(reason=str(exc)))]
     value=lambda name: LaunchConfiguration(name).perform(context)
     bringup=get_package_share_directory('mechaship_bringup')
     vectornav=os.path.join(get_package_share_directory('vectornav'),'config','vectornav.yaml')
-    common={'output':'screen','respawn':True,'respawn_delay':4.0}
+    expected=[]
+    for option,topics in (
+        ('use_gps',['/gps/fix']),
+        ('use_imu',['/vectornav/raw/common','/vectornav/imu']),
+        ('use_camera',['/camera/image_raw']),
+        ('use_lidar',['/velodyne_packets','/velodyne_points','/scan']),
+        ('use_arduino',['/actuators/status'])):
+        if value(option).lower()=='true':expected.extend(topics)
+    if value('use_mcu').lower()=='true' and value('use_arduino').lower()!='true':
+        expected.extend(['/sensor/battery/voltage','/sensor/emo/status','/smc_2000/fix'])
+    common={'output':'screen','respawn':True,'respawn_delay':4.0,
+            'sigterm_timeout':'2','sigkill_timeout':'1'}
     return [
+        RegisterEventHandler(OnProcessStart(on_start=_session.started)),
+        RegisterEventHandler(OnShutdown(on_shutdown=_session.shutdown)),
         Node(package='ublox_gps',executable='ublox_gps_node',name='ublox_gps_node',
              condition=IfCondition(LaunchConfiguration('use_gps')),
              parameters=[{'device':value('gps_device'),'frame_id':'gps_link',
@@ -45,11 +73,16 @@ def nodes(context):
         IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(bringup,'launch','velodyne_water_trial.launch.py')),
              condition=IfCondition(LaunchConfiguration('use_lidar')),
              launch_arguments={name:LaunchConfiguration(name) for name in ('velodyne_model','velodyne_ip','velodyne_ring')}.items()),
-        Node(package='mechaship_bringup',executable='sensor_status.py',name='sensor_status',output='screen'),
+        Node(package='mechaship_bringup',executable='sensor_status.py',name='sensor_status',
+             parameters=[{'expected_topics':expected}],**common),
     ]
 
 
 def generate_launch_description():
+    # Terminal/SSH loss is not a request to shut down sensors. Ctrl+C still is.
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    from isv_water_trials.shutdown import protect_console
+    protect_console()
     gps='/dev/serial/by-id/usb-u-blox_AG_-_www.u-blox.com_u-blox_GNSS_receiver-if00'
     imu='/dev/serial/by-id/usb-FTDI_USB-RS232-WE_AV0LG0SE-if00-port0'
     defaults={
@@ -57,7 +90,7 @@ def generate_launch_description():
         'gps_device':gps if Path(gps).exists() else '/dev/ttyACM0',
         'camera_device':'/dev/video0','imu_device':imu if Path(imu).exists() else '/dev/ttyUSB1','imu_baud':'115200',
         'mcu_device':'/dev/ttyTHS1','mcu_baud':'115200',
-        'use_arduino':'false','arduino_device':'/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0',
+        'use_arduino':'true','arduino_device':'/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0',
         'velodyne_model':'VLP16','velodyne_ip':'192.168.1.201','velodyne_ring':'-1',
     }
     return LaunchDescription([*(DeclareLaunchArgument(k,default_value=v) for k,v in defaults.items()),

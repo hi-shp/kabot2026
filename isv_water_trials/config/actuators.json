@@ -1,0 +1,23 @@
+{
+  "neutral_pwm_us": 1500,
+  "esc_neutral_pwm_us": 1480,
+  "command_min_pwm_us": 1100,
+  "command_max_pwm_us": 1900,
+  "min_pwm_us": 1100,
+  "max_pwm_us": 1900,
+  "rc_deadband_us": 50,
+  "rc_endpoint_margin_us": 0,
+  "rc_mode_pin": 4,
+  "rc_high_is_manual": true,
+  "left": {
+    "rc_pin": 2, "esc_pin": 9,
+    "rc_min_us": 1000, "rc_center_us": 1496, "rc_max_us": 2000,
+    "rc_reversed": true, "auto_reversed": true
+  },
+  "right": {
+    "rc_pin": 3, "esc_pin": 10,
+    "rc_min_us": 1000, "rc_center_us": 1496, "rc_max_us": 2000,
+    "rc_reversed": false, "auto_reversed": true
+  },
+  "calibration_source": "operator_rest_reference.json: 65 stable samples per side, 1488..1500us, median1496us; endpoints1000..2000 configured, not remeasured; common symmetric half-span496us"
+}

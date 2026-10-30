@@ -1,0 +1,264 @@
+{
+  "checkpoint_date_kst": "2026-10-30",
+  "audited_utc": "2026-10-30T00:11:39.165987+00:00",
+  "read_only": true,
+  "scope": "Local source and Jetson source comparison; not a flash readback or ESC connector measurement",
+  "matching_files": 35,
+  "total_files": 36,
+  "cmake_difference": "deploy copy and Jetson differ only in one comment; executable/install statements are identical",
+  "ros_graph_at_audit": "No boat sensor or actuator nodes observed in domain50; only audit node and standard graph topics",
+  "files": [
+    {
+      "path": "firmware/kabot_actuator/board_config.h",
+      "remote_path": "/home/isv/boat_firmware/kabot_actuator/board_config.h",
+      "sha256": "e2a4c6f28bc3432a700f3975ae71f2882a7345f6863b78e3ca2acbaaadb253f7",
+      "remote_sha256": "e2a4c6f28bc3432a700f3975ae71f2882a7345f6863b78e3ca2acbaaadb253f7",
+      "matches": true
+    },
+    {
+      "path": "firmware/kabot_actuator/control_core.h",
+      "remote_path": "/home/isv/boat_firmware/kabot_actuator/control_core.h",
+      "sha256": "fd0936e1f500f075201498ff058340f914cd6d6052969c262023629dd9b50e6a",
+      "remote_sha256": "fd0936e1f500f075201498ff058340f914cd6d6052969c262023629dd9b50e6a",
+      "matches": true
+    },
+    {
+      "path": "firmware/kabot_actuator/esc_output.h",
+      "remote_path": "/home/isv/boat_firmware/kabot_actuator/esc_output.h",
+      "sha256": "b002f097162deb5d98613b60f610021f14eca5ab275a651a4682c5d5ead2c5b9",
+      "remote_sha256": "b002f097162deb5d98613b60f610021f14eca5ab275a651a4682c5d5ead2c5b9",
+      "matches": true
+    },
+    {
+      "path": "firmware/kabot_actuator/esc_pwm.h",
+      "remote_path": "/home/isv/boat_firmware/kabot_actuator/esc_pwm.h",
+      "sha256": "2a765ae665a0cd562700c23061798725fe47a9788687c20f5f4921251566cc60",
+      "remote_sha256": "2a765ae665a0cd562700c23061798725fe47a9788687c20f5f4921251566cc60",
+      "matches": true
+    },
+    {
+      "path": "firmware/kabot_actuator/esc_startup.h",
+      "remote_path": "/home/isv/boat_firmware/kabot_actuator/esc_startup.h",
+      "sha256": "a189fe0552db090a0c553ad1f4c67b8d337945e84c4aa88fd36affc227daf0b5",
+      "remote_sha256": "a189fe0552db090a0c553ad1f4c67b8d337945e84c4aa88fd36affc227daf0b5",
+      "matches": true
+    },
+    {
+      "path": "firmware/kabot_actuator/kabot_actuator.ino",
+      "remote_path": "/home/isv/boat_firmware/kabot_actuator/kabot_actuator.ino",
+      "sha256": "b3092d272416c53f996a3395208899002d2f1440fa05e1a966a4eab9d860543c",
+      "remote_sha256": "b3092d272416c53f996a3395208899002d2f1440fa05e1a966a4eab9d860543c",
+      "matches": true
+    },
+    {
+      "path": "firmware/kabot_actuator/manual_response.h",
+      "remote_path": "/home/isv/boat_firmware/kabot_actuator/manual_response.h",
+      "sha256": "eeb4b1ba07eb9a6dcc07c5ab2449b4659ab733ebe1545b2fd59d1b7d88a6fb3b",
+      "remote_sha256": "eeb4b1ba07eb9a6dcc07c5ab2449b4659ab733ebe1545b2fd59d1b7d88a6fb3b",
+      "matches": true
+    },
+    {
+      "path": "firmware/kabot_actuator/protocol.h",
+      "remote_path": "/home/isv/boat_firmware/kabot_actuator/protocol.h",
+      "sha256": "dd4fd71fc3e2bbb930181e764e762a24d252e81f13940b0aba6430c0b5102fce",
+      "remote_sha256": "dd4fd71fc3e2bbb930181e764e762a24d252e81f13940b0aba6430c0b5102fce",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/actuator_config.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/actuator_config.py",
+      "sha256": "2cb6d1aadb1e1d9fc448369c66b6a822db0c6dadda0ff786a171bae86ba5cdc5",
+      "remote_sha256": "2cb6d1aadb1e1d9fc448369c66b6a822db0c6dadda0ff786a171bae86ba5cdc5",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/actuator_protocol.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/actuator_protocol.py",
+      "sha256": "75e6efa5a0446523fe591c40e3cf967436e0995eada259beba1dc085553e2daa",
+      "remote_sha256": "75e6efa5a0446523fe591c40e3cf967436e0995eada259beba1dc085553e2daa",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/analyze.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/analyze.py",
+      "sha256": "8390f718eebeec8364b6f58aa9cb5166dff25e6d1c829efe2111139d07a4c949",
+      "remote_sha256": "8390f718eebeec8364b6f58aa9cb5166dff25e6d1c829efe2111139d07a4c949",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/arduino_bridge.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/arduino_bridge.py",
+      "sha256": "58c4011c67cf8532ac90650f35d8afdbb550f10bb3a9e71ffeb7d531feb5533d",
+      "remote_sha256": "58c4011c67cf8532ac90650f35d8afdbb550f10bb3a9e71ffeb7d531feb5533d",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/avoid_preview.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/avoid_preview.py",
+      "sha256": "a62e585a12572936faf8285bd7d8f9e89180b25ecff09edfb6faa4c6f87901ec",
+      "remote_sha256": "a62e585a12572936faf8285bd7d8f9e89180b25ecff09edfb6faa4c6f87901ec",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/common.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/common.py",
+      "sha256": "bd068aed82ca206fd6f5c44ed5f0950d96b0a831f81856d8071d74d2b402653d",
+      "remote_sha256": "bd068aed82ca206fd6f5c44ed5f0950d96b0a831f81856d8071d74d2b402653d",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/gps_track.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/gps_track.py",
+      "sha256": "951bd4a398ff3feb26e4d8f8ce498e5bff293d080959759b752a5644e0c7305c",
+      "remote_sha256": "951bd4a398ff3feb26e4d8f8ce498e5bff293d080959759b752a5644e0c7305c",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/identification.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/identification.py",
+      "sha256": "a2110bf18a14a1ae5b37492c451cd8a0f0c07e2c627c60a5cebc5fed3f9815cf",
+      "remote_sha256": "a2110bf18a14a1ae5b37492c451cd8a0f0c07e2c627c60a5cebc5fed3f9815cf",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/marker.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/marker.py",
+      "sha256": "10b87b70c8204c9f4021ba17fe60de117684b9bf6db695b3228efc6f7984c3d5",
+      "remote_sha256": "10b87b70c8204c9f4021ba17fe60de117684b9bf6db695b3228efc6f7984c3d5",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/mode_test.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/mode_test.py",
+      "sha256": "0e29e15f5e2042ea7e1b861a359575f8fa4330441c5d64379f04261113ca3055",
+      "remote_sha256": "0e29e15f5e2042ea7e1b861a359575f8fa4330441c5d64379f04261113ca3055",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/mpc.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/mpc.py",
+      "sha256": "35bb43044e72e95375304edd84a01060bf437cb5424d42429bf698505975925c",
+      "remote_sha256": "35bb43044e72e95375304edd84a01060bf437cb5424d42429bf698505975925c",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/preflight.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/preflight.py",
+      "sha256": "1f44765e711c05c5dd6aee0ee29f525c2b9928c8d37cead1398b7c4b68fb29db",
+      "remote_sha256": "1f44765e711c05c5dd6aee0ee29f525c2b9928c8d37cead1398b7c4b68fb29db",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/proxy.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/proxy.py",
+      "sha256": "bca76b527c63a8156c4b178cbc5fb41062b20ebe144d9dcda277af78000cdc6a",
+      "remote_sha256": "bca76b527c63a8156c4b178cbc5fb41062b20ebe144d9dcda277af78000cdc6a",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/recorder.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/recorder.py",
+      "sha256": "cf6eafc278da1293f37078499be0e6fc773957b2cc6ec8e0fcf90f10d018f677",
+      "remote_sha256": "cf6eafc278da1293f37078499be0e6fc773957b2cc6ec8e0fcf90f10d018f677",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/reinitialize_esc.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/reinitialize_esc.py",
+      "sha256": "72d01e196580285af50ce262df482bb56e04da1bcd7f79898ac9c740a8888f9e",
+      "remote_sha256": "72d01e196580285af50ce262df482bb56e04da1bcd7f79898ac9c740a8888f9e",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/shutdown.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/shutdown.py",
+      "sha256": "10dda66ab4a9d800c5d9e6a08e8c035ffa2a1cf792af1076e7abd5edd80216ec",
+      "remote_sha256": "10dda66ab4a9d800c5d9e6a08e8c035ffa2a1cf792af1076e7abd5edd80216ec",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/stop_thrusters.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/stop_thrusters.py",
+      "sha256": "dd2122895e90a1a548b93218d7e90e9550a0990f51816ced8c31677d47ca6af2",
+      "remote_sha256": "dd2122895e90a1a548b93218d7e90e9550a0990f51816ced8c31677d47ca6af2",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/trial.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/trial.py",
+      "sha256": "6e07a07ee6c72e3eeaf9b7b734d45ee06e46478e0276c4436eaed739cc4e09ea",
+      "remote_sha256": "6e07a07ee6c72e3eeaf9b7b734d45ee06e46478e0276c4436eaed739cc4e09ea",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/isv_water_trials/__init__.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/isv_water_trials/__init__.py",
+      "sha256": "ea80778c225cbc978970268127cfbe32bea531a2dbf4d30024924798d981d7a8",
+      "remote_sha256": "ea80778c225cbc978970268127cfbe32bea531a2dbf4d30024924798d981d7a8",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/config/actuators.json",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/config/actuators.json",
+      "sha256": "04d3c1fde6dee2fe68c80499fe4da0949a85fd14405ae0cebf7a38787c1a7e4c",
+      "remote_sha256": "04d3c1fde6dee2fe68c80499fe4da0949a85fd14405ae0cebf7a38787c1a7e4c",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/config/boat.json",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/config/boat.json",
+      "sha256": "292f21fbfcacd2651eb2c9667387f36bec27a66494a3021df8bc8d0def00a6ba",
+      "remote_sha256": "292f21fbfcacd2651eb2c9667387f36bec27a66494a3021df8bc8d0def00a6ba",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/config/boat_live.json",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/config/boat_live.json",
+      "sha256": "3c97e3c7720b54bfd4580c69bcdaf2623f0043aed654dcbe419a7ff604d91d0a",
+      "remote_sha256": "3c97e3c7720b54bfd4580c69bcdaf2623f0043aed654dcbe419a7ff604d91d0a",
+      "matches": true
+    },
+    {
+      "path": "isv_water_trials/setup.py",
+      "remote_path": "/home/isv/ros2_ws/src/isv_water_trials/setup.py",
+      "sha256": "703ca42d646ba5e3d5ffb131c58d73e95032222ac45e71c977e6bded18950d3c",
+      "remote_sha256": "703ca42d646ba5e3d5ffb131c58d73e95032222ac45e71c977e6bded18950d3c",
+      "matches": true
+    },
+    {
+      "path": "deploy/jetson/mechaship_bringup/CMakeLists.txt",
+      "remote_path": "/home/isv/ros2_ws/src/mechaship/mechaship_bringup/CMakeLists.txt",
+      "sha256": "c4c0e1760d1a514f3f01ae1b2761855b62037f80e52590db99fe32b24c2c97f5",
+      "remote_sha256": "6bcbd2aadd2a2093e8a09d487a7496ead6797ca953846bb82313fcdc85cbbbbc",
+      "matches": false
+    },
+    {
+      "path": "deploy/jetson/mechaship_bringup/launch/all_sensors.launch.py",
+      "remote_path": "/home/isv/ros2_ws/src/mechaship/mechaship_bringup/launch/all_sensors.launch.py",
+      "sha256": "c40393a6f1a2a62df1d2661967205155f76ff082de3f4d8109cccb6c77270431",
+      "remote_sha256": "c40393a6f1a2a62df1d2661967205155f76ff082de3f4d8109cccb6c77270431",
+      "matches": true
+    },
+    {
+      "path": "deploy/jetson/mechaship_bringup/launch/velodyne_water_trial.launch.py",
+      "remote_path": "/home/isv/ros2_ws/src/mechaship/mechaship_bringup/launch/velodyne_water_trial.launch.py",
+      "sha256": "c8d73ef90adb802ece6536f4e0c5db2670ba06ea6c1458bd9c7cc1d52100fd55",
+      "remote_sha256": "c8d73ef90adb802ece6536f4e0c5db2670ba06ea6c1458bd9c7cc1d52100fd55",
+      "matches": true
+    },
+    {
+      "path": "deploy/jetson/mechaship_bringup/launch/process_lifecycle.py",
+      "remote_path": "/home/isv/ros2_ws/src/mechaship/mechaship_bringup/launch/process_lifecycle.py",
+      "sha256": "cbbb2e268e81d6f1975588de8fceebe7b90ededd0817cb91ef24600ce2eb69e8",
+      "remote_sha256": "cbbb2e268e81d6f1975588de8fceebe7b90ededd0817cb91ef24600ce2eb69e8",
+      "matches": true
+    },
+    {
+      "path": "deploy/jetson/mechaship_bringup/scripts/sensor_status.py",
+      "remote_path": "/home/isv/ros2_ws/src/mechaship/mechaship_bringup/scripts/sensor_status.py",
+      "sha256": "b1a411b557d937f6c672e5f943cd1d49275aa392f8c49948a1fe645ad7c638be",
+      "remote_sha256": "b1a411b557d937f6c672e5f943cd1d49275aa392f8c49948a1fe645ad7c638be",
+      "matches": true
+    }
+  ]
+}

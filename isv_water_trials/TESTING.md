@@ -1,5 +1,22 @@
 # Verification status
 
+## Current checkpoint: 2026-10-30
+
+The operator confirms current RC/AUTO left/right forward/reverse, mode handover,
+EMO operation, bringup, continuous test sender and ESC initialization as working.
+The current operating contract is [BOAT_BASELINE_2026-10-30](../docs/BOAT_BASELINE_2026-10-30.md).
+Earlier NOT-performed/failed entries below are historical checks, not a claim that
+the now-confirmed actuator functions remain unverified.
+
+- This documentation/checkpoint task did not change control behavior, reflash the UNO or actuate motors.
+- Read-only SSH audit: 35/36 selected source/config files match exactly. The remaining deployed bringup CMake file differs from the local deploy copy only in a comment. No ROS sensor/actuator nodes were running in domain50 during this audit; current topic receipt/rates were not remeasured.
+- Local Python suite before documentation: 52 collected, 32 passed, 20 skipped because ROS or POSIX serial fixtures need their target environment.
+- Immediately preceding Jetson fake-service run: 6 selected ROS fixtures passed (SIGHUP/SIGTERM persistence, external-stop ignoring, explicit initialization and automatic resumption, transient stop followed by fresh commands, Ctrl+C neutral cleanup). These fixtures do not drive motors.
+- Previous current-firmware AVR compile/upload verification and C++ control/protocol checks passed; this checkpoint did not perform a new flash readback.
+- Navigation/MPC performance, calibrated thrust and hydrodynamic identification remain separate from the operator-confirmed actuator operation.
+
+## Historical checks
+
 Work date: 2026-10-29 Asia/Seoul.
 
 - Live SSH and ROS Humble environment: observed.
