@@ -18,7 +18,7 @@ class Grid:
         info = message.info
         self.width, self.height = int(info.width), int(info.height)
         self.resolution = float(info.resolution)
-        if not 0 < self.width*self.height <= 2_000_000 or not .005 <= self.resolution <= 1:
+        if not 0 < self.width*self.height <= 8_000_000 or not .005 <= self.resolution <= 1:
             raise ValueError('Invalid occupancy grid dimensions')
         self.frame = message.header.frame_id
         self.ox, self.oy = info.origin.position.x, info.origin.position.y

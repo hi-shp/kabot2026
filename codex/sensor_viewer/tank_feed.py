@@ -7,23 +7,28 @@ from queue import SimpleQueue, Empty
 import struct
 import threading
 import time
+import uuid
 
 
 class TankFeed:
     def __init__(self, node, store):
         from geometry_msgs.msg import PoseWithCovarianceStamped
+        from std_msgs.msg import Empty
         self.node, self.store = node, store
         self.pose_type = PoseWithCovarianceStamped
         self.publisher = node.create_publisher(PoseWithCovarianceStamped, '/initialpose', 1)
+        self.empty_type=Empty;self.localize_publisher=node.create_publisher(Empty,'/tank/localize/request',1)
         self.pending = SimpleQueue(); self.lock = threading.RLock()
         self.grid = None; self.body = b''; self.sequence = 0
+        self.stream_id = uuid.uuid4().hex
+        self.last_geometry = None; self.last_cells = None
         self.route_checked = 0.; self.route_mtime = None
         node.create_timer(.1, self.work)
 
     def map(self, message):
         from telemetry_core import quaternion_angles
         info = message.info; count = info.width*info.height
-        if not 0<count<=2_000_000 or len(message.data)!=count: return
+        if not 0<count<=8_000_000 or len(message.data)!=count: return
         if not .005<=info.resolution<=1: return
         angle = quaternion_angles(info.origin.orientation)
         metadata = {'width':info.width,'height':info.height,'resolution_m':info.resolution,
@@ -31,9 +36,14 @@ class TankFeed:
                     'origin_yaw_deg':angle['deg_signed']['yaw'] if angle else 0.,
                     'frame_id':message.header.frame_id}
         with self.lock:
-            self.sequence += 1; self.grid = message
-            self.body = struct.pack('<4sIII',b'KMAP',self.sequence,info.width,info.height)+message.data.tobytes()
+            cells=message.data.tobytes()
+            if metadata!=self.last_geometry or cells!=self.last_cells:
+                self.sequence += 1
+                self.body = struct.pack('<4sIII',b'KMAP',self.sequence,info.width,info.height)+cells
+                self.last_geometry=dict(metadata);self.last_cells=cells
+            self.grid = message
             metadata['sequence'] = self.sequence
+            metadata['stream_id'] = self.stream_id
         self.store.value('map',metadata)
 
     def payload(self, after):
@@ -74,10 +84,20 @@ class TankFeed:
                         raise ValueError('지도 세션 수신 대기 중입니다.')
                     route = {'frame_id':grid.frame,'session_id':session['session_id'],'a':dict(zip(('x','y'),a)),'b':dict(zip(('x','y'),b)),
                              'clearance_m':.75,'map_resolution_m':grid.resolution}
-                    temporary = target.with_suffix('.json.incoming')
-                    temporary.write_text(json.dumps(route,indent=2),encoding='utf-8'); temporary.replace(target)
+                    from isv_water_trials.tank_storage import atomic_json
+                    atomic_json(target,route)
                     self.store.value('tank_route',route)
                     response = {'ok':True,'message':'A·B 저장 완료. 왕복 노드를 실행하면 이 경로를 읽습니다.'}
+                elif path=='/api/localize':
+                    with self.store.lock:
+                        session=dict(self.store.values.get('tank_session',{}));status=dict(self.store.values.get('tank_status',{}))
+                    if not session.get('fixed_map') or time.monotonic()-session.get('received_monotonic',0)>3:
+                        raise ValueError('고정 지도를 먼저 불러오세요.')
+                    if status.get('execute') and time.monotonic()-status.get('received_monotonic',0)<3:
+                        raise ValueError('왕복 종료 후 위치를 다시 찾을 수 있습니다.')
+                    if not self.localize_publisher.get_subscription_count():raise ValueError('자동 위치 추정 노드 수신 대기')
+                    self.localize_publisher.publish(self.empty_type())
+                    response={'ok':True,'message':'자동 위치·방향 탐색을 시작합니다. 배를 잠시 정지해 주세요.'}
                 elif path=='/api/initial_pose':
                     if self.grid is None: raise ValueError('지도 수신 대기 중입니다.')
                     with self.store.lock: status = dict(self.store.values.get('tank_status',{}))

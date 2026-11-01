@@ -58,10 +58,11 @@ class RemoteBridge:
                 headers['Content-Type'] = 'application/json'
             connection.request(method,path,body=body,headers=headers)
             response = connection.getresponse()
-            if int(response.getheader('Content-Length','0')) > 2*1024*1024:
+            budget=8*1024*1024 if path.startswith('/api/map?') else 2*1024*1024
+            if int(response.getheader('Content-Length','0')) > budget:
                 raise ValueError('Viewer response exceeds budget')
-            payload = response.read(2*1024*1024+1)
-            if len(payload)>2*1024*1024:
+            payload = response.read(budget+1)
+            if len(payload)>budget:
                 raise ValueError('Viewer response exceeds budget')
             with self.lock:
                 self.received_bytes += len(payload)
@@ -202,7 +203,7 @@ def make_handler(bridge, args):
             self.end_headers()
             try:
                 self.wfile.write(payload)
-            except (BrokenPipeError,ConnectionResetError):
+            except (BrokenPipeError,ConnectionResetError,ConnectionAbortedError):
                 pass
 
         def do_GET(self):
@@ -223,7 +224,7 @@ def make_handler(bridge, args):
         def do_POST(self):
             origin = self.headers.get('Origin')
             allowed = ('http://127.0.0.1:'+str(args.port),'http://localhost:'+str(args.port))
-            if origin not in allowed or urlsplit(self.path).path not in ('/api/select','/api/route','/api/initial_pose'):
+            if origin not in allowed or urlsplit(self.path).path not in ('/api/select','/api/route','/api/initial_pose','/api/localize'):
                 self.send(403,b'{}');return
             size = int(self.headers.get('Content-Length','0'))
             if not 0 < size <= 1024:

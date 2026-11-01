@@ -17,7 +17,9 @@ powershell -ExecutionPolicy Bypass -File codex\sensor_viewer\start_viewer.ps1
 - IMU: 큰 나침반은 VectorNav 센서 Yaw를 북쪽 0°·동쪽 90°·남쪽 180°·서쪽 270°로 표시합니다. Roll·Pitch는 보조 값이며 `±180°`로 바꿀 수 있습니다. 회전속도는 °/s, 가속도는 m/s²입니다.
 - GPS: 유효한 fix가 들어오면 위치·이동 경로와 지도 링크가 표시됩니다.
 - 노드·토픽: 전체 그래프, 발행자·구독자 수, 관측한 수신 주기, 최근 메시지를 확인합니다. 큰 영상·점군은 선택한 스트림 위주로 수신합니다.
-- 수조 지도: 현재 위치, A·B 지점, 계획 경로(청록), 2초 등속 예측(분홍)을 표시합니다. 현재 위치 화살표는 라이다 +X 방향입니다.
+- 수조 지도: 현재 위치, A·B 지점, 계획 경로(청록), 예측 경로(분홍)을 표시합니다. 현재 위치 화살표는 라이다 +X 방향입니다.
+
+관측된 지도 위에서 마우스를 누른 채 끌면 지도가 이동하고, 휠을 돌리면 확대·축소됩니다. 지도 밖이나 미관측 영역의 어두운 배경에서 시작한 조작은 지도에 적용하지 않습니다. **지도 맞춤**은 전체 지도, **크게 보기**는 화면 전체에 가깝게 펼칩니다. A·B 버튼을 누른 뒤에는 원하는 지점을 클릭하며, 드래그로는 지점이 선택되지 않습니다. `Esc`로 지점 선택과 크게 보기를 닫습니다.
 
 나침반은 VectorNav 원시 방위각을 사용합니다. 실내 철제 구조물·전류가 만드는 자기장 때문에 북쪽 오차가 생길 수 있습니다. ROS IMU와 VectorNav 원시 방위각은 좌표계가 다릅니다. 각 패널의 프레임과 북쪽 기준 표기를 확인하세요. 원본 메시지에서는 ROS 단위를 유지합니다.
 
@@ -29,9 +31,15 @@ powershell -ExecutionPolicy Bypass -File codex\sensor_viewer\start_viewer.ps1
 # 터미널 1: 이미 실행 중이면 유지
 ros2 launch mechaship_bringup all_sensors.launch.py
 
-# 터미널 2: 지도 작성 + 라이다 오도메트리
-ros2 launch isv_water_trials tank_mapping.launch.py
+# 터미널 2: 현재 라이다 데이터로 새 지도 작성
+ros2 launch isv_water_trials tank_create_map.launch.py
 ```
+
+센서 브링업과 지도 작성은 각각 따로 실행합니다. 지도 코드는 실행 중인 `/scan`을 받아 사용합니다. 센서나 지도 세션이 이미 켜져 있으면 중복 실행 대신 기존 세션을 사용하세요. `tank_session`으로 켠 지도는 `ros2 run isv_water_trials tank_session stop mapping`으로 종료합니다.
+
+새 지도 작성은 사용자가 저장할 때까지 계속됩니다. 터미널 3에서 `ros2 run isv_water_trials tank_save --freeze --name ~/water_trials/tank_maps/pool_new.tankmap`으로 저장하세요. 지도 작성 터미널에서 Ctrl+C를 누른 뒤 `ros2 launch isv_water_trials tank_mapping.launch.py`를 실행하면 방금 저장한 고정 지도로 위치를 추정합니다. 기존 파일을 보존하려면 새 이름을 사용합니다.
+
+SSH가 끊겨도 지도 작성을 이어가려면 터미널 2의 launch 대신 `ros2 run isv_water_trials tank_session start mapping mode:=mapping`을 사용합니다. 이 경우 저장·고정은 아래 3절의 `tank_session freeze` 명령을 사용합니다.
 
 처음에는 보이는 범위가 지도에 들어옵니다. RC로 천천히 움직여 수조 벽과 모서리를 여러 방향에서 관측하세요. 실제 벽 위치·거리와 지도, 배의 이동 방향과 위치 화살표를 비교한 뒤 주행에 사용합니다. 수면 반사와 대칭인 벽은 위치 추정 오차를 만들 수 있습니다.
 
@@ -43,66 +51,143 @@ ros2 launch isv_water_trials tank_mapping.launch.py
 
 ## 3. 지도 저장·현재 위치·목적지
 
-지도를 충분히 만든 뒤 저장합니다.
+지도를 충분히 만든 뒤 파일 이름을 정해 고정합니다. `tank_session`으로 시작한 지도 세션에서 실행하세요.
 
 ```bash
-ros2 run isv_water_trials tank_save --name ~/water_trials/tank_maps/tank
+ros2 run isv_water_trials tank_session freeze --name ~/water_trials/tank_maps/pool.tankmap
 ```
 
-이미지·YAML과 위치 추정에 쓸 `.posegraph`·`.data`를 함께 저장합니다. 지도 작성 터미널을 Ctrl+C로 종료한 뒤, 저장 지도로 위치를 추정합니다.
+지도 격자와 위치 추정용 pose graph를 **`.tankmap` 파일 하나**에 묶고, 같은 지도로 위치 추정 모드를 시작합니다. 기존 파일은 덮어쓰지 않습니다. 이후 `/map`의 벽·격자는 저장 당시 상태를 유지하며 배의 위치만 갱신합니다. 새 지도를 만들 때는 다른 파일 이름을 사용하세요.
+
+다음 접속부터는 아래 명령만 실행하면 마지막으로 고정한 지도가 열립니다. 이미 실행 중이면 기존 세션을 유지합니다.
 
 ```bash
-ros2 launch isv_water_trials tank_mapping.launch.py \
-  mode:=localization map_file:=$HOME/water_trials/tank_maps/tank
+ros2 run isv_water_trials tank_session start mapping
 ```
 
-PC 화면에서 **현재 위치**를 누르고 지도 위 배의 위치를 클릭합니다. 초기 방향은 지도 +X가 0°, +Y가 90°인 라이다 +X 방향입니다. 실제 배 위치와 화면 위치가 일치하는지 확인합니다.
+고정 지도를 시작하면 **초기 방향 입력 없이 자동 위치·방향 탐색**을 시작합니다. 배를 잠시 정지하면 지도 안의 위치와 360° 방향 후보를 비교합니다. 벽 일치도·미관측 영역·광선 경로를 검사하고, 상위 후보가 충분히 구분되며 새 스캔 3개에서도 유지될 때 SLAM에 초기 위치를 전달합니다. 이후 SLAM 정합이 확인되면 현재 위치 화살표가 나타납니다. 화면의 **자동 위치 찾기**로 다시 탐색할 수 있습니다.
 
-그다음 **A 지점 → B 지점 → 왕복 경로 저장**을 누릅니다. 벽·미관측 영역과 가까운 지점은 저장 단계에서 안내합니다. A·B는 1m 이상 떨어뜨립니다. 경로는 `~/water_trials/tank/route.json`에 저장됩니다. 지도 작성 세션이 바뀌면 A·B를 다시 선택합니다. 같은 저장 지도를 재사용하면 경로도 재사용할 수 있습니다.
+자동 인계 기준은 **일치 점수 0.80 이상·2위와 차이 0.05 이상·새 스캔 3회 연속 확인**입니다. SLAM 정합까지 확인되면 현재 위치를 실시간 갱신하고, 후보 재검토는 백그라운드에서 이어갑니다. 저장 지도는 고정됩니다. 시작 명령에 `localization_score:=0.85 localization_margin:=0.05`처럼 붙이면 인계 기준을 조정할 수 있습니다. 이미 실행 중인 세션에는 재시작 후 적용됩니다.
+
+화면은 점수 0.80 이상인 후보를 **추정 위치 (검증 중)**로 표시하고, 라이다 오도메트리로 위치·방향을 최대 10Hz 갱신합니다. 기존 후보는 약 2초 간격으로 비교하고, 지도 전체는 약 60초 간격으로 탐색합니다. 이동 이력을 후보별로 지도에 맞춰 벽·지도 경계를 통과하는 후보를 제외합니다. 배 폭 0.50m와 지도 오차 0.05m를 고려해 경로 중심에서 벽까지 0.20m 여유를 검사하며, 미관측 영역은 벽과 구분합니다.
+
+크게 다른 후보는 같은 관측으로 평가한 현재 후보보다 점수가 0.02 이상 높거나 현재 경로가 벽과 겹칠 때 이어받습니다. 현재 위치와 누적 경로가 함께 재정렬됩니다. 경로는 젯슨에서 최근 4,096개 이동 표본을 보관하고 화면에는 최대 1,200점을 표시하므로 대시보드를 새로고침해도 이어집니다. 오도메트리 단절·재설정 시 이력을 비우고 다시 찾습니다. 이 검사는 후보를 좁히는 보조 수단이며, 왕복 제어용 위치는 후보 구분·SLAM 정합 확인을 통과해야 합니다.
+
+지도 축소는 패널에 전체 지도가 맞는 100%까지만 가능합니다. 2D 스캔과 점군 그리드는 패널 전체에 표시하며, 범위 메뉴의 `수신 최대`로 전체 수신 거리까지 볼 수 있습니다.
+
+최근 20초의 서로 다른 관측 지점을 최대 8개까지 라이다 오도메트리로 정렬해 함께 비교합니다. 화면에는 사용한 관측 수와 이동 범위를 표시합니다. 같은 자리의 반복 수신으로 확신도를 올리지 않으며, 오도메트리 단절·급변 시 누적 자료를 초기화합니다. 긴 직선 벽에서 후보가 남으면 모서리 등 다른 형상이 보이는 위치에서 관측한 뒤 잠시 정지하세요.
+
+대칭인 수조나 비슷한 벽이 반복되는 구역에서는 여러 후보가 남습니다. 노란 점은 후보이며, 점수는 확률이 아닙니다. 자동 탐색은 최대 45초씩 수행하고 모호하거나 관측이 바뀌면 재시도합니다. 조종으로 다른 모서리를 관측하면 후보 구분에 도움이 됩니다. 이 기능은 추진 명령을 보내지 않습니다.
+
+지도에는 상위 후보 5개의 위치를 노란 점으로 표시하고, 아래에 좌표(m)·방향(°)·일치 점수를 보여 줍니다. 재탐색 중에는 직전 후보를 흐리게 표시합니다. 확정된 현재 위치는 파란 화살표로 구분합니다.
+
+위치·방향은 자동으로 찾습니다. 다시 탐색하려면 **자동 위치 찾기**를 누르세요. 지도 +X가 0°, +Y가 90°인 라이다 +X 방향입니다. 마지막으로 확인된 위치는 재시작 시 초기 추정에 사용합니다.
+
+SLAM 정합 전에는 화면용 추정 위치를 주황색으로, 정합 후 현재 위치를 파란색으로 표시합니다. 정합 수신이 지연되거나 추정 위치가 지도 밖·미관측 영역·벽으로 들어가면 자동 위치 찾기를 다시 실행합니다. 저장 뒤 배를 옮겼다면 자동 탐색 결과를 실제 위치와 비교하세요. 새 고정 저장에는 최근 지도 위치를 함께 기록하며, 위치 수신이 끊긴 상태에서는 저장 완료로 처리하지 않습니다.
+
+SSH만 끊겼다가 연결된 경우 젯슨의 지도·위치 추정은 계속 실행됩니다. 대시보드를 새로고침하면 같은 지도와 현재 위치를 다시 받습니다. 화면용 서버가 재시작해도 지도 식별자를 확인해 캐시를 갱신합니다.
+
+기존 자동 저장본을 복구하려면 `autosave/latest.json`의 `map_file` 경로를 사용합니다.
+
+```bash
+cat ~/water_trials/tank_maps/autosave/latest.json
+ros2 run isv_water_trials tank_save --freeze --from-snapshot <map_file경로> --name ~/water_trials/tank_maps/pool.tankmap
+ros2 run isv_water_trials tank_session stop mapping
+ros2 run isv_water_trials tank_session start mapping
+```
+
+새 지도 작성은 기존 세션을 종료한 뒤 `tank_session start mapping mode:=mapping`으로 시작합니다.
+
+그다음 **A 지점 → B 지점 → 왕복 경로 저장**을 누릅니다. 벽·미관측 영역과 가까운 지점은 저장 단계에서 안내합니다. A·B는 1m 이상 떨어뜨립니다. 경로는 `~/water_trials/tank/route.json`에 저장됩니다. 지도 작성 세션이 바뀌면 A·B를 다시 선택합니다. 같은 저장 지도를 재사용하면 경로도 재사용할 수 있습니다. 경로는 `.tankmap`에 포함되지 않으며, 다른 지도에서 새 경로를 저장하면 `route.json`의 이전 경로가 교체됩니다.
 
 SLAM Toolbox의 지도 저장과 `initialpose` 위치 지정은 [공식 문서](https://github.com/SteveMacenski/slam_toolbox#readme)를 따릅니다.
 
-## 4. 왕복 시험과 기록
+## 4. SSH 연결과 관계없이 A·B 왕복
 
-먼저 미리보기로 경로·대기 사유를 확인합니다. 이 명령은 추진기 서비스를 호출하지 않습니다.
+센서·지도·왕복을 젯슨의 독립 프로세스로 실행합니다. 기존 터미널에서 실행한 브링업·지도는 먼저 그 터미널의 Ctrl+C로 종료하고 아래 명령으로 시작하세요.
 
 ```bash
+# 센서와 지도 작성: 한 번씩 실행
+ros2 run isv_water_trials tank_session start sensors
+ros2 run isv_water_trials tank_session start mapping
+```
+
+PC 대시보드에서 지도를 확인하고 A·B를 저장합니다. 현재 위치와 방향이 실제 배와 맞는지 확인한 뒤 실행합니다. 다른 추진 시험 노드는 먼저 종료하세요.
+
+```bash
+# 추진 없는 경로 미리보기
 ros2 run isv_water_trials indoor_trial
+
+# 미리보기를 Ctrl+C로 끝낸 뒤 실제 왕복 시작
+ros2 run isv_water_trials tank_session start trial --execute --percent 20
+
+# 상태 확인 / 실행 화면 다시 열기
+ros2 run isv_water_trials tank_session status
+ros2 run isv_water_trials tank_session attach trial
 ```
 
-실제 왕복은 기존 `mode_test` 등 추진 명령 노드를 Ctrl+C로 끝낸 뒤 실행합니다. 현재 장착 방향은 기본값 `--forward-axis-deg 0`을 사용합니다.
+`attach trial` 화면에서 **Ctrl+C**를 누르면 중립을 요청하고 왕복을 종료합니다. SSH 연결 종료는 젯슨 실행에 영향을 주지 않습니다. 직접 종료할 때는 다음 명령도 사용할 수 있습니다.
 
 ```bash
-# 라이다 +X가 선수 방향인 경우
-ros2 run isv_water_trials indoor_trial --execute --percent 20 --forward-axis-deg 0
+ros2 run isv_water_trials tank_session stop trial  # 왕복 종료·중립
+ros2 run isv_water_trials tank_session stop all    # 기록·지도·소유한 센서 세션까지 종료
 ```
 
-배는 현재 위치에서 A로 이동한 뒤 A↔B를 반복합니다. 도착하면 2초간 중립을 유지합니다. `--percent`는 좌우 각 채널의 PWM 명령 한도이며 기본 20%, 설정 범위는 0 초과~30%입니다. 출력 비율과 실제 속도·추력의 비율은 다릅니다.
+기존 터미널에서 따로 띄운 노드는 그 터미널에서 종료합니다. 실행 로그는 `~/water_trials/runtime/`에 있습니다. 세션 프로세스 오류는 5초 뒤 재시도하며, 데이터 수신이 복구될 때까지 추진은 중립으로 대기합니다.
 
-RC 우선권과 방향 변환은 기존 아두이노 설정을 사용합니다. 위치·스캔이 끊기거나 벽과 가까워지면 AUTO 명령을 중립으로 두고 노드는 대기합니다. 데이터가 회복되면 경로를 다시 계산합니다. Ctrl+C는 중립 응답을 확인한 뒤 왕복 노드를 종료합니다. SSH 연결이 끊겨도 프로세스는 유지됩니다.
+### 출력과 벽 회피
 
-전체 센서 원본은 별도 터미널에서 기록합니다. 점군과 패킷이 함께 저장되므로 여유 공간을 확인하세요.
+- 좌우 각각 **±20%가 상한**입니다. 직선 구간은 20%, 선회·도착·회피에서는 출력을 줄이거나 중립으로 둡니다. 퍼센트는 PWM 명령 비율입니다.
+- 벽·미관측 영역을 선체 여유 거리 0.75m만큼 확장해 경로를 계산합니다. 라이다 장착점에서 선체 전체가 이 반경에 들어가는지 확인하세요.
+- 실시간 스캔과 지도에 대해 여러 조향 후보의 3초 이동을 검사합니다. 현재 전진·횡방향 속도로 3.5초 타력 이동할 공간도 확인합니다. 위치·IMU·스캔 지연, 속도 범위 초과, 관측 부족 때는 중립으로 대기합니다.
+- 벽과 충분히 멀고 목표까지 2m 이상 남은 직선 구간에서 **20% → 12% → 완만한 좌우 조향 → 타력 → 반대 조향 → 20%**를 반복합니다. 각 구간은 6초이며 회피·도착 제어가 우선합니다. `--no-excitation`을 붙이면 경로 추종만 합니다.
+- RC 우선권·실제 ESC 방향과 중립은 현재 아두이노 설정을 사용합니다. Ctrl+C 정지는 기존 정지 응답을 확인합니다.
+
+초기 충돌 검사는 전진 0.45m/s·선회 0.65rad/s의 임시 응답 가정과 관측 속도를 사용합니다. 회피 결과는 실제 관성·외란·라이다 관측 오차의 영향을 받습니다. 첫 왕복에서 실제 정지거리와 지도 오차를 확인하고 여유 거리 `--clearance`를 늘려 사용하세요. 기본 허용 속도는 0.6m/s, 회전속도는 1.2rad/s입니다.
+
+### 누적 기록·그래프·물성 추정
+
+`start trial --execute`는 센서 원본 기록도 함께 시작합니다. 왕복 로그는 `~/water_trials/indoor/<시각>/`, 원본 bag은 `~/water_trials/bags/`에 저장됩니다.
+
+- 위치·오도메트리·좌우 명령·MCU 응답·IMU 자세/각속도/가속도: 10Hz, 1분 파일 분할, **2초마다 fsync**.
+- 원본 스캔·점군·IMU·TF·지도·상태: **1분 또는 256MiB마다 bag 분할**. 저장 공간이 1GiB 아래면 원본 기록을 닫아 운항 로그 공간을 남깁니다.
+- 지도 작성 중 **60초마다** 이미지와 pose graph 저장. 완성된 최근 지도 경로: `~/water_trials/tank_maps/autosave/latest.json`.
+- **60초마다** `analysis.html`, `motion.csv`, `response_model.json`, `convergence.jsonl` 갱신. 대시보드는 최근 30초의 좌우 입력·전진/횡방향 속도·라이다/IMU 회전속도를 표시합니다.
+
+갑작스러운 전원 차단에서는 동기화 사이의 최근 기록과 쓰던 bag 일부가 손상될 수 있습니다. 이전 분할 로그·지도는 보존합니다. 분석기는 마지막 미완성 JSON 줄을 건너뜁니다. 원본 bag 복구가 필요하면 해당 폴더에서 `ros2 bag reindex <bag폴더>`를 사용합니다.
+
+기본 분석은 최근 최대 120,000개 유효 위치 기록(10Hz 기준 약 3시간 20분)을 사용하며 원본은 계속 누적합니다. 실측이 충분하면 PWM에 대한 전진·회전 응답 계수, 시정수, 95% 블록 부트스트랩 구간과 **시간순 마지막 30%의 1·2·3초 예측 오차**를 계산합니다. 미래 명령을 넣은 위치·방향 예측 오차도 등속 예측과 비교합니다. 반복 분석의 계수 변화는 수렴 그래프로 남깁니다.
 
 ```bash
-mkdir -p ~/water_trials/bags
-ros2 bag record -a -o ~/water_trials/bags/tank_$(date +%Y%m%d_%H%M%S) \
-  --max-bag-size 1073741824
-```
-
-왕복 노드는 `~/water_trials/indoor/<시각>/`에 위치·연속 오도메트리·IMU Z축 회전속도·명령·MCU 응답·운항 구간을 기록합니다. 모델 분석에는 AUTO에서 응답이 확인된 기록만 사용합니다.
-
-```bash
+# 종료 직후 최종 분석 / 여러 실험을 합쳐 분석
 ros2 run isv_water_trials indoor_analyze ~/water_trials/indoor/<시각>
+ros2 run isv_water_trials indoor_analyze <실험1폴더> <실험2폴더> --output ~/water_trials/combined
+
+# 검증된 응답 모델로 화면의 3초 예측 경로를 표시하며 다음 시험
+ros2 run isv_water_trials tank_session start trial --execute --percent 20 \
+  --model ~/water_trials/indoor/<시각>/response_model.json
 ```
 
-결과는 `response_model.json`, 검증 구간 예측 CSV와 `analysis.html`입니다. PC로 가져와 확인할 수 있습니다.
+모델은 학습에 사용한 입력·속도 범위에서만 예측에 사용합니다. 벽 회피 여유는 학습 결과 때문에 줄이지 않습니다. IMU 센서 Z와 라이다 회전속도는 둘 다 기록·비교하며, IMU 장착 방향을 보정하기 전에는 임의로 융합하지 않습니다.
 
 ```powershell
 scp -r isv@10.182.77.20:/home/isv/water_trials/indoor/<시각> .\tank_result
 Start-Process .\tank_result\analysis.html
 ```
 
-분석 항목은 속도·각속도·주행거리, PWM에 대한 전진·선회 응답 계수와 시정수, 학습에 쓰지 않은 마지막 30% 구간의 예측 오차입니다. 출력 변화가 부족하면 계수 산출 보류 사유를 남깁니다. 절대 저항·부가질량·관성모멘트에는 좌우 추진기의 PWM–추력 실측이 추가로 필요합니다. 총질량 25kg, 길이 1.1m, 폭 0.5m, 추진기 간격 0.32m는 기록에 포함됩니다.
+총질량 25kg, 길이 1.1m, 폭 0.5m, 추진기 간격 0.32m를 메타데이터에 보관합니다. 현재 추정 결과는 이 배의 저출력 수조 응답입니다. 절대 저항·부가질량·관성모멘트에는 좌우 추진기의 PWM–추력 실측이 추가로 필요합니다. 다른 적재량·고속·파도 조건은 별도 실험으로 검증합니다.
+
+### 전원 복구 후
+
+저장 자료는 자동 보존하며, 재부팅 뒤 추진은 사용자가 위치를 확인하고 시작합니다.
+
+```bash
+cat ~/water_trials/tank_maps/active.json
+ros2 run isv_water_trials tank_session start sensors
+ros2 run isv_water_trials tank_session start mapping
+```
+
+대시보드에서 현재 위치·방향을 확인한 뒤 `start trial --execute --percent 20`을 실행합니다. 같은 고정 지도의 A·B는 재사용할 수 있습니다. 새 지도 좌표와 이전 경로가 섞이면 왕복 노드는 중립으로 대기합니다.
 
 ## 주요 토픽
 
@@ -115,8 +200,9 @@ Start-Process .\tank_result\analysis.html
 | `/tank/odom` | 연속 라이다 오도메트리; 속도 분석 기준 |
 | `/tank/pose` | 지도상 현재 라이다 위치 |
 | `/tank/session` | 현재 지도 세션·작성/위치 추정 모드 |
+| `/tank/localization_candidates` | 자동 위치 탐색 상태·위치/방향 후보·벽 일치도 |
 | `/tank/status` | 왕복 상태·목적지·계획 경로 |
-| `/tank/prediction` | 2초 등속 예측; 학습된 물리 모델과 구분 |
+| `/tank/prediction` | 초기 이동 가정 또는 검증된 모델의 예측 경로; kind 필드로 구분 |
 | `/actuators/status`, `/water_trial/command` | MCU 상태, 왕복 명령 기록 |
 
-확인 범위: 실제 센서 화면·점군 16개 링·지도 생성·저장·불러오기와 추진 없는 미리보기를 확인했습니다. 실제 왕복 주행과 수조 치수에 대한 지도 정확도는 현장 검증이 필요합니다.
+확인 범위: 기존 센서 화면·지도 저장 경로에 더해 새 충돌 검사·기록 복구·회귀 분석을 모의 데이터로 검사했습니다. 새 왕복 제어의 실제 수조 주행과 정지거리는 현장 검증이 필요합니다.

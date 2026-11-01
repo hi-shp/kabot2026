@@ -10,6 +10,7 @@ import os
 import signal
 import threading
 import time
+import uuid
 from urllib.parse import parse_qs, urlsplit
 
 from telemetry_core import (POINT_HEADER, GpsTrack, bounded_preview, cloud_value,
@@ -32,6 +33,7 @@ class Store:
         self.cloud_sequence = 0
         self.errors = {}
         self.last_client = 0.
+        self.instance_id=uuid.uuid4().hex
 
     def touch(self):
         with self.lock:
@@ -57,7 +59,7 @@ class Store:
                                    age_s=round(now-arrivals[-1],3) if arrivals else None))
             values = {k:dict((key,value) for key,value in v.items() if key!='received_monotonic')
                       | {'age_s':round(now-v['received_monotonic'],3)} for k,v in self.values.items()}
-            return {'version':VERSION,'demo':False,'server_time_s':time.time(),
+            return {'version':VERSION,'instance_id':self.instance_id,'demo':False,'server_time_s':time.time(),
                     'nodes':self.graph['nodes'],'topics':topics,'graph_updated_s':self.graph['updated_s'],
                     'values':values,'preview':self.preview,'selected_topic':self.selected,
                     'errors':dict(self.errors),
@@ -177,7 +179,7 @@ def make_node(store):
                             if topic == '/tank/pose': store.value('tank_pose',data)
                         elif typename == 'std_msgs/msg/String' and topic == '/actuators/status':
                             data = json.loads(message.data);store.value('actuators',dict(data,topic=topic))
-                        elif typename == 'std_msgs/msg/String' and topic in ('/tank/status','/tank/prediction','/tank/session'):
+                        elif typename == 'std_msgs/msg/String' and topic in ('/tank/status','/tank/prediction','/tank/session','/tank/localization_candidates'):
                             data = json.loads(message.data);store.value(topic.replace('/tank/','tank_'),data)
                     except (ValueError,AttributeError,TypeError,OverflowError) as exc:
                         with store.lock:
@@ -273,7 +275,7 @@ def make_handler(store):
 
         def do_POST(self):
             path = urlsplit(self.path).path
-            if path not in ('/api/select','/api/route','/api/initial_pose'):
+            if path not in ('/api/select','/api/route','/api/initial_pose','/api/localize'):
                 self.send(404);return
             try:
                 size = int(self.headers.get('Content-Length','0'))

@@ -12,13 +12,65 @@ ssh isv@10.182.77.20
 
 새 젯슨 터미널은 ROS 환경이 자동 적용됩니다. 파일 수정 후에는 `cb`로 빌드·적용합니다.
 
-**전체 브링업** — GPS·IMU·라이다·아두이노 브리지를 켭니다.
+**센서 브링업** — GPS·IMU·라이다·아두이노 브리지를 켭니다. SSH가 끊겨도 젯슨에서 계속 실행됩니다.
 
 ```bash
-ros2 launch mechaship_bringup all_sensors.launch.py
+ros2 run isv_water_trials tank_session start sensors
 ```
 
-카메라를 연결했다면 `use_camera:=true`를 추가합니다. Ctrl+C로 해당 브링업과 하위 프로세스를 종료합니다.
+기존 `ros2 launch mechaship_bringup all_sensors.launch.py`도 같은 센서를 켭니다. 두 방식 중 하나만 사용하세요. 직접 launch한 경우 해당 터미널의 Ctrl+C로 종료합니다. 카메라를 연결했다면 `use_camera:=true`를 추가합니다.
+
+**새 지도 작성** — 센서 브링업 뒤 실행합니다. 지도를 바꾸기 전에는 왕복을 종료하세요.
+
+```bash
+ros2 run isv_water_trials tank_session stop trial
+ros2 run isv_water_trials tank_session stop mapping
+ros2 run isv_water_trials tank_session start mapping mode:=mapping
+```
+
+RC로 천천히 이동하며 벽·모서리를 관측합니다. 새 지도 작성은 저장할 때까지 이어집니다.
+
+**지도 저장·고정** — 작성한 지도를 `tank_pnu.tankmap` 하나로 저장하고, 같은 지도에서 자동 위치추정으로 전환합니다.
+
+```bash
+ros2 run isv_water_trials tank_session freeze --name ~/water_trials/tank_maps/tank_pnu.tankmap
+```
+
+이 명령이 지도 세션을 자동 재시작하므로 따로 `start mapping`을 입력할 필요가 없습니다. 저장 후 벽·격자는 고정되고 배 위치만 갱신합니다. 같은 이름이 있으면 `tank_pnu_20261102.tankmap`처럼 새 이름을 쓰세요.
+
+**저장 지도 불러오기** — 다음 접속부터 마지막으로 고정한 지도를 불러옵니다. 이미 실행 중이면 기존 세션을 유지합니다.
+
+```bash
+ros2 run isv_water_trials tank_session start mapping
+```
+
+다른 저장 지도를 고르려면 지도 세션을 종료하고 파일을 지정합니다.
+
+```bash
+ros2 run isv_water_trials tank_session stop mapping
+ros2 run isv_water_trials tank_session start mapping mode:=localization map_file:=~/water_trials/tank_maps/tank_pnu.tankmap
+```
+
+초기 위치·방향은 자동으로 찾습니다. 대시보드의 **자동 위치 찾기**는 기존 추정을 비우고 다시 탐색하는 버튼입니다. 현재 위치와 방향이 실제 배와 맞는지 확인한 뒤 왕복을 시작하세요.
+
+**A·B 왕복·응답 기록** — 대시보드에서 **A 지점 → B 지점 → 왕복 경로 저장** 후 실행합니다.
+
+```bash
+ros2 run isv_water_trials tank_session start trial --execute --percent 20
+ros2 run isv_water_trials tank_session attach trial
+```
+
+좌우 출력 상한은 각각 20%이며 선회·회피·도착 때 감속합니다. 센서 원본과 이동 응답·분석 결과를 자동 저장합니다. `attach trial`의 Ctrl+C는 중립을 요청하고 왕복을 종료합니다. SSH가 끊겨도 젯슨의 왕복은 계속됩니다. A·B는 같은 지도에서 재사용하며 새 지도에서는 다시 지정합니다.
+
+**상태 확인·종료**
+
+```bash
+ros2 run isv_water_trials tank_session status
+ros2 run isv_water_trials tank_session stop trial  # 왕복 종료·중립
+ros2 run isv_water_trials tank_session stop all    # 세션으로 켠 센서·지도·기록까지 종료
+```
+
+왕복 기록: `~/water_trials/indoor/`, 원본 bag: `~/water_trials/bags/`, 실행 로그: `~/water_trials/runtime/`. PC 대시보드 실행과 위치추정·분석 기준은 [수조 운용 안내](codex/docs/INDOOR_TANK.md)에 있습니다.
 
 **추진기 시험** — 다른 터미널에서 실행합니다. 아래 명령은 양쪽 50% 직진입니다.
 
