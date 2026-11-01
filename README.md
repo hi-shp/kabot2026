@@ -1,5 +1,7 @@
 # KABOAT 2026
 
+[PC 센서 화면·실내 수조 SLAM·왕복 시험](codex/docs/INDOOR_TANK.md): 라이다·IMU·전체 토픽을 PC에서 보고, GPS 없이 지도에서 A·B 지점을 정합니다.
+
 ## 필수 명령어
 
 **SSH 접속** — PC에서 젯슨에 연결합니다.
