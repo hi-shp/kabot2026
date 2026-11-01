@@ -97,7 +97,14 @@ $('graphRows').onclick=async e=>{const button=e.target.closest('button[data-topi
 $('openMap').onclick=()=>{if(latestGps?.valid_fix)window.open(`https://www.google.com/maps?q=${latestGps.latitude_deg.toFixed(8)},${latestGps.longitude_deg.toFixed(8)}`,'_blank','noopener,noreferrer');};
 async function post(path,data){try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}),value=await r.json();if(!r.ok)throw Error(value.error||'요청을 처리하지 못했습니다.');return value;}catch(e){$('tankStatus').textContent=e.message;return null;}}
 
-let tankView={x:null,y:null,zoom:1},tankPointer=null,tankDragged=false;
+let tankView={x:null,y:null,zoom:1},tankPointer=null,tankDragged=false,tankInteraction=false,tankClickStart=null;
+function setTankInteraction(active){
+ tankInteraction=active;document.querySelector('.tank-panel').classList.toggle('map-active',active);
+ $('tankInteractionHint').textContent=active?'지도 조작 중 · 드래그 이동 · 휠 확대·축소 · 밖 클릭 / Esc 해제':'지도를 클릭하면 휠 확대·축소와 드래그 이동이 켜집니다.';
+ if(!active){if(tankPointer&&$('tankMap').hasPointerCapture(tankPointer.id))$('tankMap').releasePointerCapture(tankPointer.id);tankPointer=null;tankClickStart=null;tankDragged=false;$('tankMap').classList.remove('dragging');}
+}
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('.tank-panel'))setTankInteraction(false);});
+window.addEventListener('blur',()=>setTankInteraction(false));
 let trailWasProvisional=false;
 let tankTransform=null,tankTrail=[],lastTankStamp=null,tankSession=null,mapStream=null,serverInstance=null;
 function acceptState(next){
@@ -159,8 +166,8 @@ function drawTrial(){
  }
 }
 function routeLabel(){const point=p=>p?`${F(p.x,2)}, ${F(p.y,2)} m`:'미지정';$('routeInfo').textContent=`A ${point(route.a)} / B ${point(route.b)}`;$('saveRoute').disabled=!(route.a&&route.b);}
-for(const [id,mode] of [['setA','a'],['setB','b']])$(id).onclick=()=>{selectedMapAction=mode;for(const key of ['setA','setB'])$(key).classList.toggle('active',key===id);$('tankStatus').textContent=`${mode.toUpperCase()} 지점을 클릭하세요.`;};
-$('tankMap').onclick=e=>{if(tankDragged){tankDragged=false;return;}if(!tankTransform||!selectedMapAction||!onKnownTankMap(e.clientX,e.clientY))return;const rect=$('tankMap').getBoundingClientRect(),{s,cx,cy,dpr}=tankTransform;route[selectedMapAction]={x:((e.clientX-rect.left)*dpr-cx)/s,y:(cy-(e.clientY-rect.top)*dpr)/s};routeLabel();drawTank();if(selectedMapAction==='a')$('setB').click();};
+for(const [id,mode] of [['setA','a'],['setB','b']])$(id).onclick=()=>{setTankInteraction(true);selectedMapAction=mode;for(const key of ['setA','setB'])$(key).classList.toggle('active',key===id);$('tankStatus').textContent=`${mode.toUpperCase()} 지점을 클릭하세요.`;};
+$('tankMap').onclick=e=>{tankClickStart=null;if(tankDragged){tankDragged=false;return;}if(!tankInteraction){setTankInteraction(true);return;}if(!tankTransform||!selectedMapAction||!onKnownTankMap(e.clientX,e.clientY))return;const rect=$('tankMap').getBoundingClientRect(),{s,cx,cy,dpr}=tankTransform;route[selectedMapAction]={x:((e.clientX-rect.left)*dpr-cx)/s,y:(cy-(e.clientY-rect.top)*dpr)/s};routeLabel();drawTank();if(selectedMapAction==='a')$('setB').click();};
 function zoomTank(factor,clientX,clientY){
  if(!tankTransform)return;const rect=$('tankMap').getBoundingClientRect(),t=tankTransform;
  const px=clientX===undefined?t.w/2:(clientX-rect.left)*t.dpr,py=clientY===undefined?t.h/2:(clientY-rect.top)*t.dpr;
@@ -174,15 +181,15 @@ function onKnownTankMap(clientX,clientY){
  const a=radians(m.origin_yaw_deg||0),col=Math.floor((Math.cos(a)*x+Math.sin(a)*y)/m.resolution_m),row=Math.floor((-Math.sin(a)*x+Math.cos(a)*y)/m.resolution_m);
  return col>=0&&row>=0&&col<m.width&&row<m.height&&mapCells[row*m.width+col]>=0;
 }
-$('tankMap').addEventListener('wheel',e=>{if(!onKnownTankMap(e.clientX,e.clientY))return;e.preventDefault();zoomTank(Math.exp(-clamp(e.deltaY,-200,200)*.003),e.clientX,e.clientY);},{passive:false});
-$('tankMap').addEventListener('pointerdown',e=>{if(e.button!==0)return;tankDragged=false;if(!onKnownTankMap(e.clientX,e.clientY))return;tankPointer={id:e.pointerId,x:e.clientX,y:e.clientY,viewX:tankTransform.viewX,viewY:tankTransform.viewY,scale:tankTransform.s/tankTransform.dpr};$('tankMap').setPointerCapture(e.pointerId);});
-$('tankMap').addEventListener('pointermove',e=>{if(!tankPointer||tankPointer.id!==e.pointerId)return;const dx=e.clientX-tankPointer.x,dy=e.clientY-tankPointer.y;if(Math.hypot(dx,dy)>4)tankDragged=true;if(!tankDragged)return;tankView.x=tankPointer.viewX-dx/tankPointer.scale;tankView.y=tankPointer.viewY+dy/tankPointer.scale;$('tankMap').classList.add('dragging');drawTank();});
+$('tankMap').addEventListener('wheel',e=>{if(!tankInteraction||!onKnownTankMap(e.clientX,e.clientY))return;e.preventDefault();zoomTank(Math.exp(-clamp(e.deltaY,-200,200)*.003),e.clientX,e.clientY);},{passive:false});
+$('tankMap').addEventListener('pointerdown',e=>{if(e.button!==0)return;tankDragged=false;tankClickStart={x:e.clientX,y:e.clientY};if(!tankInteraction||!onKnownTankMap(e.clientX,e.clientY))return;tankPointer={id:e.pointerId,x:e.clientX,y:e.clientY,viewX:tankTransform.viewX,viewY:tankTransform.viewY,scale:tankTransform.s/tankTransform.dpr};$('tankMap').setPointerCapture(e.pointerId);});
+$('tankMap').addEventListener('pointermove',e=>{if(!tankInteraction){if(tankClickStart&&Math.hypot(e.clientX-tankClickStart.x,e.clientY-tankClickStart.y)>4)tankDragged=true;return;}if(!tankPointer||tankPointer.id!==e.pointerId)return;const dx=e.clientX-tankPointer.x,dy=e.clientY-tankPointer.y;if(Math.hypot(dx,dy)>4)tankDragged=true;if(!tankDragged)return;tankView.x=tankPointer.viewX-dx/tankPointer.scale;tankView.y=tankPointer.viewY+dy/tankPointer.scale;$('tankMap').classList.add('dragging');drawTank();});
 function endTankDrag(e){if(tankPointer?.id===e.pointerId){tankPointer=null;$('tankMap').classList.remove('dragging');}}
 $('tankMap').addEventListener('pointerup',endTankDrag);$('tankMap').addEventListener('pointercancel',endTankDrag);
-$('tankZoomIn').onclick=()=>zoomTank(1.4);$('tankZoomOut').onclick=()=>zoomTank(1/1.4);
+$('tankZoomIn').onclick=()=>{setTankInteraction(true);zoomTank(1.4);};$('tankZoomOut').onclick=()=>{setTankInteraction(true);zoomTank(1/1.4);};
 $('tankFit').onclick=()=>{tankView={x:null,y:null,zoom:1};drawTank();};
 $('tankExpand').onclick=()=>{const panel=document.querySelector('.tank-panel');panel.classList.toggle('expanded');$('tankExpand').textContent=panel.classList.contains('expanded')?'화면 복귀':'크게 보기';drawTank();};
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){selectedMapAction=null;for(const key of ['setA','setB'])$(key).classList.remove('active');document.querySelector('.tank-panel').classList.remove('expanded');$('tankExpand').textContent='크게 보기';drawTank();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){setTankInteraction(false);selectedMapAction=null;for(const key of ['setA','setB'])$(key).classList.remove('active');document.querySelector('.tank-panel').classList.remove('expanded');$('tankExpand').textContent='크게 보기';drawTank();}});
 new ResizeObserver(()=>drawTank()).observe($('tankMap'));
 $('autoLocate').onclick=async()=>{const result=await post('/api/localize',{});if(result)$('globalMatchInfo').textContent=result.message;};
 $('saveRoute').onclick=async()=>{const result=await post('/api/route',{a:route.a,b:route.b});if(result)$('tankStatus').textContent=result.message;};

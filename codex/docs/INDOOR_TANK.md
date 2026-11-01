@@ -19,7 +19,7 @@ powershell -ExecutionPolicy Bypass -File codex\sensor_viewer\start_viewer.ps1
 - 노드·토픽: 전체 그래프, 발행자·구독자 수, 관측한 수신 주기, 최근 메시지를 확인합니다. 큰 영상·점군은 선택한 스트림 위주로 수신합니다.
 - 수조 지도: 현재 위치, A·B 지점, 계획 경로(청록), 예측 경로(분홍)을 표시합니다. 현재 위치 화살표는 라이다 +X 방향입니다.
 
-관측된 지도 위에서 마우스를 누른 채 끌면 지도가 이동하고, 휠을 돌리면 확대·축소됩니다. 지도 밖이나 미관측 영역의 어두운 배경에서 시작한 조작은 지도에 적용하지 않습니다. **지도 맞춤**은 전체 지도, **크게 보기**는 화면 전체에 가깝게 펼칩니다. A·B 버튼을 누른 뒤에는 원하는 지점을 클릭하며, 드래그로는 지점이 선택되지 않습니다. `Esc`로 지점 선택과 크게 보기를 닫습니다.
+지도를 한 번 클릭하면 지도 조작이 켜집니다. 그 뒤 관측된 지도 위에서 드래그하면 이동하고 휠을 돌리면 확대·축소됩니다. 패널 밖을 클릭하거나 `Esc`를 누르면 지도 조작이 풀리고 페이지 스크롤이 우선됩니다. 지도 밖이나 미관측 영역의 어두운 배경에서 시작한 조작은 지도에 적용하지 않습니다. **지도 맞춤**은 전체 지도, **크게 보기**는 화면 전체에 가깝게 펼칩니다. A·B 버튼을 누른 뒤에는 원하는 지점을 클릭하며, 드래그로는 지점이 선택되지 않습니다. `Esc`로 지점 선택과 크게 보기를 닫습니다.
 
 나침반은 VectorNav 원시 방위각을 사용합니다. 실내 철제 구조물·전류가 만드는 자기장 때문에 북쪽 오차가 생길 수 있습니다. ROS IMU와 VectorNav 원시 방위각은 좌표계가 다릅니다. 각 패널의 프레임과 북쪽 기준 표기를 확인하세요. 원본 메시지에서는 ROS 단위를 유지합니다.
 
@@ -121,19 +121,24 @@ ros2 run isv_water_trials indoor_trial
 # 미리보기를 Ctrl+C로 끝낸 뒤 실제 왕복 시작
 ros2 run isv_water_trials tank_session start trial --execute --percent 20
 
-# 상태 확인 / 실행 화면 다시 열기
+# 상태 확인
 ros2 run isv_water_trials tank_session status
+
+# 문자 상태·오류 로그가 필요할 때만 실행
 ros2 run isv_water_trials tank_session attach trial
 ```
 
-`attach trial` 화면에서 **Ctrl+C**를 누르면 중립을 요청하고 왕복을 종료합니다. SSH 연결 종료는 젯슨 실행에 영향을 주지 않습니다. 직접 종료할 때는 다음 명령도 사용할 수 있습니다.
+응답 그래프와 자동 기록은 왕복 노드 실행과 함께 시작합니다. `attach trial`은 문자 로그를 확인하는 선택 명령입니다. 이 화면에서 **Ctrl+C**를 누르면 중립을 요청하고 왕복을 종료합니다. SSH가 끊겨도 젯슨 실행은 이어집니다. 개별 종료는 필요한 명령만 사용하세요.
 
 ```bash
 ros2 run isv_water_trials tank_session stop trial  # 왕복 종료·중립
-ros2 run isv_water_trials tank_session stop all    # 기록·지도·소유한 센서 세션까지 종료
+ros2 run isv_water_trials tank_session stop mapping  # 지도 작성·위치추정 종료
+ros2 run isv_water_trials tank_session stop sensors  # 센서 브링업 종료
+ros2 run isv_water_trials tank_session stop record   # 원본 센서 기록 종료
+ros2 run isv_water_trials tank_session stop all      # 왕복·기록·지도·센서 전부 종료
 ```
 
-기존 터미널에서 따로 띄운 노드는 그 터미널에서 종료합니다. 실행 로그는 `~/water_trials/runtime/`에 있습니다. 세션 프로세스 오류는 5초 뒤 재시도하며, 데이터 수신이 복구될 때까지 추진은 중립으로 대기합니다.
+센서·매핑 종료 전에는 왕복부터 종료합니다. 새 지도를 남기려면 `freeze`로 고정 저장한 뒤 매핑을 종료하세요. 저장된 `.tankmap`은 유지됩니다. 기존 터미널에서 직접 launch한 노드는 해당 터미널의 Ctrl+C로 종료합니다. 실행 로그는 `~/water_trials/runtime/`에 있습니다. 세션 프로세스 오류는 5초 뒤 재시도하며, 데이터 수신이 복구될 때까지 추진은 중립으로 대기합니다.
 
 ### 출력과 벽 회피
 

@@ -57,18 +57,26 @@ ros2 run isv_water_trials tank_session start mapping mode:=localization map_file
 
 ```bash
 ros2 run isv_water_trials tank_session start trial --execute --percent 20
-ros2 run isv_water_trials tank_session attach trial
 ```
 
-좌우 출력 상한은 각각 20%이며 선회·회피·도착 때 감속합니다. 센서 원본과 이동 응답·분석 결과를 자동 저장합니다. `attach trial`의 Ctrl+C는 중립을 요청하고 왕복을 종료합니다. SSH가 끊겨도 젯슨의 왕복은 계속됩니다. A·B는 같은 지도에서 재사용하며 새 지도에서는 다시 지정합니다.
+좌우 출력 상한은 각각 20%이며 선회·회피·도착 때 감속합니다. 응답 그래프는 대시보드에서 확인하고, 센서 원본과 이동 응답·분석 결과는 자동 저장됩니다. SSH가 끊겨도 젯슨의 왕복은 계속됩니다. A·B는 같은 지도에서 재사용하며 새 지도에서는 다시 지정합니다.
+
+문자 상태·오류 로그가 필요할 때만 `ros2 run isv_water_trials tank_session attach trial`로 터미널 로그를 엽니다. 이 화면의 Ctrl+C는 중립을 요청하고 왕복을 종료합니다.
 
 **상태 확인·종료**
 
 ```bash
 ros2 run isv_water_trials tank_session status
 ros2 run isv_water_trials tank_session stop trial  # 왕복 종료·중립
-ros2 run isv_water_trials tank_session stop all    # 세션으로 켠 센서·지도·기록까지 종료
+ros2 run isv_water_trials tank_session stop mapping  # 지도 작성·위치추정 종료
+ros2 run isv_water_trials tank_session stop sensors  # 센서 브링업 종료
+ros2 run isv_water_trials tank_session stop record   # 원본 센서 기록 종료
+ros2 run isv_water_trials tank_session stop all      # 왕복·기록·지도·센서 전부 종료
 ```
+
+개별 명령은 필요한 것만 실행하세요. 센서나 매핑을 끄기 전에는 왕복부터 종료합니다. 새 지도를 남기려면 종료 전에 `freeze`로 고정 저장하세요. 저장한 `.tankmap` 파일은 종료 후에도 유지됩니다.
+
+위 종료 명령은 `tank_session`으로 실행한 세션에 적용됩니다. `ros2 launch ...`로 직접 실행한 브링업·매핑이나 `mode_test`는 해당 터미널에서 Ctrl+C로 종료합니다.
 
 왕복 기록: `~/water_trials/indoor/`, 원본 bag: `~/water_trials/bags/`, 실행 로그: `~/water_trials/runtime/`. PC 대시보드 실행과 위치추정·분석 기준은 [수조 운용 안내](codex/docs/INDOOR_TANK.md)에 있습니다.
 
