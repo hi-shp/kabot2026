@@ -1,7 +1,74 @@
 """Bounded tank manoeuvres and conservative map/scan rollout screening (SI)."""
 import math
+from collections import deque
 import numpy as np
 from .tank_core import guidance, wrap
+
+
+class MotionVelocity:
+    """Estimate body velocity from received odometry, independent of map corrections."""
+    def __init__(self):
+        self.samples=deque(maxlen=32);self.received=None
+
+    def add(self,stamp,x,y,heading,received):
+        if not all(math.isfinite(v) for v in (stamp,x,y,heading,received)):return
+        sample=(stamp,x,y,heading)
+        if self.samples:
+            old=self.samples[-1];dt=stamp-old[0]
+            if dt==0:return  # Repeated data cannot refresh a stale estimate.
+            if dt<0 or dt>.8 or math.hypot(x-old[1],y-old[2])>max(.3,2.*dt) or abs(wrap(heading-old[3]))>max(.35,2.*dt):
+                self.samples.clear()
+        self.samples.append(sample);self.received=received
+        while len(self.samples)>2 and stamp-self.samples[0][0]>.8:self.samples.popleft()
+
+    def estimate(self,now,ros_now):
+        if len(self.samples)<2 or self.received is None or now-self.received>.6:return None
+        a,b=self.samples[0],self.samples[-1];dt=b[0]-a[0]
+        if dt<.08 or not -.1<=ros_now-b[0]<.6:return None
+        vx,vy=(b[1]-a[1])/dt,(b[2]-a[2])/dt;co,si=math.cos(b[3]),math.sin(b[3])
+        return (vx*co+vy*si,-vx*si+vy*co,wrap(b[3]-a[3])/dt)
+
+
+class DepartureRest:
+    """Require confirmed neutral and fresh, continuously stationary observations."""
+    def __init__(self, minimum=3., stable=1., speed=.08, rate=math.radians(5.), enabled=True):
+        self.minimum=minimum; self.stable=stable; self.speed=speed; self.rate=rate;self.enabled=enabled
+        self.begin()
+
+    def begin(self):
+        self.active=self.enabled; self.interrupt()
+
+    def interrupt(self):
+        self.neutral_since=None; self.stable_since=None; self.last_stamp=None; self.last_seen=None; self.samples=[]
+
+    def update(self, now, stamps, velocity, gyro, quaternion, neutral):
+        if not neutral:
+            self.interrupt(); return None
+        if self.last_seen is not None and now-self.last_seen>.5: self.interrupt()
+        if self.neutral_since is None: self.neutral_since=now
+        if velocity is None or not all(math.isfinite(x) for x in (*stamps,*velocity,*gyro,*quaternion)):
+            self.interrupt(); return None
+        if self.last_stamp is not None:
+            if any(b<a for a,b in zip(self.last_stamp,stamps)):
+                self.interrupt(); return None
+            if any(b==a for a,b in zip(self.last_stamp,stamps)): return None
+        self.last_stamp=stamps; self.last_seen=now
+        stationary=math.hypot(*velocity[:2])<=self.speed and abs(velocity[2])<=self.rate and math.sqrt(sum(g*g for g in gyro))<=self.rate
+        norm=math.sqrt(sum(q*q for q in quaternion))
+        if not stationary or not .9<norm<1.1:
+            self.stable_since=None; self.samples=[]; return None
+        if self.stable_since is None: self.stable_since=now
+        self.samples.append((now,tuple(q/norm for q in quaternion),tuple(gyro),tuple(velocity)))
+        self.samples=[s for s in self.samples if now-s[0]<=self.stable+.5]
+        if now-self.neutral_since<self.minimum or now-self.stable_since<self.stable or len(self.samples)<max(5,math.ceil(self.stable*5)): return None
+        reference=self.samples[0][1]; quats=[q if sum(a*b for a,b in zip(q,reference))>=0 else tuple(-v for v in q) for _,q,_,_ in self.samples]
+        mean=[sum(q[i] for q in quats)/len(quats) for i in range(4)]
+        norm=math.sqrt(sum(v*v for v in mean)); mean=[v/norm for v in mean]
+        self.active=False
+        return {'quaternion_xyzw':mean,'gyro_mean_rad_s':[sum(s[2][i] for s in self.samples)/len(self.samples) for i in range(3)],
+                'velocity_body_mean':[sum(s[3][i] for s in self.samples)/len(self.samples) for i in range(3)],
+                'limits':{'speed_m_s':self.speed,'rate_rad_s':self.rate,'minimum_neutral_s':self.minimum,'stable_s':self.stable},
+                'samples':len(self.samples),'neutral_s':now-self.neutral_since,'stable_s':now-self.stable_since}
 
 
 def excitation(t, cruise=20.):
@@ -63,7 +130,7 @@ def trajectory_clear(grid, points, obstacles, radius):
 
 
 def select_command(grid, scan, position, heading, velocity, target, goal, forward,
-                   elapsed, cap=20., radius=.75, excite=True):
+                   elapsed, cap=20., radius=.75, excite=True, margin_recovery=False):
     if not 0 < cap <= 20: raise ValueError('Tank output cap must be <=20%')
     if velocity is None or not all(math.isfinite(v) for v in velocity):
         return (0.,0.), {'phase':'HOLD','reason':'연속 속도 추정 대기','points_m':[]}
@@ -77,7 +144,9 @@ def select_command(grid, scan, position, heading, velocity, target, goal, forwar
     # a provisional envelope, not proof of stopping distance in arbitrary water.
     vx,vy = u*math.cos(heading)-v*math.sin(heading), u*math.sin(heading)+v*math.cos(heading)
     coast = [(position[0]+s*vx,position[1]+s*vy) for s in np.linspace(0,3.5,25)]
-    if not trajectory_clear(grid,coast,obstacles,radius+.10):
+    coast_safe = trajectory_clear(grid,coast,obstacles,radius)
+    recovery = not coast_safe or margin_recovery
+    if recovery and (math.hypot(u,v)>.15 or abs(r)>.4):
         return (0.,0.), {'phase':'HOLD','reason':'타력 이동 여유 부족','points_m':coast}
     desired = guidance(position,heading,target,cap)
     if math.dist(position,goal)<1.5 and abs(wrap(math.atan2(target[1]-position[1],target[0]-position[0])-heading))<.5:
@@ -86,7 +155,7 @@ def select_command(grid, scan, position, heading, velocity, target, goal, forwar
     error = wrap(math.atan2(target[1]-position[1],target[0]-position[0])-heading)
     nearest = float(np.min(np.linalg.norm(obstacles-np.asarray(position),axis=1)))
     phase = 'transit'
-    if excite and nearest > radius+1.2 and math.dist(position,goal)>2. and abs(error)<.18:
+    if excite and not recovery and nearest > radius+1.2 and math.dist(position,goal)>2. and abs(error)<.18:
         base,turn,phase = excitation(elapsed,cap)
         base = min(cap,max(0.,base)); turn += cap*error/.8
         desired = (max(-cap,min(cap,base-turn)),max(-cap,min(cap,base+turn)))
@@ -96,14 +165,21 @@ def select_command(grid, scan, position, heading, velocity, target, goal, forwar
         for base in (cap*.5, 0.):
             scale = max(1.,abs(base-turn)/cap,abs(base+turn)/cap)
             candidates.append((((base-turn)/scale,(base+turn)/scale),'avoidance'))
+    if recovery:
+        # At low speed, actively leave a threatened coast trajectory instead of
+        # deadlocking at neutral. Every candidate still clears map and live scan.
+        limit=min(cap,10.)
+        candidates=[((left,right),'clearance_recovery') for left,right in (
+            (-limit,-limit),(limit,limit),(-limit,limit),(limit,-limit),
+            (-limit,0.),(0.,-limit),(limit,0.),(0.,limit))]
     best = None
     for order,(command,label) in enumerate(candidates):
         points = rollout(position,heading,velocity,command,cap)
-        if not trajectory_clear(grid,points,obstacles,radius+.10): continue
+        if not trajectory_clear(grid,points,obstacles,radius): continue
         score = math.dist(points[-1],target) + .01*(abs(command[0]-desired[0])+abs(command[1]-desired[1]))
         if order==0: score -= .25
         if best is None or score<best[0]: best = (score,command,label,points)
     if best is None:
         return (0.,0.), {'phase':'HOLD','reason':'충돌 여유를 만족하는 조향 없음','points_m':coast}
     return best[1], {'phase':best[2], 'reason':'', 'points_m':best[3],
-                     'nearest_m':nearest,'kind':'provisional_safety_rollout','seconds':3.}
+                     'nearest_m':nearest,'coast_clear':coast_safe,'kind':'provisional_safety_rollout','seconds':3.}

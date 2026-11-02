@@ -35,7 +35,7 @@ def worker(name, extra):
     import fcntl
     lock = (ROOT/(name+'.lock')).open('w')
     try: fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-    except BlockingIOError: return
+    except BlockingIOError: lock.close(); return
     stopped = False; child = None
     def stop(*_):
         nonlocal stopped
@@ -48,6 +48,7 @@ def worker(name, extra):
     atomic_json(ROOT/(name+'.json'),{'pid':os.getpid(),'start_ticks':identity(os.getpid()),'args':extra})
     command = command_for(name,extra)
     try:
+        if name=='mapping':main(['start','record'],_internal=True)
         while not stopped:
             child = subprocess.Popen(command,stdin=subprocess.DEVNULL,start_new_session=True)
             while child.poll() is None: time.sleep(.1)
@@ -59,25 +60,31 @@ def worker(name, extra):
             until = time.monotonic()+5
             while not stopped and time.monotonic()<until: time.sleep(.1)
     finally:
-        if child and child.poll() is None:
-            os.killpg(child.pid,signal.SIGINT)
-            child.wait(timeout=15)
-        marker = ROOT/(name+'.json')
-        if running(name) and running(name)['pid']==os.getpid(): marker.unlink(missing_ok=True)
+        try:
+            if child and child.poll() is None:
+                os.killpg(child.pid,signal.SIGINT)
+                child.wait(timeout=30 if name=='record' else 15)
+        finally:
+            if name=='mapping':main(['stop','record'],_internal=True)
+            marker = ROOT/(name+'.json')
+            if running(name) and running(name)['pid']==os.getpid(): marker.unlink(missing_ok=True)
+            lock.close()
 
 
-def main(argv=None):
+def main(argv=None,*,_internal=False):
     argv=list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0]=='freeze' and (len(argv)==1 or argv[1]!='mapping'):
         argv.insert(1,'mapping')
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action',choices=('start','status','attach','stop','freeze','_worker'))
-    parser.add_argument('name',choices=(*NAMES,'all'),nargs='?',default='all')
+    choices=NAMES if _internal or argv[:1]==['_worker'] else tuple(n for n in NAMES if n!='record')
+    parser.add_argument('name',choices=(*choices,'all'),nargs='?',default='all')
     args,extra = parser.parse_known_args(argv)
     if extra and extra[0]=='--': extra = extra[1:]
     ROOT.mkdir(parents=True,exist_ok=True)
     if args.action=='_worker': return worker(args.name,extra)
     names = NAMES if args.name=='all' else (args.name,)
+    if args.action=='stop' and args.name=='all':names=tuple(n for n in names if n!='record')
     if args.action=='freeze':
         freeze_parser=argparse.ArgumentParser()
         freeze_parser.add_argument('--name',default='~/water_trials/tank_maps/pool.tankmap')
@@ -90,10 +97,10 @@ def main(argv=None):
         if running('mapping'):raise RuntimeError('지도 프로세스 종료 대기 중입니다.')
         main(['start','mapping'])
     elif args.action=='start':
-        if args.name=='all': parser.error('Start sensors, mapping, record and trial individually')
-        if running(args.name): print(args.name+' already running'); return
-        if args.name=='trial' and '--execute' in extra:
-            main(['start','record'])
+        if args.name=='all': parser.error('Choose sensors, mapping or trial')
+        if running(args.name):
+            if args.name=='mapping' and not running('record'):main(['start','record'],_internal=True)
+            print(args.name+' already running'); return
         with (ROOT/(args.name+'.log')).open('a',encoding='utf-8') as stream:
             subprocess.Popen([sys.executable,'-m','isv_water_trials.tank_session','_worker',args.name,'--',*extra],
                 start_new_session=True,stdin=subprocess.DEVNULL,stdout=stream,stderr=subprocess.STDOUT,close_fds=True)
@@ -107,9 +114,10 @@ def main(argv=None):
             if value:
                 try: os.kill(value['pid'],signal.SIGINT)
                 except ProcessLookupError: pass
-                until = time.monotonic()+15
+                until = time.monotonic()+({'mapping':50,'record':35}.get(name,15))
                 while running(name) and time.monotonic()<until: time.sleep(.1)
-            print(name+': '+('STOP_PENDING: inspect session log' if running(name) else 'stopped'))
+            if name=='mapping' and not running(name) and running('record'):main(['stop','record'],_internal=True)
+            if not _internal:print(name+': '+('STOP_PENDING: inspect session log' if running(name) else 'stopped'))
     elif args.action=='attach':
         if args.name=='all': parser.error('Choose one session to attach')
         print('Ctrl+C: stop this session. SSH loss: keep it running.',flush=True)

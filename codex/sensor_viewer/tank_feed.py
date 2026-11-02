@@ -10,6 +10,12 @@ import time
 import uuid
 
 
+def position_edit_blocked(values):
+    now=time.monotonic();trial=values.get('tank_status',{});mcu=values.get('actuators',{})
+    rc=bool(mcu.get('receiving') and mcu.get('mode')==1 and now-mcu.get('received_monotonic',0)<.5)
+    return bool(trial.get('execute') and now-trial.get('received_monotonic',0)<3 and not rc)
+
+
 class TankFeed:
     def __init__(self, node, store):
         from geometry_msgs.msg import PoseWithCovarianceStamped
@@ -93,20 +99,36 @@ class TankFeed:
                         session=dict(self.store.values.get('tank_session',{}));status=dict(self.store.values.get('tank_status',{}))
                     if not session.get('fixed_map') or time.monotonic()-session.get('received_monotonic',0)>3:
                         raise ValueError('고정 지도를 먼저 불러오세요.')
-                    if status.get('execute') and time.monotonic()-status.get('received_monotonic',0)<3:
-                        raise ValueError('왕복 종료 후 위치를 다시 찾을 수 있습니다.')
+                    with self.store.lock: blocked=position_edit_blocked(self.store.values)
+                    if blocked:
+                        raise ValueError('RC 모드로 전환하거나 왕복을 종료한 뒤 위치를 다시 찾으세요.')
                     if not self.localize_publisher.get_subscription_count():raise ValueError('자동 위치 추정 노드 수신 대기')
                     self.localize_publisher.publish(self.empty_type())
-                    response={'ok':True,'message':'자동 위치·방향 탐색을 시작합니다. 배를 잠시 정지해 주세요.'}
+                    response={'ok':True,'message':'현재 위치를 유지하며 주변 정합을 보정합니다.'}
                 elif path=='/api/initial_pose':
                     if self.grid is None: raise ValueError('지도 수신 대기 중입니다.')
                     with self.store.lock: status = dict(self.store.values.get('tank_status',{}))
-                    if status.get('execute') and time.monotonic()-status.get('received_monotonic',0)<2:
-                        raise ValueError('왕복 노드를 Ctrl+C로 종료한 뒤 현재 위치를 설정해 주세요.')
+                    with self.store.lock: blocked=position_edit_blocked(self.store.values)
+                    if blocked:
+                        raise ValueError('RC 모드로 전환하거나 왕복을 종료한 뒤 현재 위치를 지정하세요.')
                     consumers = self.node.get_subscriptions_info_by_topic('/initialpose')
                     if not any(c.node_name=='slam_toolbox' for c in consumers):
                         raise ValueError('저장 지도의 localization 모드에서 현재 위치를 설정해 주세요.')
-                    x,y,angle = (float(data[k]) for k in ('x','y','yaw_deg'))
+                    if 'candidate_id' in data:
+                        with self.store.lock:
+                            session=dict(self.store.values.get('tank_session',{}))
+                            report=dict(self.store.values.get('tank_localization_candidates',{}))
+                        if not data.get('map_id') or data['map_id']!=session.get('session_id') or data['map_id']!=report.get('map_id'):
+                            raise ValueError('지도가 바뀌었습니다. 후보를 다시 선택해 주세요.')
+                        if time.monotonic()-report.get('received_monotonic',0)>.5 or time.monotonic()-session.get('received_monotonic',0)>3:
+                            raise ValueError('최신 위치 수신 대기 중입니다.')
+                        candidate=next((c for c in report.get('live_candidates',[]) if c.get('candidate_id')==data['candidate_id']),None)
+                        if candidate is None:raise ValueError('후보가 갱신되었습니다. 다시 선택해 주세요.')
+                        age=self.node.get_clock().now().nanoseconds/1e9-candidate.get('stamp_s',0)
+                        if not -.1<=age<.5:raise ValueError('후보 위치 수신이 지연되고 있습니다.')
+                        x,y,angle=(float(candidate[k]) for k in ('x','y','yaw_deg'))
+                    else:
+                        x,y,angle = (float(data[k]) for k in ('x','y','yaw_deg'))
                     if not all(math.isfinite(v) for v in (x,y,angle)): raise ValueError('위치·방향 값을 확인해 주세요.')
                     msg = self.pose_type(); msg.header.frame_id = self.grid.header.frame_id
                     msg.header.stamp = self.node.get_clock().now().to_msg()

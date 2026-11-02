@@ -1,6 +1,7 @@
 """Bounded, deterministic SE(2) scan-to-fixed-map search with ambiguity rejection."""
 import math
 import time
+import uuid
 from collections import deque
 import numpy as np
 from scipy.ndimage import distance_transform_edt
@@ -12,9 +13,11 @@ def wrap(a):
 
 def handoff_ready(result,min_score=.80,min_margin=.05):
     """Accept a strong, separated hypothesis; a high-scoring tie stays unresolved."""
+    if result.get('display_fallback'):return False
     candidates=result.get('candidates',[])
     if len(candidates)<2:return False
     best,second=candidates[:2]
+    if best.get('path_valid') is False:return False
     fields=('score','inliers','known','free','x','y','yaw_deg')
     if not all(math.isfinite(best.get(k,float('nan'))) for k in fields):return False
     if not math.isfinite(second.get('score',float('nan'))):return False
@@ -22,9 +25,39 @@ def handoff_ready(result,min_score=.80,min_margin=.05):
             and best['inliers']>=.65 and best['known']>=.8 and best['free']>=.85)
 
 
+def retain_display_candidate(result,previous=()):
+    """Keep finite evidence visible without authorizing a localization handoff."""
+    result=dict(result)
+    fields=('x','y','yaw_deg','score','inliers','known','free')
+    candidates=[c for c in result.get('candidates',[]) if all(math.isfinite(c.get(k,float('nan'))) for k in fields)]
+    if not candidates:
+        candidates=[dict(c,score_stale=True) for c in previous if all(math.isfinite(c.get(k,float('nan'))) for k in fields)]
+        if candidates:
+            candidates=[max(candidates,key=lambda c:c['score'])]
+            result['display_fallback']=True
+    result['candidates']=candidates
+    if candidates and (result.get('display_fallback') or candidates[0].get('path_valid') is False):
+        result.update(display_fallback=True,state='UNCONFIRMED',margin=0.,reason='최고 점수 후보 유지 · 위치 재검토 중')
+    return result
+
+
+def identify_candidates(candidates,previous):
+    """Keep selection identities through score reorderings and small corrections."""
+    unused=list(previous);out=[]
+    for candidate in candidates:
+        nearby=[p for p in unused if math.hypot(candidate['x']-p['x'],candidate['y']-p['y'])<1.
+                and abs(wrap(math.radians(candidate['yaw_deg']-p['yaw_deg'])))<math.radians(25)]
+        old=min(nearby,key=lambda p:math.hypot(candidate['x']-p['x'],candidate['y']-p['y'])+
+                abs(wrap(math.radians(candidate['yaw_deg']-p['yaw_deg'])))) if nearby else None
+        identity=old.get('candidate_id') if old else None
+        if old is not None:unused.remove(old)
+        out.append(dict(candidate,candidate_id=identity or uuid.uuid4().hex))
+    return out
+
+
 class DisplayTrack:
     """Score-qualified display estimate. It never marks navigation localization ready."""
-    def __init__(self):self.anchor=None;self.conflict=False;self.revision=0
+    def __init__(self):self.anchor=None;self.conflict=False;self.revision=0;self.fallback=False;self.metrics={}
 
     @staticmethod
     def propagate(point,reference,current):
@@ -38,7 +71,8 @@ class DisplayTrack:
         if not candidates or reference is None or current is None:return False
         best=candidates[0]
         if not all(math.isfinite(best.get(k,float('nan'))) for k in ('x','y','yaw_deg','score','inliers','known','free')):return False
-        if best['score']<min_score or best['inliers']<.65 or best['known']<.8 or best['free']<.85:return False
+        fallback=bool(result.get('display_fallback'))
+        if not fallback and (best['score']<min_score or best['inliers']<.65 or best['known']<.8 or best['free']<.85):return False
         proposed=self.propagate(best,reference,current)
         if self.anchor is not None:
             prior=self.pose(current)
@@ -46,7 +80,7 @@ class DisplayTrack:
             if math.hypot(proposed['x']-prior['x'],proposed['y']-prior['y'])>1. or abs(da)>math.radians(20):
                 # Compare on the SAME scan/history, never against an old score.
                 incumbent=result.get('incumbent_score')
-                if not (result.get('incumbent_path_valid') is False or
+                if not (fallback or self.fallback or result.get('incumbent_path_valid') is False or
                         incumbent is not None and best['score']>=incumbent+.02):
                     self.conflict=True;return False
             elif not result.get('path_checked'):
@@ -56,14 +90,16 @@ class DisplayTrack:
                               yaw_deg=(prior['yaw_deg']+math.degrees(da)*.2)%360)
             # A path-checked correction is applied whole: interpolating two valid
             # hypotheses can place their midpoint inside a wall.
-        self.anchor=(proposed,tuple(current),stamp,best['score']);self.conflict=False
+        if best.get('score_stale'):stamp=best.get('matched_stamp_s',stamp)
+        self.anchor=(proposed,tuple(current),stamp,best['score']);self.conflict=False;self.fallback=fallback
+        self.metrics={k:best[k] for k in ('inliers','known','free')}
         self.revision+=1
         return True
 
     def pose(self,current):
         if self.anchor is None:return None
         point,reference,stamp,score=self.anchor
-        return dict(self.propagate(point,reference,current),score=score,matched_stamp_s=stamp,provisional=True,conflict=self.conflict,revision=self.revision)
+        return dict(self.propagate(point,reference,current),score=score,matched_stamp_s=stamp,provisional=True,conflict=self.conflict,revision=self.revision,display_fallback=self.fallback,**self.metrics)
 
     def trail(self,history,limit=1200):
         if self.anchor is None or not history:return []
@@ -247,6 +283,52 @@ class GlobalMatcher:
         metrics=self.evaluate(poses,points);order=np.argsort(-metrics[:,0])
         return self.describe(poses[order],metrics[order])
 
+    def track(self,seed,points,min_score=.8):
+        """Bounded scan-to-map refinement of one selected hypothesis, not relocalization."""
+        base=self.candidate_poses([seed])[0]
+        offsets=np.array([(x,y,a) for x in np.arange(-.5,.501,.1) for y in np.arange(-.5,.501,.1)
+                          for a in np.radians(np.arange(-8.,8.01,2.))])
+        poses=base+offsets;metrics=self.evaluate(poses,points)
+        tied=np.flatnonzero(metrics[:,0]>=np.max(metrics[:,0])-1e-7)
+        i=int(tied[np.argmin(np.sum(((poses[tied]-base)/np.array([.2,.2,math.radians(3)]))**2,axis=1))]);best=poses[i]
+        refined=best+np.array([(x,y,a) for x in (-.05,0.,.05) for y in (-.05,0.,.05) for a in np.radians((-1.,0.,1.))])
+        fine=self.evaluate(refined,points)
+        tied=np.flatnonzero(fine[:,0]>=np.max(fine[:,0])-1e-7)
+        j=int(tied[np.argmin(np.sum(((refined[tied]-base)/np.array([.2,.2,math.radians(3)]))**2,axis=1))]);best=refined[j];quality=fine[j]
+        if quality[0]<min_score or quality[1]<.65 or quality[2]<.8 or quality[3]<.85:
+            return dict(accepted=False,reason='저장 지도와 현재 스캔 일치도 부족',score=float(quality[0]))
+        # A flat objective cannot reliably distinguish displacement along a wall.
+        rivals=(np.linalg.norm(poses[:,:2]-best[:2],axis=1)>.3)|(np.abs(poses[:,2]-best[2])>math.radians(4))
+        ambiguous=bool(np.any(rivals) and float(np.max(metrics[rivals,0]))>=float(quality[0])-.015)
+        if ambiguous:
+            # Keep the manually chosen hypothesis in unobservable directions.
+            # Among equally supported local poses prefer the smallest change.
+            all_poses=np.vstack((poses,refined,base[None,:]))
+            all_metrics=np.vstack((metrics,fine,self.evaluate([base],points)))
+            supported=(all_metrics[:,0]>=max(min_score,float(quality[0])-.01))&(all_metrics[:,1]>=.65)&(all_metrics[:,2]>=.8)&(all_metrics[:,3]>=.85)
+            choices=all_poses[supported]
+            cost=np.sum(((choices-base)/np.array([.2,.2,math.radians(3)]))**2,axis=1)
+            best=choices[int(np.argmin(cost))]
+        # Resolve near-equal wall matches before judging the search boundary.
+        # A weak peak at the edge must not discard a well-supported nearby pose.
+        delta=best-base
+        if max(abs(delta[0]),abs(delta[1]))>.49 or abs(delta[2])>math.radians(7.9):
+            return dict(accepted=False,reason='주변 정합 범위 초과 · 다음 스캔으로 재확인 중')
+        delta=best-base;length=float(np.linalg.norm(delta[:2]))
+        delta[:2]*=min(1.,.08/max(length,1e-9));delta[2]=np.clip(delta[2],-math.radians(.5),math.radians(.5))
+        applied=base+delta;applied_metrics=self.evaluate([applied],points)[0]
+        segment=np.linspace(base[:2],applied[:2],max(2,math.ceil(float(np.linalg.norm(delta[:2]))/(self.resolution*.4))+1))
+        _,inside,cells=self.sample(segment[:,0],segment[:,1])
+        if not np.all(inside&(cells>=0)&(cells<35)):
+            return dict(accepted=False,reason='보정 경로가 지도 장애물과 겹침')
+        before=self.evaluate([base],points)[0]
+        if applied_metrics[0]+.005<before[0]:return dict(accepted=False,reason='부분 보정 일치도 저하')
+        candidate=self.describe(np.asarray([applied]),np.asarray([applied_metrics]))['candidates'][0]
+        supported=bool(applied_metrics[0]>=min_score and applied_metrics[1]>=.65 and applied_metrics[2]>=.8 and applied_metrics[3]>=.85)
+        return dict(accepted=True,candidate=candidate,supported=supported,
+                    translation_m=float(np.linalg.norm(delta[:2])),rotation_deg=float(math.degrees(delta[2])),
+                    reason=('선택 위치 유지 · 관측 가능한 방향의 오차 보정 중' if ambiguous else '주변 지도 정합으로 위치·방향 보정 중') if supported else '초기 위치 오차를 나누어 보정 중')
+
     def candidate_poses(self,candidates):
         poses=[]
         for c in candidates:
@@ -259,10 +341,11 @@ class GlobalMatcher:
 
         0.20 m clearance = half of 0.50 m beam minus 0.05 m map tolerance.
         This is conservative candidate evidence, not a full hull collision model.
-        Unknown coverage is reported separately and is not labelled a wall.
+        Unknown coverage and retracing the same route are allowed. Candidate
+        retention tolerates brief map noise; navigation uses strict validity.
         """
         if not candidates:return []
-        if reference is None or not history:return [dict(valid=True,known=0.,samples=0) for _ in candidates]
+        if reference is None or not history:return [dict(valid=True,plausible=True,known=0.,samples=0) for _ in candidates]
         path=np.asarray(history,dtype=float)[:,:2];pieces=[path[:1]]
         for start,end in zip(path[:-1],path[1:]):
             count=max(1,int(np.ceil(np.linalg.norm(end-start)/(self.resolution*.5))))
@@ -275,22 +358,33 @@ class GlobalMatcher:
             co=math.cos(p[2]);si=math.sin(p[2])
             distance,inside,cells=self.sample(p[0]+co*relative[:,0]-si*relative[:,1],p[1]+si*relative[:,0]+co*relative[:,1])
             blocked=inside&((cells>=65)|(distance<.20-1e-9))
-            results.append(dict(valid=bool(inside.all() and not blocked.any()),known=float((inside&(cells>=0)).mean()),samples=len(path)))
+            hard_bad=~inside|(cells>=65)
+            edges=np.diff(np.r_[False,hard_bad,False].astype(int))
+            runs=np.flatnonzero(edges==-1)-np.flatnonzero(edges==1)
+            longest=float(max(0,runs.max(initial=0)-1))*self.resolution*.5
+            plausible=not hard_bad.any() or (hard_bad.mean()<=.02 and longest<=max(.10,self.resolution)+1e-9)
+            results.append(dict(valid=bool(inside.all() and not blocked.any()),plausible=bool(plausible),
+                                known=float((inside&(cells>=0)).mean()),samples=len(path)))
         return results
 
     def constrain_path(self,result,history,reference,points,incumbent=None):
         candidates=result.get('candidates',[])
         metrics=self.path_metrics(candidates,history,reference)
-        kept=[dict(c,path_known=m['known']) for c,m in zip(candidates,metrics) if m['valid']]
+        annotated=[dict(c,path_known=m['known'],path_valid=m['valid']) for c,m in zip(candidates,metrics)]
+        kept=[c for c,m in zip(annotated,metrics) if m['plausible']]
+        fallback=not kept or bool(result.get('display_fallback'))
+        if not kept and annotated:kept=[max(annotated,key=lambda c:c['score'])]
+        kept.sort(key=lambda c:c['score'],reverse=True)
         result=dict(result,candidates=kept,path_checked=bool(history and reference is not None),
-                    path_rejected=len(candidates)-len(kept),path_points=len(history))
+                    path_rejected=len(candidates)-len(kept),path_points=len(history),display_fallback=fallback)
         result['margin']=kept[0]['score']-kept[1]['score'] if len(kept)>1 else 0.
-        if not kept:result.update(state='NO_MATCH',reason='이동 경로가 벽 또는 지도 경계와 겹쳐 후보 재탐색')
+        if kept and (kept[0]['score']<.8 or kept[0]['inliers']<.65 or kept[0]['known']<.8 or kept[0]['free']<.85):
+            result['display_fallback']=True
         if incumbent is not None:
             valid=self.path_metrics([incumbent],history,reference)[0]['valid']
             score=float(self.evaluate(self.candidate_poses([incumbent]),points)[0,0])
             result.update(incumbent_path_valid=valid,incumbent_score=score)
-        return result
+        return retain_display_candidate(result)
 
     def refine(self,candidates,points):
         """Small local correction around every existing hypothesis, retaining rivals."""

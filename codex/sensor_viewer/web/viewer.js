@@ -1,10 +1,16 @@
 'use strict';
+const viewQuery=new URLSearchParams(location.search),embeddedSensors=viewQuery.get('sensors_only')==='1',sensorSection=embeddedSensors?viewQuery.get('section'):null;
+const graphOnly=sensorSection==='graph',sensorOnly=sensorSection==='sensors';
+if(embeddedSensors){
+ document.body.classList.add('sensors-only');if(sensorSection)document.body.classList.add('section-'+sensorSection);
+ new ResizeObserver(()=>parent.postMessage({kind:'sensor-height',height:document.body.scrollHeight},location.origin)).observe(document.body);
+}
 const $=id=>document.getElementById(id), F=(v,n=1)=>Number.isFinite(v)?v.toFixed(n):'—', clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const radians=x=>x*Math.PI/180, wrap=x=>((x%360)+360)%360;
 let state=null,lastStateAt=0,connection=null,tableMode='topics',previewTopic='',selectedMapAction=null,mapMeta=null,mapPixels=null,mapCells=null,mapSeq=-1,pointBytes=0;
 let route={a:null,b:null},latestGps=null,history=[],lastImuStamp=0;
-const colors=['#ffae9c','#69d8d1','#77aaff'];
+const colors=['#a6a6a6','#d5a779','#f1dc6c'];
 function fitCanvas(canvas){const rect=canvas.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2),w=Math.max(1,Math.round(rect.width*dpr)),h=Math.max(1,Math.round(rect.height*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}return {w,h,dpr};}
 function ageText(id,value){const age=value?.age_s;$(id).textContent=age==null?'대기':age<2?`${F(age,1)} s 전`:`${F(age,1)} s 지연`;$(id).className='age '+(age==null?'':age<2?'fresh':'stale');}
 function vectorText(v){return v?['x','y','z'].map(k=>`${k.toUpperCase()} ${F(v[k],2)}`).join('  '):'—';}
@@ -40,8 +46,8 @@ class CloudView{
   if(this.gl){const gl=this.gl;gl.viewport(0,0,w,h);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);gl.uniformMatrix4fv(this.uniforms.Matrix,false,this.matrix);gl.uniform1f(this.uniforms.Size,Number($('pointSize').value)*dpr);gl.uniform1f(this.uniforms.Range,this.range);gl.uniform1f(this.uniforms.Mode,({ring:0,distance:1,height:2})[$('color').value]);
    const bind=buffer=>{gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.enableVertexAttribArray(this.aPosition);gl.vertexAttribPointer(this.aPosition,3,gl.FLOAT,false,16,0);gl.enableVertexAttribArray(this.aRing);gl.vertexAttribPointer(this.aRing,1,gl.FLOAT,false,16,12);};
    bind(this.gridBuffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(grid),gl.DYNAMIC_DRAW);gl.uniform1f(this.uniforms.Grid,1);gl.drawArrays(gl.LINES,0,grid.length/4);bind(this.pointBuffer);gl.uniform1f(this.uniforms.Grid,0);gl.drawArrays(gl.POINTS,0,this.points.length/4);
-  }else if(this.context){const c=this.context;c.clearRect(0,0,w,h);c.strokeStyle='#29404e';c.beginPath();for(let i=0;i<grid.length;i+=8){const a=this.project(...grid.slice(i,i+3),w,h),b=this.project(...grid.slice(i+4,i+7),w,h);if(a&&b){c.moveTo(...a);c.lineTo(...b);}}c.stroke();c.fillStyle='#69d8d1';for(let i=0;i<this.points.length;i+=4){const p=this.project(this.points[i],this.points[i+1],this.points[i+2],w,h);if(p)c.fillRect(p[0],p[1],2*dpr,2*dpr);}}
-  const c=this.overlay.getContext('2d');c.clearRect(0,0,w,h);c.font=`${11*dpr}px Segoe UI`;c.lineWidth=dpr;const center=this.project(0,0,0,w,h);if(center){for(const [x,y,z,label,color] of [[Math.min(4,this.range*.4),0,0,'선수 +X','#f5bb87'],[0,Math.min(4,this.range*.4),0,'좌현 +Y','#89bbff']]){const p=this.project(x,y,z,w,h);if(p){c.strokeStyle=color;c.fillStyle=color;c.beginPath();c.moveTo(...center);c.lineTo(...p);c.stroke();c.fillText(label,p[0]+4*dpr,p[1]-4*dpr);}}}c.fillStyle='#a7bdce';c.fillText(`격자 ${step} m · 세로 ±${F(this.range,1)} m`,12*dpr,20*dpr);
+  }else if(this.context){const c=this.context;c.clearRect(0,0,w,h);c.strokeStyle='#444444';c.beginPath();for(let i=0;i<grid.length;i+=8){const a=this.project(...grid.slice(i,i+3),w,h),b=this.project(...grid.slice(i+4,i+7),w,h);if(a&&b){c.moveTo(...a);c.lineTo(...b);}}c.stroke();c.fillStyle='#b5c9b0';for(let i=0;i<this.points.length;i+=4){const p=this.project(this.points[i],this.points[i+1],this.points[i+2],w,h);if(p)c.fillRect(p[0],p[1],2*dpr,2*dpr);}}
+  const c=this.overlay.getContext('2d');c.clearRect(0,0,w,h);c.font=`${11*dpr}px Segoe UI`;c.lineWidth=dpr;const center=this.project(0,0,0,w,h);if(center){for(const [x,y,z,label,color] of [[Math.min(4,this.range*.4),0,0,'선수 +X','#f5bb87'],[0,Math.min(4,this.range*.4),0,'좌현 +Y','#b9aaca']]){const p=this.project(x,y,z,w,h);if(p){c.strokeStyle=color;c.fillStyle=color;c.beginPath();c.moveTo(...center);c.lineTo(...p);c.stroke();c.fillText(label,p[0]+4*dpr,p[1]-4*dpr);}}}c.fillStyle='#bbbbbb';c.fillText(`격자 ${step} m · 세로 ±${F(this.range,1)} m`,12*dpr,20*dpr);
  }
  hover(event){if(!this.matrix||!this.points.length)return;const rect=this.canvas.getBoundingClientRect(),w=this.canvas.width,h=this.canvas.height,x=(event.clientX-rect.left)*w/rect.width,y=(event.clientY-rect.top)*h/rect.height;let best=-1,dist=(13*w/rect.width)**2;for(let i=0;i<this.points.length;i+=4){const p=this.project(this.points[i],this.points[i+1],this.points[i+2],w,h);if(!p)continue;const d=(p[0]-x)**2+(p[1]-y)**2;if(d<dist){dist=d;best=i;}}$('pointReadout').hidden=best<0;if(best>=0){const [a,b,c,r]=this.points.slice(best,best+4);$('pointReadout').textContent=`X ${F(a,2)} m · Y ${F(b,2)} m · Z ${F(c,2)} m\n거리 ${F(Math.hypot(a,b,c),2)} m · 방위각 ${F(wrap(Math.atan2(b,a)*180/Math.PI),1)}°\nRing ${r>=0?r:'—'}`;}}
 }
@@ -55,56 +61,55 @@ function gridStep(range){const raw=range/5,power=10**Math.floor(Math.log10(raw))
 function selectedRange(kind){const value=$('range').value;return value==='max'?Math.max(1,kind==='scan'?(state?.values?.scan?.range_max_m||100):(state?.limits?.max_range_m||100)):Number(value);}
 function drawScan(){
  const canvas=$('scan'),{w,h,dpr}=fitCanvas(canvas),c=canvas.getContext('2d'),data=state?.values?.scan,R=selectedRange('scan'),s=Math.min(w,h)/2/R,cx=w/2,cy=h/2,step=gridStep(R),edge=Math.hypot(w/2,h/2)/s;
- c.clearRect(0,0,w,h);c.strokeStyle='#304452';c.fillStyle='#8fa7b9';c.font=`${10*dpr}px Segoe UI`;
+ c.clearRect(0,0,w,h);c.strokeStyle='#444444';c.fillStyle='#aaaaaa';c.font=`${10*dpr}px Segoe UI`;
  c.beginPath();for(let x=cx% (step*s);x<=w;x+=step*s){c.moveTo(x,0);c.lineTo(x,h);}for(let y=cy% (step*s);y<=h;y+=step*s){c.moveTo(0,y);c.lineTo(w,y);}c.stroke();
- c.strokeStyle='#30445288';for(let r=step;r<=edge;r+=step){c.beginPath();c.arc(cx,cy,r*s,0,2*Math.PI);c.stroke();if(cy-r*s>12*dpr)c.fillText(`${F(r,r<5?1:0)} m`,cx+4*dpr,cy-r*s-3*dpr);}
- c.strokeStyle='#527184';c.beginPath();c.moveTo(cx,0);c.lineTo(cx,h);c.moveTo(0,cy);c.lineTo(w,cy);c.stroke();
+ c.strokeStyle='#44444488';for(let r=step;r<=edge;r+=step){c.beginPath();c.arc(cx,cy,r*s,0,2*Math.PI);c.stroke();if(cy-r*s>12*dpr)c.fillText(`${F(r,r<5?1:0)} m`,cx+4*dpr,cy-r*s-3*dpr);}
+ c.strokeStyle='#777777';c.beginPath();c.moveTo(cx,0);c.lineTo(cx,h);c.moveTo(0,cy);c.lineTo(w,cy);c.stroke();
  c.fillText('선수 · 0°',cx+4*dpr,14*dpr);c.fillText('좌현 90°',6*dpr,cy-5*dpr);c.fillText('우현 270°',w-60*dpr,cy-5*dpr);c.fillText('선미 · 케이블',cx-28*dpr,h-8*dpr);
- c.fillStyle='#69d8d1';for(const [angle,distance] of data?.polar_deg_m||[]){if(!Number.isFinite(distance)||distance<0||distance>(data.range_max_m||Infinity))continue;const a=radians(angle);c.fillRect(cx-Math.sin(a)*distance*s,cy-Math.cos(a)*distance*s,2*dpr,2*dpr);}
- c.fillStyle='#e7eef4';c.fillRect(cx-2*dpr,cy-2*dpr,4*dpr,4*dpr);
+ c.fillStyle='#b5c9b0';for(const [angle,distance] of data?.polar_deg_m||[]){if(!Number.isFinite(distance)||distance<0||distance>(data.range_max_m||Infinity))continue;const a=radians(angle);c.fillRect(cx-Math.sin(a)*distance*s,cy-Math.cos(a)*distance*s,2*dpr,2*dpr);}
+ c.fillStyle='#eeeeee';c.fillRect(cx-2*dpr,cy-2*dpr,4*dpr,4*dpr);
 }
 function northHeading(){const v=state?.values?.vectornav,h=v?.deg_360?.yaw;return v?.age_s<2&&Number.isFinite(h)?wrap(h):null;}
 function compassDirection(h){return ['북','북동','동','남동','남','남서','서','북서'][Math.round(wrap(h)/45)%8];}
 function drawAttitude(){
- const canvas=$('attitude'),{w,h,dpr}=fitCanvas(canvas),c=canvas.getContext('2d'),heading=northHeading(),r=Math.min(w*.34,h*.36),x=w/2,y=h*.46;
+ const canvas=$('attitude'),{w,h,dpr}=fitCanvas(canvas),c=canvas.getContext('2d'),heading=northHeading(),r=Math.max(10*dpr,Math.min(w/2-38*dpr,h/2-25*dpr)),x=w/2,y=h/2;
  c.clearRect(0,0,w,h);canvas.dataset.headingDeg=heading===null?'':String(heading);canvas.setAttribute('aria-label',heading===null?'북쪽 기준 방위각 수신 대기':`북쪽 기준 ${F(heading,1)}도 ${compassDirection(heading)}`);
- c.fillStyle='#0e202c';c.beginPath();c.arc(x,y,r,0,2*Math.PI);c.fill();c.strokeStyle='#527184';c.lineWidth=1.5*dpr;c.stroke();
- for(let deg=0;deg<360;deg+=10){const a=radians(deg),major=deg%30===0,inner=r-(major?11:5)*dpr;c.strokeStyle=deg===0?'#ffae9c':major?'#7996a8':'#3d5668';c.lineWidth=dpr;c.beginPath();c.moveTo(x+Math.sin(a)*inner,y-Math.cos(a)*inner);c.lineTo(x+Math.sin(a)*r,y-Math.cos(a)*r);c.stroke();if(deg%90!==0&&major){c.fillStyle='#7e9aaf';c.font=`${9*dpr}px Segoe UI`;c.textAlign='center';c.textBaseline='middle';c.fillText(String(deg),x+Math.sin(a)*(r-22*dpr),y-Math.cos(a)*(r-22*dpr));}}
- c.textAlign='center';c.textBaseline='middle';c.font=`bold ${12*dpr}px Malgun Gothic`;for(const [deg,text] of [[0,'북 N'],[90,'동 E'],[180,'남 S'],[270,'서 W']]){const a=radians(deg);c.fillStyle=deg===0?'#ffae9c':'#a8c1d1';c.fillText(text,x+Math.sin(a)*(r+15*dpr),y-Math.cos(a)*(r+15*dpr));}
- if(heading!==null){c.save();c.translate(x,y);c.rotate(radians(heading));c.fillStyle='#69d8d1';c.strokeStyle='#b2f0e8';c.lineWidth=dpr;c.beginPath();c.moveTo(0,-r*.67);c.lineTo(r*.17,-r*.23);c.lineTo(0,-r*.32);c.lineTo(-r*.17,-r*.23);c.closePath();c.fill();c.stroke();c.strokeStyle='#69d8d177';c.beginPath();c.moveTo(0,-r*.32);c.lineTo(0,r*.23);c.stroke();c.restore();}
- c.textAlign='center';c.fillStyle=heading===null?'#8199aa':'#e7eef4';c.font=`600 ${23*dpr}px Segoe UI`;c.fillText(heading===null?'—':F(wrap(Math.round(heading*10)/10),1)+'°',x,y+r*.19);c.font=`${11*dpr}px Malgun Gothic`;c.fillStyle='#91a9bb';c.fillText(heading===null?'방위각 수신 대기':compassDirection(heading),x,y+r*.47);c.font=`${10*dpr}px Malgun Gothic`;c.fillText('북쪽 0° · 시계 방향 증가',x,h-8*dpr);c.textAlign='left';c.textBaseline='alphabetic';
+ c.fillStyle='#0e1923';c.beginPath();c.arc(x,y,r,0,2*Math.PI);c.fill();c.strokeStyle='#777777';c.lineWidth=1.5*dpr;c.stroke();
+ for(let deg=0;deg<360;deg+=10){const a=radians(deg),major=deg%30===0,inner=r-(major?11:5)*dpr;c.strokeStyle=deg===0?'#d5a779':major?'#999999':'#555555';c.lineWidth=dpr;c.beginPath();c.moveTo(x+Math.sin(a)*inner,y-Math.cos(a)*inner);c.lineTo(x+Math.sin(a)*r,y-Math.cos(a)*r);c.stroke();if(deg%90!==0&&major&&r>=65*dpr){c.fillStyle='#999999';c.font=`${9*dpr}px Segoe UI`;c.textAlign='center';c.textBaseline='middle';c.fillText(String(deg),x+Math.sin(a)*(r-22*dpr),y-Math.cos(a)*(r-22*dpr));}}
+ c.textAlign='center';c.textBaseline='middle';c.font=`bold ${12*dpr}px Malgun Gothic`;for(const [deg,text] of [[0,'북 N'],[90,'동 E'],[180,'남 S'],[270,'서 W']]){const a=radians(deg);c.fillStyle=deg===0?'#d5a779':'#bbbbbb';c.fillText(text,x+Math.sin(a)*(r+15*dpr),y-Math.cos(a)*(r+15*dpr));}
+ if(heading!==null){c.save();c.translate(x,y);c.rotate(radians(heading));c.fillStyle='#f1dc6c';c.strokeStyle='#fff0ad';c.lineWidth=dpr;c.beginPath();c.moveTo(0,-r*.67);c.lineTo(r*.17,-r*.23);c.lineTo(0,-r*.32);c.lineTo(-r*.17,-r*.23);c.closePath();c.fill();c.stroke();c.strokeStyle='#f1dc6c99';c.beginPath();c.moveTo(0,-r*.32);c.lineTo(0,r*.23);c.stroke();c.restore();}
+ c.textAlign='left';c.textBaseline='alphabetic';
 }
 function drawTrend(){const canvas=$('imuTrend'),{w,h,dpr}=fitCanvas(canvas),c=canvas.getContext('2d');c.clearRect(0,0,w,h);if(history.length<2)return;const start=history.at(-1).t-30;for(let k=0;k<3;k++){c.strokeStyle=colors[k];c.lineWidth=dpr;c.beginPath();let active=false,last=null;for(const row of history){if(row.t<start)continue;const v=row.v[k];if(!Number.isFinite(v)){active=false;last=null;continue;}const x=(row.t-start)/30*w,y=h*(.5-v/360);if(!active||last!==null&&Math.abs(v-last)>180)c.moveTo(x,y);else c.lineTo(x,y);last=v;active=true;}c.stroke();}}
-function drawGps(){const canvas=$('gpsTrack'),{w,h,dpr}=fitCanvas(canvas),c=canvas.getContext('2d'),track=latestGps?.track_enu_m||[];c.clearRect(0,0,w,h);if(!track.length){c.fillStyle='#7c94a7';c.font=`${12*dpr}px Segoe UI`;c.fillText('유효한 GPS 위치를 기다리고 있습니다.',14*dpr,h/2);return;}const xs=track.map(p=>p[0]),ys=track.map(p=>p[1]),minX=Math.min(0,...xs),maxX=Math.max(0,...xs),minY=Math.min(0,...ys),maxY=Math.max(0,...ys),span=Math.max(10,maxX-minX,maxY-minY),s=Math.min(w*.8,h*.7)/span,cx=w/2-(minX+maxX)*s/2,cy=h/2+(minY+maxY)*s/2;c.strokeStyle='#29404f';c.beginPath();c.moveTo(0,cy);c.lineTo(w,cy);c.moveTo(cx,0);c.lineTo(cx,h);c.stroke();c.strokeStyle='#69d8d1';c.lineWidth=2*dpr;c.beginPath();track.forEach((p,i)=>i?c.lineTo(cx+p[0]*s,cy-p[1]*s):c.moveTo(cx+p[0]*s,cy-p[1]*s));c.stroke();const p=track.at(-1);c.fillStyle='#e7eef4';c.beginPath();c.arc(cx+p[0]*s,cy-p[1]*s,3*dpr,0,Math.PI*2);c.fill();c.fillStyle='#8fa7b9';c.font=`${10*dpr}px Segoe UI`;c.fillText(`동쪽 → · 북쪽 ↑ · 표시 폭 약 ${F(w/s,0)} m`,12*dpr,h-10*dpr);}
+function drawGps(){const canvas=$('gpsTrack'),{w,h,dpr}=fitCanvas(canvas),c=canvas.getContext('2d'),track=latestGps?.track_enu_m||[];c.clearRect(0,0,w,h);if(!track.length){c.fillStyle='#aaaaaa';c.font=`${12*dpr}px Segoe UI`;c.fillText('유효한 GPS 위치를 기다리고 있습니다.',14*dpr,h/2);return;}const xs=track.map(p=>p[0]),ys=track.map(p=>p[1]),minX=Math.min(0,...xs),maxX=Math.max(0,...xs),minY=Math.min(0,...ys),maxY=Math.max(0,...ys),span=Math.max(10,maxX-minX,maxY-minY),s=Math.min(w*.8,h*.7)/span,cx=w/2-(minX+maxX)*s/2,cy=h/2+(minY+maxY)*s/2;c.strokeStyle='#444444';c.beginPath();c.moveTo(0,cy);c.lineTo(w,cy);c.moveTo(cx,0);c.lineTo(cx,h);c.stroke();c.strokeStyle='#b5c9b0';c.lineWidth=2*dpr;c.beginPath();track.forEach((p,i)=>i?c.lineTo(cx+p[0]*s,cy-p[1]*s):c.moveTo(cx+p[0]*s,cy-p[1]*s));c.stroke();const p=track.at(-1);c.fillStyle='#eeeeee';c.beginPath();c.arc(cx+p[0]*s,cy-p[1]*s,3*dpr,0,Math.PI*2);c.fill();c.fillStyle='#aaaaaa';c.font=`${10*dpr}px Segoe UI`;c.fillText(`동쪽 → · 북쪽 ↑ · 표시 폭 약 ${F(w/s,0)} m`,12*dpr,h-10*dpr);}
 
 function updateSensors(){if(!state)return;const values=state.values||{},imu=values.imu,cloudData=values.cloud,scan=values.scan,gps=values.gps;
  $('nodeCount').textContent=state.nodes.length;$('topicCount').textContent=`${state.topics.filter(t=>t.age_s!==null&&t.age_s<2).length} / ${state.topics.length}`;$('pointCount').textContent=cloudData?`${cloudData.display_points.toLocaleString()} / ${cloudData.input_points.toLocaleString()}`:'—';const topic=state.topics.find(t=>t.name===cloudData?.topic);$('ringCount').textContent=cloudData?`${cloudData.rings.length||'—'} 층 · ${F(topic?.hz,1)} Hz`:'—';
- ageText('cloudAge',cloudData);ageText('imuAge',imu);ageText('scanAge',scan);ageText('gpsAge',gps);$('cloudEmpty').hidden=Boolean(cloudData&&cloud.points.length);$('cloudFrame').textContent=`${cloudData?.topic||'/velodyne_points'} · ${cloudData?.frame_id||'센서 좌표'} · 선수 +X / 좌현 +Y · m`;$('decodeInfo').textContent=cloudData?`변환 ${F(cloudData.decode_ms,1)} ms · ${state.limits.cloud_hz} FPS 상한`:'';
+ ageText('cloudAge',cloudData);ageText('imuAge',imu);ageText('scanAge',scan);ageText('gpsAge',gps);$('cloudEmpty').hidden=Boolean(cloudData&&cloud.points.length);$('cloudFrame').textContent=`${cloudData?.topic||'/velodyne_points'} · ${cloudData?.frame_id||'센서 좌표'} · +X 선수 / +Y 좌현 · m`;$('decodeInfo').textContent=cloudData?`변환 ${F(cloudData.decode_ms,1)} ms · ${state.limits.cloud_hz} FPS 상한`:'';
  $('imuFrame').textContent=`${imu?.topic||'/vectornav/imu'} · ${imu?.frame_id||'센서 프레임'}`;
  for(const k of ['roll','pitch'])$(k).textContent=angleValue(imu?.orientation,k);const heading=northHeading();$('yaw').textContent=heading===null?'—':F(wrap(Math.round(heading*10)/10),1)+'°';$('heading').textContent=heading===null?'대기':compassDirection(heading);$('gyro').textContent=vectorText(imu?.angular_velocity_deg_s);$('accel').textContent=vectorText(imu?.acceleration_m_s2);
  if(imu?.orientation&&imu.stamp_s!==lastImuStamp){lastImuStamp=imu.stamp_s;history.push({t:imu.stamp_s,v:[imu.orientation.deg_signed.roll,imu.orientation.deg_signed.pitch,heading===null?NaN:wrap(heading+180)-180]});if(history.length>400)history.shift();}
  $('scanFrame').textContent=`${scan?.frame_id||'센서 좌표'} · 선수 0° / 좌현 90° · 거리 m`;$('nearest').textContent=scan?.nearest?`최근접 ${F(scan.nearest.distance_m,2)} m / ${F(scan.nearest.azimuth_deg,1)}°`:'최근접 —';
  latestGps=gps;$('fixStatus').textContent=gps?.valid_fix?'위치 고정됨':gps?'위치 고정 대기 · fix '+gps.fix_status:'GPS 메시지 대기';$('openMap').disabled=!gps?.valid_fix;$('latlon').textContent=gps?.valid_fix?`${F(gps.latitude_deg,7)} / ${F(gps.longitude_deg,7)}`:'—';$('altitude').textContent=gps?.valid_fix?`${F(gps.altitude_m,2)} m / ${F(values.gps_velocity?.speed_m_s,2)} m/s`:'—';$('enu').textContent=gps?.valid_fix?`${F(gps.east_m,2)} / ${F(gps.north_m,2)} m`:'—';
- drawAttitude();drawTrend();drawScan();drawGps();drawTank();renderGraph();renderPreview();
- const errors=Object.entries(state.errors||{});$('notice').hidden=!errors.length&&!state.demo;if(state.demo)$('notice').textContent='예제 데이터로 화면을 확인하고 있습니다.';else if(errors.length)$('notice').textContent=errors.map(([name,error])=>`${name}: ${error}`).join(' · ');
- $('demoTag').hidden=!state.demo;
+ const a=values.actuators;$('actuatorMode').textContent=a?.mode_name||a?.mode||'대기';const command=(side)=>{const pwm=a?.['logical_'+side+'_us']??a?.[side],percent=a?.[side+'_percent']??(Number.isFinite(pwm)?(pwm-1500)/4:null);return Number.isFinite(percent)?`${F(percent,1)}% · ${pwm} µs`:'토픽 데이터에서 확인';};$('actuatorLeft').textContent=command('left');$('actuatorRight').textContent=command('right');$('actuatorDetail').textContent=a?'상태 수신 중':'수신 대기';
+ drawAttitude();drawTrend();drawScan();if(!sensorOnly)drawGps();if(!embeddedSensors)drawTank();if(!sensorOnly){renderGraph();renderPreview();}
+ const errors=Object.entries(state.errors||{});$('notice').hidden=!errors.length;if(errors.length)$('notice').textContent=errors.map(([name,error])=>`${name}: ${error}`).join(' · ');
 }
-function renderGraph(){const query=$('search').value.toLowerCase();if(!state)return;if(tableMode==='nodes'){$('tableHead').innerHTML='<tr><th>노드</th><th>발행 토픽</th></tr>';$('graphRows').innerHTML=state.nodes.filter(n=>n.toLowerCase().includes(query)).map(n=>`<tr><td class="topic">${esc(n)}</td><td>${state.topics.filter(t=>t.publisher_nodes.includes(n)).length}</td></tr>`).join('');return;}
- $('tableHead').innerHTML='<tr><th>토픽</th><th>형식</th><th>Pub / Sub</th><th>Hz</th><th>최근</th><th></th></tr>';$('graphRows').innerHTML=state.topics.filter(t=>(t.name+' '+t.types.join(' ')).toLowerCase().includes(query)).map(t=>`<tr class="${t.name===previewTopic?'selected':''}"><td class="topic"><span class="dot ${t.age_s===null?'':t.age_s<2?'fresh':'stale'}"></span>${esc(t.name)}</td><td class="type">${esc(t.types.join(', '))}</td><td>${t.publishers} / ${t.subscribers}</td><td>${F(t.hz,1)}</td><td>${t.age_s===null?'대기':F(t.age_s,1)+' s'}</td><td><button data-topic="${esc(t.name)}">데이터</button></td></tr>`).join('');$('graphUpdated').textContent=`${state.topics.length}개 토픽`;}
+function graphRows(html){if($('graphRows').innerHTML!==html)$('graphRows').innerHTML=html;}
+function renderGraph(){const query=$('search').value.toLowerCase();if(!state)return;if(tableMode==='nodes'){$('tableHead').innerHTML='<tr><th>노드</th><th>발행 토픽</th></tr>';graphRows(state.nodes.filter(n=>n.toLowerCase().includes(query)).map(n=>`<tr><td class="topic">${esc(n)}</td><td>${state.topics.filter(t=>t.publisher_nodes.includes(n)).length}</td></tr>`).join(''));return;}
+ $('tableHead').innerHTML='<tr><th>토픽</th><th>형식</th><th>Pub / Sub</th><th>Hz</th><th>최근</th><th></th></tr>';graphRows(state.topics.filter(t=>(t.name+' '+t.types.join(' ')).toLowerCase().includes(query)).map(t=>`<tr class="${t.name===previewTopic?'selected':''}"><td class="topic"><span class="dot ${t.age_s===null?'':t.age_s<2?'fresh':'stale'}"></span>${esc(t.name)}</td><td class="type">${esc(t.types.join(', '))}</td><td>${t.publishers} / ${t.subscribers}</td><td>${F(t.hz,1)}</td><td>${t.age_s===null?'대기':F(t.age_s,1)+' s'}</td><td><button data-topic="${esc(t.name)}">데이터</button></td></tr>`).join(''));$('graphUpdated').textContent=`${state.topics.length}개 토픽`;}
 function renderPreview(){const item=state?.preview;$('previewTitle').textContent=previewTopic||state?.selected_topic||'토픽을 선택하세요';if(item&&item.topic===(previewTopic||state.selected_topic)){$('previewUnits').textContent=$('rawPreview').checked?'원본 메시지 · 형식별 원래 단위':item.units;$('preview').textContent=JSON.stringify($('rawPreview').checked?item.raw:item.display,null,2);}else{$('preview').textContent='선택한 토픽의 메시지를 기다리고 있습니다.';}}
 $('topicsTab').onclick=()=>{tableMode='topics';$('topicsTab').classList.add('active');$('nodesTab').classList.remove('active');renderGraph();};$('nodesTab').onclick=()=>{tableMode='nodes';$('nodesTab').classList.add('active');$('topicsTab').classList.remove('active');renderGraph();};$('search').oninput=renderGraph;$('rawPreview').onchange=renderPreview;$('signedAngles').onchange=updateSensors;
 $('graphRows').onclick=async e=>{const button=e.target.closest('button[data-topic]');if(!button)return;previewTopic=button.dataset.topic;renderGraph();renderPreview();await post('/api/select',{topic:previewTopic});};
 $('openMap').onclick=()=>{if(latestGps?.valid_fix)window.open(`https://www.google.com/maps?q=${latestGps.latitude_deg.toFixed(8)},${latestGps.longitude_deg.toFixed(8)}`,'_blank','noopener,noreferrer');};
 async function post(path,data){try{const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}),value=await r.json();if(!r.ok)throw Error(value.error||'요청을 처리하지 못했습니다.');return value;}catch(e){$('tankStatus').textContent=e.message;return null;}}
 
-let tankView={x:null,y:null,zoom:1},tankPointer=null,tankDragged=false,tankInteraction=false,tankClickStart=null;
-function setTankInteraction(active){
- tankInteraction=active;document.querySelector('.tank-panel').classList.toggle('map-active',active);
- $('tankInteractionHint').textContent=active?'지도 조작 중 · 드래그 이동 · 휠 확대·축소 · 밖 클릭 / Esc 해제':'지도를 클릭하면 휠 확대·축소와 드래그 이동이 켜집니다.';
- if(!active){if(tankPointer&&$('tankMap').hasPointerCapture(tankPointer.id))$('tankMap').releasePointerCapture(tankPointer.id);tankPointer=null;tankClickStart=null;tankDragged=false;$('tankMap').classList.remove('dragging');}
+let tankView={x:null,y:null,zoom:1},tankPointer=null,tankDragged=false;
+function cancelTankDrag(){
+ if(tankPointer&&$('tankMap').hasPointerCapture(tankPointer.id))$('tankMap').releasePointerCapture(tankPointer.id);
+ tankPointer=null;tankDragged=false;$('tankMap').classList.remove('dragging');
 }
-document.addEventListener('pointerdown',e=>{if(!e.target.closest('.tank-panel'))setTankInteraction(false);});
-window.addEventListener('blur',()=>setTankInteraction(false));
+window.addEventListener('blur',cancelTankDrag);
 let trailWasProvisional=false;
 let tankTransform=null,tankTrail=[],lastTankStamp=null,tankSession=null,mapStream=null,serverInstance=null;
 function acceptState(next){
@@ -113,14 +118,38 @@ function acceptState(next){
  serverInstance=instance;state=next;
 }
 
+let selectedCandidateId=null,candidateMapId=null;
+function liveTankCandidates(){
+ const report=state?.values?.tank_localization_candidates,session=state?.values?.tank_session;
+ if(!report||report.manual_locked||report.map_id!==session?.session_id||report.age_s>=1)return [];
+ const now=state.server_time_s||report.stamp_s;
+ return (report.live_candidates||[]).filter(p=>p.candidate_id&&[p.x,p.y,p.yaw_deg,p.score,p.stamp_s].every(Number.isFinite)&&now-p.stamp_s>=-.1&&now-p.stamp_s<1).slice(0,5);
+}
+function candidateControls(){
+ const locked=!!state?.values?.tank_localization_candidates?.manual_locked;document.querySelector('.candidate-controls').hidden=locked;$('candidateInfo').hidden=locked;
+ const mapId=state?.values?.tank_session?.session_id,candidates=liveTankCandidates();
+ if(mapId!==candidateMapId){selectedCandidateId=null;candidateMapId=mapId;}
+ if(selectedCandidateId&&!candidates.some(p=>p.candidate_id===selectedCandidateId))selectedCandidateId=null;
+ const box=$('candidateButtons'),key=candidates.map(p=>p.candidate_id).join(',');
+ if(box.dataset.key!==key){box.dataset.key=key;box.replaceChildren(...candidates.map((p,i)=>{const b=document.createElement('button');b.dataset.candidateId=p.candidate_id;b.textContent='후보 '+(i+1);return b;}));}
+ for(const b of box.children){const active=b.dataset.candidateId===selectedCandidateId;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));}
+ const selected=candidates.find(p=>p.candidate_id===selectedCandidateId),trial=state?.values?.tank_status;
+ const mcu=state?.values?.actuators,rc=mcu?.receiving&&mcu.mode===1&&mcu.age_s<.5;
+ $('applyCandidate').disabled=!selected||!!(trial?.execute&&trial.age_s<3&&!rc);
+ $('candidateSelection').textContent=selected?`${F(selected.x,2)}, ${F(selected.y,2)} m · ${F(wrap(selected.yaw_deg),1)}° · 점수 ${F(selected.score,2)}`:'후보를 선택하면 해당 화살표가 강조됩니다.';
+}
+function tankArrow(c,point,screen,dpr,color,size=1,alpha=1){
+ c.save();c.globalAlpha=alpha;c.translate(...screen(point.x,point.y));c.rotate(-radians(point.yaw_deg));c.scale(size,size);
+ c.fillStyle=color;c.strokeStyle='#222222';c.lineWidth=1.5*dpr;c.beginPath();c.moveTo(13*dpr,0);c.lineTo(-8*dpr,-7*dpr);c.lineTo(-5*dpr,0);c.lineTo(-8*dpr,7*dpr);c.closePath();c.fill();c.stroke();c.restore();
+}
 function tankDisplayPose(){
  const values=state?.values||{},session=values.tank_session,actual=values.tank_pose,report=values.tank_localization_candidates;
  if((!session?.fixed_map||session.localization_ready===true)&&actual?.age_s<1)return actual;
  const p=report?.display_pose;
  if(!p||report.map_id!==session?.session_id||report.age_s>=1||!Number.isFinite(p.stamp_s))return null;
  const age=(state.server_time_s||report.stamp_s)-p.stamp_s;
- if(age<-.1||age>=1||![p.x,p.y,p.yaw_deg].every(Number.isFinite))return null;
- return {position_m:{x:p.x,y:p.y},orientation:{deg_signed:{yaw:p.yaw_deg}},age_s:age,stamp_s:p.stamp_s,provisional:true};
+ if(age<-.1||(!p.held&&age>=1)||![p.x,p.y,p.yaw_deg].every(Number.isFinite))return null;
+ return {position_m:{x:p.x,y:p.y},orientation:{deg_signed:{yaw:p.yaw_deg}},age_s:age,stamp_s:p.stamp_s,provisional:true,held:!!p.held,manual_locked:!!p.manual_locked,display_fallback:!!p.display_fallback};
 }
 function drawTank(){const canvas=$('tankMap'),{w,h,dpr}=fitCanvas(canvas),c=canvas.getContext('2d');c.clearRect(0,0,w,h);const meta=state?.values?.map,pose=tankDisplayPose();ageText('mapAge',meta);$('mapEmpty').hidden=Boolean(mapPixels&&mapMeta);if(!mapPixels||!mapMeta)return;const m=mapMeta,r=m.resolution_m,theta=radians(m.origin_yaw_deg||0),co=Math.cos(theta),si=Math.sin(theta),corners=[[0,0],[m.width*r,0],[0,m.height*r],[m.width*r,m.height*r]].map(([x,y])=>[m.origin_x_m+co*x-si*y,m.origin_y_m+si*x+co*y]),xs=corners.map(p=>p[0]),ys=corners.map(p=>p[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),base=Math.min((w-24*dpr)/(maxX-minX||1),(h-24*dpr)/(maxY-minY||1)),s=base*tankView.zoom,viewX=tankView.x??(minX+maxX)/2,viewY=tankView.y??(minY+maxY)/2,cx=w/2-viewX*s,cy=h/2+viewY*s;const screen=(x,y)=>[cx+x*s,cy-y*s];tankTransform={s,cx,cy,dpr,w,h,viewX,viewY};$("tankZoomLabel").textContent=Math.round(tankView.zoom*100)+"%";$("tankZoomOut").disabled=tankView.zoom<=1;
  c.save();c.translate(...screen(m.origin_x_m,m.origin_y_m));c.rotate(-theta);c.scale(s,-s);c.imageSmoothingEnabled=false;c.drawImage(mapPixels,0,0,m.width*r,m.height*r);c.restore();
@@ -139,35 +168,84 @@ function drawTank(){const canvas=$('tankMap'),{w,h,dpr}=fitCanvas(canvas),c=canv
  c.strokeStyle='#7696a6';c.lineWidth=1.5*dpr;c.beginPath();tankTrail.forEach((p,i)=>i?c.lineTo(...screen(...p)):c.moveTo(...screen(...p)));c.stroke();
  if(route.a&&route.b){c.strokeStyle='#e6b36a';c.lineWidth=2*dpr;c.setLineDash([5*dpr,5*dpr]);c.beginPath();c.moveTo(...screen(route.a.x,route.a.y));c.lineTo(...screen(route.b.x,route.b.y));c.stroke();c.setLineDash([]);}
  const predicted=state?.values?.tank_prediction,planned=state?.values?.tank_status;
- for(const [points,color,dashed] of [[planned?.age_s<2?planned.path_m:null,'#69d8d1',false],[predicted?.age_s<1?predicted.points_m:null,'#de90ba',true]]){if(!points?.length)continue;c.strokeStyle=color;c.lineWidth=2*dpr;c.setLineDash(dashed?[4*dpr,4*dpr]:[]);c.beginPath();points.forEach((p,i)=>i?c.lineTo(...screen(...p)):c.moveTo(...screen(...p)));c.stroke();c.setLineDash([]);}
+ for(const [points,color,dashed] of [[planned?.age_s<2?planned.path_m:null,'#b5c9b0',false],[predicted?.age_s<1?predicted.points_m:null,'#de90ba',true]]){if(!points?.length)continue;c.strokeStyle=color;c.lineWidth=2*dpr;c.setLineDash(dashed?[4*dpr,4*dpr]:[]);c.beginPath();points.forEach((p,i)=>i?c.lineTo(...screen(...p)):c.moveTo(...screen(...p)));c.stroke();c.setLineDash([]);}
  for(const [key,point] of Object.entries(route)){if(!point)continue;const p=screen(point.x,point.y);c.fillStyle=key==='a'?'#1f918b':'#bd843c';c.beginPath();c.arc(...p,8*dpr,0,2*Math.PI);c.fill();c.font=`bold ${10*dpr}px Segoe UI`;c.fillStyle='#fff';c.textAlign='center';c.fillText(key.toUpperCase(),p[0],p[1]+3.5*dpr);c.textAlign='left';}
  const localization=state?.values?.tank_localization_candidates;
  const sameMap=Boolean(localization?.map_id)&&localization.map_id===state?.values?.tank_session?.session_id;
  const fresh=sameMap&&localization.age_s<5, ready=state?.values?.tank_session?.localization_ready===true;
  const candidateAge=Number.isFinite(localization?.candidate_stamp_s)?Math.max(0,(state.server_time_s||localization.stamp_s)-localization.candidate_stamp_s):0;
- const candidates=fresh&&!ready?(localization.candidates||[]).filter(p=>[p.x,p.y,p.yaw_deg,p.score].every(Number.isFinite)).slice(0,5):[];
+ const liveCandidates=liveTankCandidates();candidateControls();
+ const candidates=fresh&&!localization.manual_locked?(liveCandidates.length?liveCandidates:localization.candidates||[]).filter(p=>[p.x,p.y,p.yaw_deg,p.score].every(Number.isFinite)).slice(0,5):[];
  const historical=localization?.state==='SEARCHING'||candidateAge>15;
  $('globalMatchInfo').textContent=fresh?'자동 위치: '+localization.reason+(localization.observation_count?' · 관측 '+localization.observation_count+'곳 / 이동 '+F(localization.observation_baseline_m,2)+' m':'')+(localization.path_rejected?' · 경로 불일치 '+localization.path_rejected+'개 제외':'')+(Number.isFinite(localization.margin)?' · 후보 점수차 '+F(localization.margin,2):''):'자동 위치 탐색 상태 수신 대기';
- $('candidateInfo').textContent=candidates.length?(historical?'이전 관측 후보 · ':'미확정 후보 · ')+candidates.map((p,i)=>`#${i+1} (${F(p.x,2)}, ${F(p.y,2)}) m / ${F(p.yaw_deg,1)}° / 점수 ${F(p.score,2)}`).join('   |   ')+(historical?` · ${F(candidateAge,0)}초 전 결과`:''):(ready?'현재 위치 정합 확인됨':fresh&&localization.state==='SEARCHING'?'위치·방향 후보 계산 중입니다. 방향 입력 없이 탐색합니다.':fresh?localization.reason:'자동 탐색 결과를 기다리고 있습니다.');
+ $('candidateInfo').textContent=candidates.length?(localization.display_fallback?'임시 후보 유지 · ':historical?'이전 관측 후보 · ':'미확정 후보 · ')+candidates.map((p,i)=>`#${i+1} (${F(p.x,2)}, ${F(p.y,2)}) m / ${F(p.yaw_deg,1)}° / 점수 ${F(p.score,2)}`).join('   |   ')+(historical?` · ${F(candidateAge,0)}초 전 결과`:''):(ready?'현재 위치 정합 확인됨':fresh&&localization.state==='SEARCHING'?'위치·방향 후보 계산 중입니다. 방향 입력 없이 탐색합니다.':fresh?localization.reason:'자동 탐색 결과를 기다리고 있습니다.');
  for(const [i,point] of candidates.entries()){
-  const p=screen(point.x,point.y);c.save();c.globalAlpha=pose?.provisional?.3:historical?.55:1;c.fillStyle=i===0?'#ffe078':'#e4a95b';c.strokeStyle='#101c28';c.lineWidth=1.5*dpr;c.beginPath();c.arc(p[0],p[1],(i===0?6:4.5)*dpr,0,2*Math.PI);c.fill();c.stroke();c.restore();
+  tankArrow(c,point,screen,dpr,point.score>=(localization.accept_score||.8)?'#ffe078':'#c28f55',.8,liveCandidates.length?.65:.3);
  }
  const q=pose?.position_m,angle=pose?.orientation?.deg_signed?.yaw;if(q&&Number.isFinite(angle)){const p=screen(q.x,q.y);c.save();c.translate(...p);c.rotate(-radians(angle));c.fillStyle=pose.age_s<1&&state?.values?.tank_session?.localization_ready!==false?'#3b9cbd':'#bf9a56';c.beginPath();c.moveTo(13*dpr,0);c.lineTo(-8*dpr,-7*dpr);c.lineTo(-5*dpr,0);c.lineTo(-8*dpr,7*dpr);c.closePath();c.fill();c.restore();}
- c.fillStyle='#92aabc';c.font=`${11*dpr}px Segoe UI`;c.fillText(`X → · Y ↑ · ${F(r,3)} m / 셀`,12*dpr,h-10*dpr);$('mapInfo').textContent=`${m.frame_id} · ${m.width} × ${m.height} 셀 · ${pose?.provisional?'추정 위치 (검증 중)':'현재 위치'} ${q?F(q.x,2)+', '+F(q.y,2)+' m':'대기'}`;const status=state?.values?.tank_status,sessionInfo=state?.values?.tank_session;if(sessionInfo?.fixed_map&&sessionInfo.localization_ready===false)$('tankStatus').textContent='고정 지도 · '+(pose?.provisional?'추정 위치 실시간 추적 · 후보 비교 2초 / 전체 탐색 60초':fresh?'자동 위치 확정 대기':'위치 추정 상태 수신 대기');else if(status?.age_s<2)$('tankStatus').textContent=status.state+(status.reason?' · '+status.reason:'');else if(sessionInfo?.fixed_map)$('tankStatus').textContent='고정 지도 · 위치 정합 확인됨';}
+ const selected=liveCandidates.find(p=>p.candidate_id===selectedCandidateId);if(selected)tankArrow(c,selected,screen,dpr,'#ffffff',1.3,1);
+ c.fillStyle='#92aabc';c.font=`${11*dpr}px Segoe UI`;c.fillText(`X → · Y ↑ · ${F(r,3)} m / 셀`,12*dpr,h-10*dpr);$('mapInfo').textContent=`${m.frame_id} · ${m.width} × ${m.height} 셀 · ${pose?.held?'마지막 확인 위치':pose?.manual_locked?'지정 위치 추적':pose?.display_fallback?'임시 위치 (재검토 중)':pose?.provisional?'추정 위치 (검증 중)':'현재 위치'} ${q?F(q.x,2)+', '+F(q.y,2)+' m':'대기'}`;const status=state?.values?.tank_status,sessionInfo=state?.values?.tank_session;if(sessionInfo?.fixed_map&&sessionInfo.localization_ready===false)$('tankStatus').textContent='고정 지도 · '+(pose?.held?(localization.reason||'위치 신호 대기 · 마지막 위치 표시'):localization?.manual_locked?(localization.reason||'주변 지도 정합 중'):pose?.display_fallback?'임시 위치 추적 · 후보 비교 2초 / 전체 탐색 12초':pose?.provisional?'추정 위치 실시간 추적 · 후보 비교 2초 / 전체 탐색 60초':fresh?'자동 위치 확정 대기':'위치 추정 상태 수신 대기');else if(status?.age_s<2)$('tankStatus').textContent=status.state+(status.reason?' · '+status.reason:'');else if(sessionInfo?.fixed_map)$('tankStatus').textContent='고정 지도 · 위치 정합 확인됨';}
+let trialClock={session:null,last:null,at:0,scales:{}};
+function trialWindow(history,end){
+ const rows=history.filter(r=>Array.isArray(r)&&Number.isFinite(r[0])&&r[0]>=end-30&&r[0]<=end).sort((a,b)=>a[0]-b[0]);
+ const gaps=rows.slice(1).map((r,i)=>r[0]-rows[i][0]).filter(x=>x>0).sort((a,b)=>a-b);
+ const interval=gaps.length?gaps[Math.floor(gaps.length/2)]:.3;
+ return {rows,interval,gapLimit:Math.max(1,Math.min(3,interval*2.5))};
+}
 function drawTrial(){
- const data=state?.values?.tank_status, rows=data?.history||[];
- $('trialInfo').textContent=data?`${data.state} · ${data.phase||''} · ${data.legs||0}회 도착 · ${data.log_directory||''} · ${data.age_s>2?'수신 지연':'최근 30초'}`:'젯슨 기록 대기';
- for(const [id,cols,factor] of [['trialInputs',[4,5],1],['trialSpeed',[1,2],1],['trialYaw',[3,6],180/Math.PI]]){
+ const data=state?.values?.tank_status,history=(data?.history||[]).filter(r=>Array.isArray(r)&&Number.isFinite(r[0]));
+ const newest=history.length?Math.max(...history.map(r=>r[0])):0,now=performance.now(),session=data?.log_directory||null;
+ if(trialClock.session!==session)trialClock={session,last:null,at:now,scales:{}};
+ if(trialClock.last!==newest){trialClock.last=newest;trialClock.at=now;}
+ const end=Number.isFinite(data?.elapsed_s)?data.elapsed_s:newest+(now-trialClock.at)/1000;
+ const {rows,interval,gapLimit}=trialWindow(history,end);
+ $('trialInfo').textContent=data?`${data.state} · ${data.phase||''} · ${data.legs||0}회 도착 · ${data.age_s>2?'수신 지연':'최근 30초'} · 표시 간격 약 ${F(interval,1)}초`:'젯슨 기록 대기';
+ $('trialInfo').title=data?.log_directory||'';
+ $('trialReason').textContent=data?.reason||'';$('trialReason').hidden=!data?.reason;
+ for(const [id,cols,factor,unit,minimum,step,labels] of [
+  ['trialInputs',[4,5],1,'%',Math.max(20,data?.output_limit_percent||20),5,['좌현','우현']],
+  ['trialSpeed',[1,2],1,'m/s',.1,.1,['전진','횡방향']],
+  ['trialYaw',[3,6],180/Math.PI,'°/s',5,5,['라이다','IMU Z']]]){
   const canvas=$(id),{w,h,dpr}=fitCanvas(canvas),c=canvas.getContext('2d');c.clearRect(0,0,w,h);
-  if(rows.length<2)continue;const values=rows.flatMap(r=>cols.map(k=>r[k]*factor)).filter(Number.isFinite),lo=Math.min(0,...values),hi=Math.max(.01,...values),span=Math.max(.01,hi-lo),duration=Math.max(.1,rows.at(-1)[0]-rows[0][0]);
-  c.fillStyle='#92aabc';c.font=`${11*dpr}px Segoe UI`;c.fillText(`${F(hi,2)}`,4*dpr,12*dpr);c.fillText(`${F(lo,2)}`,4*dpr,h-5*dpr);
-  cols.forEach((k,j)=>{c.beginPath();c.strokeStyle=j?'#e6b36a':'#69d8d1';c.lineWidth=1.5*dpr;let prev=null;
-   for(const row of rows){if(!Number.isFinite(row[k])){prev=null;continue;}const x=45*dpr+(w-55*dpr)*(row[0]-rows[0][0])/duration,y=15*dpr+(h-30*dpr)*(hi-row[k]*factor)/span;if(prev===null||row[0]-prev>1)c.moveTo(x,y);else c.lineTo(x,y);prev=row[0];}c.stroke();});
+  const values=rows.flatMap(r=>cols.filter(k=>Number.isFinite(r[k])).map(k=>r[k]*factor));
+  const magnitude=Math.max(minimum,...values.map(Math.abs));
+  const bound=Math.max(trialClock.scales[id]||minimum,Math.ceil(magnitude/step)*step);trialClock.scales[id]=bound;
+  const left=53*dpr,right=w-12*dpr,top=30*dpr,bottom=h-29*dpr,span=bound*2.16;
+  const X=t=>left+(right-left)*(t-(end-30))/30,Y=v=>(top+bottom)/2-v/span*(bottom-top);
+  c.font=`${11*dpr}px Segoe UI`;c.lineWidth=dpr;c.setLineDash([]);
+  for(const value of [-bound,-bound/2,0,bound/2,bound]){
+   const y=Y(value);c.strokeStyle=value===0?'#607b8e':'#263b4a';c.beginPath();c.moveTo(left,y);c.lineTo(right,y);c.stroke();
+   c.fillStyle='#a6bdcb';c.textAlign='right';c.fillText(F(value,unit==='m/s'?2:1),left-7*dpr,y+4*dpr);
+  }
+  for(const seconds of [-30,-20,-10,0]){
+   const x=X(end+seconds);c.strokeStyle='#263b4a';c.beginPath();c.moveTo(x,top);c.lineTo(x,bottom);c.stroke();
+   c.textAlign=seconds===-30?'left':seconds===0?'right':'center';c.fillStyle='#a6bdcb';c.fillText(seconds===0?'현재':`${seconds}초`,x,h-8*dpr);
+  }
+  c.textAlign='left';c.fillStyle='#a6bdcb';c.fillText(unit,4*dpr,15*dpr);
+  cols.forEach((k,j)=>{
+   const color=j?'#ffad66':'#63ded0',legendX=left+j*95*dpr;c.strokeStyle=color;c.lineWidth=1.7*dpr;c.setLineDash([]);
+   c.beginPath();c.moveTo(legendX,12*dpr);c.lineTo(legendX+18*dpr,12*dpr);c.stroke();c.fillStyle=color;c.fillText(labels[j],legendX+23*dpr,16*dpr);
+   c.save();c.beginPath();c.rect(left,top,right-left,bottom-top);c.clip();c.beginPath();let previous=null;
+   for(const row of rows){
+    if(!Number.isFinite(row[k])){previous=null;continue;}
+    const x=X(row[0]),y=Y(row[k]*factor),connected=previous&&row[0]>previous[0]&&row[0]-previous[0]<=gapLimit;
+    if(connected){if(id==='trialInputs')c.lineTo(x,Y(previous[k]*factor));c.lineTo(x,y);}else c.moveTo(x,y);
+    previous=row;
+   }
+   c.stroke();c.setLineDash([]);c.fillStyle=color;
+   for(const row of rows)if(Number.isFinite(row[k])){c.beginPath();c.arc(X(row[0]),Y(row[k]*factor),1.5*dpr,0,2*Math.PI);c.fill();}
+   c.restore();c.setLineDash([]);
+  });
+  c.fillStyle='#a6bdcb';c.textAlign='center';
+  if(!values.length)c.fillText('최근 표본 대기',(left+right)/2,(top+bottom)/2-9*dpr);
+  else if(rows.some((r,i)=>i&&r[0]-rows[i-1][0]>gapLimit))c.fillText('긴 수신 공백은 선을 연결하지 않습니다',(left+right)/2,bottom-3*dpr);
+  c.textAlign='left';
  }
 }
+new ResizeObserver(()=>drawTrial()).observe(document.querySelector('.trial-charts'));
 function routeLabel(){const point=p=>p?`${F(p.x,2)}, ${F(p.y,2)} m`:'미지정';$('routeInfo').textContent=`A ${point(route.a)} / B ${point(route.b)}`;$('saveRoute').disabled=!(route.a&&route.b);}
-for(const [id,mode] of [['setA','a'],['setB','b']])$(id).onclick=()=>{setTankInteraction(true);selectedMapAction=mode;for(const key of ['setA','setB'])$(key).classList.toggle('active',key===id);$('tankStatus').textContent=`${mode.toUpperCase()} 지점을 클릭하세요.`;};
-$('tankMap').onclick=e=>{tankClickStart=null;if(tankDragged){tankDragged=false;return;}if(!tankInteraction){setTankInteraction(true);return;}if(!tankTransform||!selectedMapAction||!onKnownTankMap(e.clientX,e.clientY))return;const rect=$('tankMap').getBoundingClientRect(),{s,cx,cy,dpr}=tankTransform;route[selectedMapAction]={x:((e.clientX-rect.left)*dpr-cx)/s,y:(cy-(e.clientY-rect.top)*dpr)/s};routeLabel();drawTank();if(selectedMapAction==='a')$('setB').click();};
+for(const [id,mode] of [['setA','a'],['setB','b']])$(id).onclick=()=>{selectedMapAction=mode;$('tankStatus').textContent=`${mode.toUpperCase()} 지점을 클릭하세요.`;};
+$('tankMap').onclick=e=>{if(tankDragged){tankDragged=false;return;}if(!tankTransform||!selectedMapAction||!onKnownTankMap(e.clientX,e.clientY))return;const rect=$('tankMap').getBoundingClientRect(),{s,cx,cy,dpr}=tankTransform;route[selectedMapAction]={x:((e.clientX-rect.left)*dpr-cx)/s,y:(cy-(e.clientY-rect.top)*dpr)/s};routeLabel();drawTank();if(selectedMapAction==='a')$('setB').click();};
 function zoomTank(factor,clientX,clientY){
  if(!tankTransform)return;const rect=$('tankMap').getBoundingClientRect(),t=tankTransform;
  const px=clientX===undefined?t.w/2:(clientX-rect.left)*t.dpr,py=clientY===undefined?t.h/2:(clientY-rect.top)*t.dpr;
@@ -181,22 +259,37 @@ function onKnownTankMap(clientX,clientY){
  const a=radians(m.origin_yaw_deg||0),col=Math.floor((Math.cos(a)*x+Math.sin(a)*y)/m.resolution_m),row=Math.floor((-Math.sin(a)*x+Math.cos(a)*y)/m.resolution_m);
  return col>=0&&row>=0&&col<m.width&&row<m.height&&mapCells[row*m.width+col]>=0;
 }
-$('tankMap').addEventListener('wheel',e=>{if(!tankInteraction||!onKnownTankMap(e.clientX,e.clientY))return;e.preventDefault();zoomTank(Math.exp(-clamp(e.deltaY,-200,200)*.003),e.clientX,e.clientY);},{passive:false});
-$('tankMap').addEventListener('pointerdown',e=>{if(e.button!==0)return;tankDragged=false;tankClickStart={x:e.clientX,y:e.clientY};if(!tankInteraction||!onKnownTankMap(e.clientX,e.clientY))return;tankPointer={id:e.pointerId,x:e.clientX,y:e.clientY,viewX:tankTransform.viewX,viewY:tankTransform.viewY,scale:tankTransform.s/tankTransform.dpr};$('tankMap').setPointerCapture(e.pointerId);});
-$('tankMap').addEventListener('pointermove',e=>{if(!tankInteraction){if(tankClickStart&&Math.hypot(e.clientX-tankClickStart.x,e.clientY-tankClickStart.y)>4)tankDragged=true;return;}if(!tankPointer||tankPointer.id!==e.pointerId)return;const dx=e.clientX-tankPointer.x,dy=e.clientY-tankPointer.y;if(Math.hypot(dx,dy)>4)tankDragged=true;if(!tankDragged)return;tankView.x=tankPointer.viewX-dx/tankPointer.scale;tankView.y=tankPointer.viewY+dy/tankPointer.scale;$('tankMap').classList.add('dragging');drawTank();});
+$('tankMap').addEventListener('wheel',e=>{if(!onKnownTankMap(e.clientX,e.clientY))return;e.preventDefault();zoomTank(Math.exp(-clamp(e.deltaY,-200,200)*.003),e.clientX,e.clientY);},{passive:false});
+$('tankMap').addEventListener('pointerdown',e=>{if(e.button!==0)return;tankDragged=false;if(!onKnownTankMap(e.clientX,e.clientY))return;tankPointer={id:e.pointerId,x:e.clientX,y:e.clientY,viewX:tankTransform.viewX,viewY:tankTransform.viewY,scale:tankTransform.s/tankTransform.dpr};$('tankMap').setPointerCapture(e.pointerId);});
+$('tankMap').addEventListener('pointermove',e=>{if(!tankPointer||tankPointer.id!==e.pointerId)return;const dx=e.clientX-tankPointer.x,dy=e.clientY-tankPointer.y;if(Math.hypot(dx,dy)>4)tankDragged=true;if(!tankDragged)return;tankView.x=tankPointer.viewX-dx/tankPointer.scale;tankView.y=tankPointer.viewY+dy/tankPointer.scale;$('tankMap').classList.add('dragging');drawTank();});
 function endTankDrag(e){if(tankPointer?.id===e.pointerId){tankPointer=null;$('tankMap').classList.remove('dragging');}}
 $('tankMap').addEventListener('pointerup',endTankDrag);$('tankMap').addEventListener('pointercancel',endTankDrag);
-$('tankZoomIn').onclick=()=>{setTankInteraction(true);zoomTank(1.4);};$('tankZoomOut').onclick=()=>{setTankInteraction(true);zoomTank(1/1.4);};
+$('tankZoomIn').onclick=()=>{zoomTank(1.4);};$('tankZoomOut').onclick=()=>{zoomTank(1/1.4);};
 $('tankFit').onclick=()=>{tankView={x:null,y:null,zoom:1};drawTank();};
 $('tankExpand').onclick=()=>{const panel=document.querySelector('.tank-panel');panel.classList.toggle('expanded');$('tankExpand').textContent=panel.classList.contains('expanded')?'화면 복귀':'크게 보기';drawTank();};
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){setTankInteraction(false);selectedMapAction=null;for(const key of ['setA','setB'])$(key).classList.remove('active');document.querySelector('.tank-panel').classList.remove('expanded');$('tankExpand').textContent='크게 보기';drawTank();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){cancelTankDrag();selectedMapAction=null;for(const key of ['setA','setB'])$(key).classList.remove('active');document.querySelector('.tank-panel').classList.remove('expanded');$('tankExpand').textContent='크게 보기';drawTank();}});
 new ResizeObserver(()=>drawTank()).observe($('tankMap'));
+$('candidateButtons').onclick=e=>{const b=e.target.closest('button[data-candidate-id]');if(!b)return;selectedCandidateId=b.dataset.candidateId;drawTank();};
+$('applyCandidate').onclick=async()=>{const selected=liveTankCandidates().find(p=>p.candidate_id===selectedCandidateId);if(!selected)return;const result=await post('/api/initial_pose',{map_id:candidateMapId,candidate_id:selected.candidate_id});if(result)$('tankStatus').textContent=result.message;};
 $('autoLocate').onclick=async()=>{const result=await post('/api/localize',{});if(result)$('globalMatchInfo').textContent=result.message;};
 $('saveRoute').onclick=async()=>{const result=await post('/api/route',{a:route.a,b:route.b});if(result)$('tankStatus').textContent=result.message;};
-new ResizeObserver(()=>{drawAttitude();drawTrend();drawScan();drawGps();drawTank();}).observe($('scan'));
+new ResizeObserver(()=>{if(graphOnly)return;drawAttitude();drawTrend();drawScan();if(!sensorOnly)drawGps();if(!embeddedSensors)drawTank();}).observe(document.querySelector('.main-grid'));
 
-async function stateLoop(){try{const response=await fetch('/api/state',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(response.ok){acceptState(await response.json());lastStateAt=performance.now();if(!previewTopic)previewTopic=state.selected_topic;updateSensors();drawTrial();}}catch(_){}setTimeout(stateLoop,document.hidden?1200:250);}
+function renderRuntime(){
+ const runtime=state?.values?.runtime,fresh=performance.now()-lastStateAt<3000&&runtime?.age_s<7;
+ const labels={sensors:'센서',mapping:'매핑',trial:'왕복'},texts={running:'실행 중',stopped:'정지',restarting:'재시작 중',unknown:'확인 중'};
+ for(const [key,label] of Object.entries(labels)){
+  const status=fresh&&texts[runtime.services?.[key]]?runtime.services[key]:'unknown',el=$('runtime-'+key);
+  let text=texts[status];
+  const trial=state?.values?.tank_status;
+  if(key==='trial'&&status==='running'&&trial?.age_s<3&&trial.state==='WAITING')text='실행 중 · 대기';
+  el.className='runtime-item '+status;el.textContent=label+' · '+text;
+  el.title=key==='trial'&&status==='running'&&trial?.age_s<3?trial.reason||'왕복 노드 실행 중':'젯슨 프로세스 기준 · 약 3초마다 갱신';
+ }
+}
+setInterval(renderRuntime,1000);
+async function stateLoop(){try{const response=await fetch(embeddedSensors?'/api/state?sensors=1':'/api/state',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(response.ok){acceptState(await response.json());lastStateAt=performance.now();if(!previewTopic)previewTopic=state.selected_topic;updateSensors();if(!embeddedSensors)drawTrial();renderRuntime();if(sensorOnly)parent.postMessage({kind:'sensor-graph',state:{nodes:state.nodes,topics:state.topics,preview:state.preview,selected_topic:state.selected_topic,graph_updated_s:state.graph_updated_s}},location.origin);}}catch(_){}setTimeout(stateLoop,document.hidden?1200:250);}
 async function cloudLoop(){try{if(!$('pauseCloud').checked&&!document.hidden){const response=await fetch('/api/cloud?after='+(cloud.sequence??-1),{cache:'no-store',signal:AbortSignal.timeout(6000)});if(response.status===200){const buffer=await response.arrayBuffer();pointBytes+=buffer.byteLength;cloud.update(buffer);}}}catch(_){}setTimeout(cloudLoop,document.hidden?1500:200);}
-let lastNetworkBytes=0,lastNetworkAt=performance.now();async function connectionLoop(){try{const response=await fetch('/api/connection',{cache:'no-store'});connection=await response.json();const now=performance.now(),kb=(connection.received_bytes-lastNetworkBytes)/Math.max(1,now-lastNetworkAt);lastNetworkBytes=connection.received_bytes;lastNetworkAt=now;$('network').textContent=`${F(kb,1)} KB/s`;}catch(_){}const fresh=performance.now()-lastStateAt<3000&&state;$('connection').className='badge '+(fresh?'live':'waiting');$('connection').textContent=fresh?(state.demo?'예제 화면':'연결됨'):connection?.status||'연결 대기';if(!fresh&&lastStateAt){for(const id of ['cloudAge','imuAge','scanAge','gpsAge']){$(id).textContent='연결 지연';$(id).className='age stale';}}setTimeout(connectionLoop,1000);}
+let lastNetworkBytes=null,lastNetworkAt=performance.now();async function connectionLoop(){try{const response=await fetch('/api/connection',{cache:'no-store'});connection=await response.json();const now=performance.now(),kb=lastNetworkBytes===null?0:Math.max(0,connection.received_bytes-lastNetworkBytes)/Math.max(1,now-lastNetworkAt);lastNetworkBytes=connection.received_bytes;lastNetworkAt=now;$('network').textContent=`${F(kb,1)} KB/s`;}catch(_){}const fresh=performance.now()-lastStateAt<3000&&state;const live=fresh&&connection?.sensors_running!==false;$('connection').className='badge '+(live?'live':'waiting');$('connection').textContent=fresh?(live?'연결됨':'브링업 대기'):connection?.status||'연결 대기';if(!fresh&&lastStateAt){for(const id of ['cloudAge','imuAge','scanAge','gpsAge']){$(id).textContent='연결 지연';$(id).className='age stale';}}setTimeout(connectionLoop,1000);}
 async function mapLoop(){try{const meta=state?.values?.map,instance=serverInstance,newStream=meta?.stream_id!==mapStream;if(meta&&(newStream||meta.sequence!==mapSeq)){const response=await fetch('/api/map?after='+(newStream?-1:mapSeq),{cache:'no-store',signal:AbortSignal.timeout(6000)});if(response.status===200){const bytes=await response.arrayBuffer(),v=new DataView(bytes);if(bytes.byteLength>=16&&v.getUint32(0,true)===0x50414d4b){const seq=v.getUint32(4,true),w=v.getUint32(8,true),h=v.getUint32(12,true);if(instance===serverInstance&&seq===meta.sequence&&w*h<=8_000_000&&bytes.byteLength===16+w*h){const cells=new Int8Array(bytes,16),image=new ImageData(w,h);for(let i=0;i<cells.length;i++){const value=cells[i],color=value<0?[29,48,61]:value>50?[17,31,43]:[187,203,207];image.data.set([...color,255],i*4);}mapPixels=document.createElement('canvas');mapPixels.width=w;mapPixels.height=h;mapPixels.getContext('2d').putImageData(image,0,0);mapCells=cells;mapMeta=meta;mapSeq=seq;mapStream=meta.stream_id;drawTank();}}}}}catch(_){}setTimeout(mapLoop,1000);}
-stateLoop();cloudLoop();connectionLoop();mapLoop();
+if(graphOnly){window.addEventListener('message',e=>{if(e.source===parent&&e.origin===location.origin&&e.data?.kind==='sensor-graph'){state=e.data.state;if(!previewTopic)previewTopic=state.selected_topic;renderGraph();renderPreview();}});}else{stateLoop();cloudLoop();connectionLoop();if(!embeddedSensors)mapLoop();}

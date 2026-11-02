@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start the local browser viewer and a read-only ROS monitor over SSH."""
+"""Local dashboard over SSH with explicit navigation controls."""
 import argparse
 import getpass
 import hashlib
@@ -17,6 +17,24 @@ from urllib.parse import urlsplit
 import webbrowser
 
 ROOT = Path(__file__).resolve().parent
+
+
+class BrowserWake:
+    """Open on bringup/reconnection only when no dashboard tab is polling."""
+    def __init__(self,url,enabled=True,opener=None,clock=None):
+        self.url=url;self.enabled=enabled;self.opener=opener or webbrowser.open;self.clock=clock or time.monotonic
+        self.last_view=float('-inf');self.last_open=float('-inf');self.active=False;self.lock=threading.Lock()
+    def viewed(self):
+        with self.lock:self.last_view=self.clock()
+    def open(self):
+        if not self.enabled:return
+        with self.lock:self.last_open=self.clock()
+        self.opener(self.url)
+    def observe(self,active):
+        with self.lock:
+            now=self.clock();should_open=self.enabled and active and not self.active and now-self.last_view>10 and now-self.last_open>30
+            self.active=active
+        if should_open:self.open()
 
 
 class ChannelHTTP(http.client.HTTPConnection):
@@ -43,6 +61,8 @@ class RemoteBridge:
         self.received_bytes = 0
         self.started = time.monotonic()
         self.last_state_bytes = 0
+        self.sensors_running=False
+        self.browser=BrowserWake('http://127.0.0.1:'+str(args.port),enabled=not getattr(args,'no_browser',False))
 
     def request(self, method, path, body=None):
         with self.lock:
@@ -71,7 +91,7 @@ class RemoteBridge:
             connection.close()
 
     def deploy(self, client):
-        files = {name:(ROOT/name).read_bytes().replace(b'\r\n',b'\n') for name in ('jetson_server.py','telemetry_core.py','tank_feed.py')}
+        files = {name:(ROOT/name).read_bytes().replace(b'\r\n',b'\n') for name in ('jetson_server.py','telemetry_core.py','tank_feed.py','outdoor_feed.py')}
         fingerprint = hashlib.sha256(b''.join(files.values())).hexdigest()[:16]
         sftp = client.open_sftp()
         home = sftp.normalize('.')
@@ -139,6 +159,7 @@ class RemoteBridge:
                     with self.lock:
                         self.client = candidate
                 alive = False
+                data={}
                 if self.remote_port:
                     try:
                         status,_,body = self.request('GET','/health')
@@ -150,11 +171,15 @@ class RemoteBridge:
                     self.remote_port = None
                     self.status = '센서 모니터 준비 중'
                     self.deploy(self.client)
+                    status,_,body=self.request('GET','/health');data=json.loads(body)
+                self.sensors_running=bool(data.get('sensors_running'))
+                self.browser.observe(self.sensors_running)
                 self.status = '연결됨'
                 self.last_error = None
                 delay = 1.
                 self.stop.wait(3)
             except Exception as exc:
+                self.sensors_running=False;self.browser.observe(False)
                 message = type(exc).__name__+': '+str(exc)[:220]
                 self.status = '연결 재시도 중'
                 if message != self.last_error:
@@ -165,7 +190,7 @@ class RemoteBridge:
     def metadata(self):
         with self.lock:
             return {'status':self.status,'error':self.last_error,'host':self.args.host,
-                    'received_bytes':self.received_bytes,'uptime_s':time.monotonic()-self.started}
+                    'received_bytes':self.received_bytes,'uptime_s':time.monotonic()-self.started,'sensors_running':self.sensors_running}
 
     def close(self):
         self.stop.set()
@@ -192,6 +217,13 @@ def make_handler(bridge, args):
         def log_message(self, *_):
             pass
 
+        def handle(self):
+            try:
+                super().handle()
+            except (ConnectionResetError,ConnectionAbortedError,BrokenPipeError):
+                # Closing/reloading a browser may reset an idle keep-alive socket.
+                pass
+
         def send(self, status, payload, content_type='application/json', encoding=None):
             self.send_response(status)
             self.send_header('Content-Type',content_type)
@@ -211,8 +243,14 @@ def make_handler(bridge, args):
             if path == '/api/connection':
                 self.send(200,json.dumps(bridge.metadata(),ensure_ascii=False).encode());return
             if path in ('/api/state','/api/cloud','/api/map'):
+                if path=='/api/state':bridge.browser.viewed()
                 self.proxy('GET');return
-            files = {'/':('index.html','text/html; charset=utf-8'),
+            if path == '/outdoor':
+                self.send_response(302);self.send_header('Location','/');self.send_header('Content-Length','0');self.end_headers();return
+            files = {'/':('outdoor.html','text/html; charset=utf-8'),
+                     '/sensors':('index.html','text/html; charset=utf-8'),
+                     '/outdoor.js':('outdoor.js','text/javascript; charset=utf-8'),
+                     '/outdoor.css':('outdoor.css','text/css; charset=utf-8'),
                      '/viewer.js':('viewer.js','text/javascript; charset=utf-8'),
                      '/viewer.css':('viewer.css','text/css; charset=utf-8')}
             if path in files:
@@ -224,10 +262,10 @@ def make_handler(bridge, args):
         def do_POST(self):
             origin = self.headers.get('Origin')
             allowed = ('http://127.0.0.1:'+str(args.port),'http://localhost:'+str(args.port))
-            if origin not in allowed or urlsplit(self.path).path not in ('/api/select','/api/route','/api/initial_pose','/api/localize'):
+            if origin not in allowed or urlsplit(self.path).path not in ('/api/select','/api/route','/api/initial_pose','/api/localize','/api/outdoor'):
                 self.send(403,b'{}');return
             size = int(self.headers.get('Content-Length','0'))
-            if not 0 < size <= 1024:
+            if not 0 < size <= (16384 if urlsplit(self.path).path == '/api/outdoor' else 1024):
                 self.send(400,b'{}');return
             self.proxy('POST',self.rfile.read(size))
 
@@ -271,7 +309,7 @@ def main():
     print('Live sensor viewer: '+url,flush=True)
     print('Ctrl+C closes this viewer and its own monitor.',flush=True)
     if not args.no_browser:
-        webbrowser.open(url)
+        bridge.browser.open()
     if hasattr(signal,'SIGHUP'):
         signal.signal(signal.SIGHUP,signal.SIG_IGN)
     try:

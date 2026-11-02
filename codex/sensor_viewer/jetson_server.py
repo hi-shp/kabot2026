@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
 import os
+from pathlib import Path
 import signal
 import threading
 import time
@@ -18,6 +19,33 @@ from telemetry_core import (POINT_HEADER, GpsTrack, bounded_preview, cloud_value
                             vector, vectornav_value)
 
 VERSION = 'kabot-sensor-viewer-v1'
+
+
+def runtime_status(proc_root=Path('/proc')):
+    """Read local process lifetimes; stale ROS topics do not imply a live session."""
+    targets = {
+        'sensors': {'all_sensors.launch.py', 'mechaship_bringup.launch.py',
+                    'sensor_status.py', 'velodyne_driver_node', 'vectornav', 'ublox_gps_node'},
+        'mapping': {'tank_mapping.launch.py', 'tank_create_map.launch.py', 'tank_pose'},
+        'trial': {'indoor_trial', 'isv_water_trials.indoor_trial'},
+    }
+    result = dict.fromkeys(targets, 'stopped')
+    try: entries = list(proc_root.iterdir())
+    except OSError: return dict.fromkeys(targets, 'unknown')
+    for entry in entries:
+        if not entry.name.isdigit(): continue
+        try:
+            if entry.joinpath('stat').read_text().rsplit(')', 1)[1].split()[0] == 'Z': continue
+            args = entry.joinpath('cmdline').read_bytes().decode(errors='replace').strip('\0').split('\0')
+        except (OSError, IndexError): continue
+        tokens = {arg.rsplit('/', 1)[-1] for arg in args}
+        for name, names in targets.items():
+            if tokens & names: result[name] = 'running'
+        if 'isv_water_trials.tank_session' in args and '_worker' in args:
+            index = args.index('_worker') + 1
+            if index < len(args) and args[index] in result and result[args[index]] != 'running':
+                result[args[index]] = 'restarting'
+    return result
 
 
 class Store:
@@ -47,6 +75,12 @@ class Store:
         with self.lock:
             self.values[key] = dict(data, received_monotonic=time.monotonic(), stamp_s=time.time())
 
+    def sensors_running(self):
+        names={'sensor_status','velodyne_driver_node','vectornav','ublox_gps_node','arduino_actuator_bridge'}
+        with self.lock:
+            return any(name.rsplit('/',1)[-1] in names for name in self.graph['nodes']) or any(
+                time.monotonic()-self.values[k]['received_monotonic']<3 for k in ('scan','imu','gps','cloud') if k in self.values)
+
     def snapshot(self):
         now = time.monotonic()
         with self.lock:
@@ -59,7 +93,7 @@ class Store:
                                    age_s=round(now-arrivals[-1],3) if arrivals else None))
             values = {k:dict((key,value) for key,value in v.items() if key!='received_monotonic')
                       | {'age_s':round(now-v['received_monotonic'],3)} for k,v in self.values.items()}
-            return {'version':VERSION,'instance_id':self.instance_id,'demo':False,'server_time_s':time.time(),
+            return {'version':VERSION,'instance_id':self.instance_id,'server_time_s':time.time(),
                     'nodes':self.graph['nodes'],'topics':topics,'graph_updated_s':self.graph['updated_s'],
                     'values':values,'preview':self.preview,'selected_topic':self.selected,
                     'errors':dict(self.errors),
@@ -87,11 +121,14 @@ def make_node(store):
             self.gps_track = GpsTrack()
             from tank_feed import TankFeed
             store.tank = self.tank = TankFeed(self,store)
+            from outdoor_feed import OutdoorFeed
+            store.outdoor = OutdoorFeed(self, store)
             self.create_timer(3.,self.refresh)
             self.create_timer(1./store.args.cloud_hz,self.encode_cloud)
             self.refresh()
 
         def refresh(self):
+            store.value('runtime', {'services': runtime_status()})
             topics = self.get_topic_names_and_types()
             cloud_names = [name for name,types in topics if 'sensor_msgs/msg/PointCloud2' in types and self.count_publishers(name)>0]
             with store.lock:
@@ -179,6 +216,8 @@ def make_node(store):
                             if topic == '/tank/pose': store.value('tank_pose',data)
                         elif typename == 'std_msgs/msg/String' and topic == '/actuators/status':
                             data = json.loads(message.data);store.value('actuators',dict(data,topic=topic))
+                        elif typename == 'std_msgs/msg/String' and topic == '/outdoor/status':
+                            data = json.loads(message.data);store.value('outdoor',data)
                         elif typename == 'std_msgs/msg/String' and topic in ('/tank/status','/tank/prediction','/tank/session','/tank/localization_candidates'):
                             data = json.loads(message.data);store.value(topic.replace('/tank/','tank_'),data)
                     except (ValueError,AttributeError,TypeError,OverflowError) as exc:
@@ -252,9 +291,11 @@ def make_handler(store):
         def do_GET(self):
             path = urlsplit(self.path)
             if path.path == '/health':
-                self.send(200,json.dumps({'version':VERSION,'pid':os.getpid()}).encode());return
+                self.send(200,json.dumps({'version':VERSION,'pid':os.getpid(),'sensors_running':store.sensors_running()}).encode());return
             if path.path == '/api/state':
-                self.send(200,json.dumps(store.snapshot(),ensure_ascii=False,allow_nan=False,separators=(',',':')).encode(),compress=True)
+                snapshot=store.snapshot()
+                if parse_qs(path.query).get('sensors')==['1']:snapshot['values'].pop('outdoor',None)
+                self.send(200,json.dumps(snapshot,ensure_ascii=False,allow_nan=False,separators=(',',':')).encode(),compress=True)
             elif path.path == '/api/cloud':
                 store.touch()
                 try:
@@ -275,13 +316,16 @@ def make_handler(store):
 
         def do_POST(self):
             path = urlsplit(self.path).path
-            if path not in ('/api/select','/api/route','/api/initial_pose','/api/localize'):
+            if path not in ('/api/select','/api/route','/api/initial_pose','/api/localize','/api/outdoor'):
                 self.send(404);return
             try:
                 size = int(self.headers.get('Content-Length','0'))
-                if not 0 < size <= 1024:
+                if not 0 < size <= (16384 if path == '/api/outdoor' else 1024):
                     raise ValueError('Bad body size')
                 data = json.loads(self.rfile.read(size))
+                if path == '/api/outdoor':
+                    status,response = store.outdoor.request(data)
+                    self.send(status,json.dumps(response,ensure_ascii=False).encode());return
                 if path != '/api/select':
                     status,response = store.tank.request(path,data)
                     self.send(status,json.dumps(response,ensure_ascii=False).encode());return

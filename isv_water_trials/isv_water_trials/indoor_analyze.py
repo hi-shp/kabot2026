@@ -12,6 +12,27 @@ from scipy.signal import savgol_filter
 from .tank_storage import read_rows, atomic_json
 
 
+def compatible_sessions(current):
+    """Collect prior trials of the same hull/axis; A/B and map may differ."""
+    current = Path(current).resolve()
+    reference = json.loads((current/'metadata.json').read_text(encoding='utf-8'))
+    def signature(meta):
+        return tuple(meta[k] for k in ('mass_kg','length_m','width_m','thruster_spacing_m')) + (meta['args'].get('forward_axis_deg') or 0.,bool(meta.get('synthetic')))
+    expected = signature(reference); included = []; excluded = []
+    for path in sorted(current.parent.iterdir()):
+        if not path.is_dir() or path.name>current.name or not (path/'metadata.json').exists(): continue
+        try:
+            meta = json.loads((path/'metadata.json').read_text(encoding='utf-8'))
+            if signature(meta)!=expected:
+                excluded.append({'session':str(path),'reason':'hull_or_axis_changed'});continue
+            if not meta['args'].get('execute',False) and path!=current: continue
+        except (OSError,ValueError,KeyError,TypeError):
+            excluded.append({'session':str(path),'reason':'invalid_metadata'});continue
+        included.append(path)
+    if current not in included: included.append(current)
+    return included,excluded
+
+
 def fit_channel(t, velocity, command):
     """dv/dt = -decay*v + PWM_gain*q + bias; units retained in output."""
     dt = np.diff(t)
@@ -117,8 +138,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('sessions',nargs='+',help='One or more trial directories')
     parser.add_argument('--output',help='Output directory; default is the last session')
+    parser.add_argument('--session-only',action='store_true',help='Analyze only the supplied session, without prior compatible trials')
     args = parser.parse_args(argv)
     roots = [Path(v).expanduser() for v in args.sessions]; root = Path(args.output).expanduser() if args.output else roots[-1]
+    excluded = []
+    if len(roots)==1 and not args.session_only:
+        roots,excluded = compatible_sessions(roots[0])
     root.mkdir(parents=True,exist_ok=True)
     rows = deque(maxlen=120000); offset = 0.; all_count = 0; metadata = None
     for session_root in roots:
@@ -144,7 +169,7 @@ def main(argv=None):
         if first is not None: offset += last-first+2.
     rows = list(rows); traces = {}; charts = []
     report = {'samples':len(rows),'total_records':all_count,'fit_window_max_rows':120000,
-        'sessions':[str(r) for r in roots],'mass_kg':metadata['mass_kg'],'length_m':metadata['length_m'],
+        'sessions':[str(r) for r in roots],'excluded_sessions':excluded,'mass_kg':metadata['mass_kg'],'length_m':metadata['length_m'],
         'width_m':metadata['width_m'],'thruster_spacing_m':metadata['thruster_spacing_m'],
         'limits':['PWM-based local surge/yaw response at <=20%; no extrapolation to other loads/speeds/waves.',
                   'Absolute drag, added mass and inertia require independently measured thrust.',

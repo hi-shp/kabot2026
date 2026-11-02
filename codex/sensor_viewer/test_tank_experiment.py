@@ -15,7 +15,7 @@ from isv_water_trials.tank_core import Grid
 from isv_water_trials.tank_safety import excitation, select_command, trajectory_clear
 from isv_water_trials.tank_storage import Journal, read_rows, atomic_json
 from isv_water_trials.tank_model import predict
-from isv_water_trials.indoor_analyze import main as analyze, fit_channel
+from isv_water_trials.indoor_analyze import main as analyze, fit_channel, compatible_sessions
 from isv_water_trials.tank_session import command_for, identity
 
 
@@ -61,6 +61,13 @@ class ExperimentTests(unittest.TestCase):
     def test_inertia_near_wall_stops_early(self):
         output,info = self.command(position=(12.,5.),velocity=(.5,0.,0.))
         self.assertEqual(output,(0.,0.)); self.assertIn('타력',info['reason'])
+
+    def test_slow_coast_conflict_can_back_away(self):
+        output,info=self.command(position=(13.,5.),velocity=(.1,0.,0.))
+        self.assertEqual(info['phase'],'clearance_recovery')
+        self.assertEqual(output,(-10.,-10.))
+        self.assertFalse(info['coast_clear'])
+        self.assertLess(info['points_m'][-1][0],13.)
 
     def test_lateral_drift_is_not_ignored(self):
         output,info = self.command(position=(7.,9.4),velocity=(0.,.4,0.))
@@ -124,6 +131,24 @@ class ExperimentTests(unittest.TestCase):
             analyze([path])
             self.assertTrue((root/'analysis.html').exists())
             self.assertEqual(json.loads((root/'response_model.json').read_text(encoding='utf-8'))['samples'],0)
+
+    def test_cumulative_analysis_preserves_sessions_across_route_changes(self):
+        with tempfile.TemporaryDirectory() as path:
+            root=Path(path)
+            meta=dict(args=dict(execute=True,forward_axis_deg=0),mass_kg=25,length_m=1.1,width_m=.5,thruster_spacing_m=.32)
+            for name in ('01','02','03','04','05'):
+                atomic_json(root/name/'metadata.json',dict(meta,route={'a':name}))
+                atomic_json(root/name/'samples.jsonl',{})
+            atomic_json(root/'02'/'metadata.json',dict(meta,mass_kg=30))
+            atomic_json(root/'03'/'metadata.json',dict(meta,synthetic=True))
+            sessions,excluded=compatible_sessions(root/'04')
+            self.assertEqual([s.name for s in sessions],['01','04'])
+            self.assertEqual(len(excluded),2)
+            analyze([str(root/'04')])
+            report=json.loads((root/'04'/'response_model.json').read_text(encoding='utf-8'))
+            self.assertEqual(len(report['sessions']),2)
+            analyze([str(root/'04'),'--session-only'])
+            self.assertEqual(len(json.loads((root/'04'/'response_model.json').read_text(encoding='utf-8'))['sessions']),1)
 
     def test_end_to_end_synthetic_logs_reports_and_multistep_validation(self):
         with tempfile.TemporaryDirectory() as path:

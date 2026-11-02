@@ -14,7 +14,7 @@ import zlib
 
 from .tank_core import Grid, guidance, projected_clearance, pwm, wrap, yaw
 from .common import clean_json
-from .tank_safety import select_command
+from .tank_safety import select_command, DepartureRest, MotionVelocity
 from .tank_storage import Journal, atomic_json
 
 
@@ -23,12 +23,14 @@ def main(argv=None):
     parser.add_argument('--route', default='~/water_trials/tank/route.json')
     parser.add_argument('--percent', type=float, default=20.)
     parser.add_argument('--clearance', type=float, default=.75, help='LiDAR-reference footprint clearance, metres')
-    parser.add_argument('--arrival', type=float, default=.35)
-    parser.add_argument('--dwell', type=float, default=2.)
+    parser.add_argument('--arrival', type=float, default=.5)
+    parser.add_argument('--dwell', type=float, default=0., help='0: continuous turnaround; >0: settled departure measurement')
     parser.add_argument('--forward-axis-deg', type=float, default=0.,
                         help='Boat forward in ROS velodyne frame; VLP16 cable aft: +X=0 (default), +Y=90')
     parser.add_argument('--execute', action='store_true')
-    parser.add_argument('--no-excitation', action='store_true', help='Only track A/B; disable open-water input schedule')
+    excitation_args=parser.add_mutually_exclusive_group()
+    excitation_args.add_argument('--no-excitation', action='store_true', default=True, help='Continuous A/B tracking (default)')
+    excitation_args.add_argument('--excitation', dest='no_excitation', action='store_false', help='Enable response experiments, including neutral coast phases')
     parser.add_argument('--model', help='Optional qualified response_model.json for displayed predictions')
     parser.add_argument('--analysis-interval', type=float, default=60.)
     parser.add_argument('--output', default='~/water_trials/indoor')
@@ -51,7 +53,7 @@ def main(argv=None):
     import rclpy
     from rclpy.node import Node
     from rclpy.signals import SignalHandlerOptions
-    from rclpy.qos import qos_profile_sensor_data, QoSProfile, DurabilityPolicy
+    from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
     from nav_msgs.msg import OccupancyGrid, Odometry
     from geometry_msgs.msg import PoseWithCovarianceStamped
     from sensor_msgs.msg import LaserScan, Imu
@@ -62,8 +64,13 @@ def main(argv=None):
     rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
     exits = ExitSignals(ctrl_c_only=True); node = Node('tank_round_trip')
     latest = {}; grid = None; map_error = None; pending_map = None; map_signature = None
+    velocity_estimator=MotionVelocity()
     def receive(key):
-        def cb(msg): latest[key] = (time.monotonic(), msg)
+        def cb(msg):
+            received=time.monotonic();latest[key]=(received,msg)
+            if key=='odom' and msg.header.frame_id=='tank_odom' and msg.child_frame_id=='velodyne':
+                stamp=msg.header.stamp.sec+msg.header.stamp.nanosec/1e9;p=msg.pose.pose
+                velocity_estimator.add(stamp,p.position.x,p.position.y,yaw(p.orientation)+forward,received)
         return cb
     def receive_map(msg):
         nonlocal pending_map,map_signature
@@ -72,10 +79,11 @@ def main(argv=None):
             pending_map = msg;map_signature=signature
     map_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
     node.create_subscription(OccupancyGrid, '/map', receive_map, map_qos)
+    live_qos=QoSProfile(depth=1,reliability=ReliabilityPolicy.BEST_EFFORT)
     for cls, topic, key in [(PoseWithCovarianceStamped,'/tank/pose','pose'), (Odometry,'/tank/odom','odom'),
                             (LaserScan,'/scan','scan'), (Imu,'/vectornav/imu','imu'), (String,'/actuators/status','mcu'),
                             (String,'/tank/session','session')]:
-        node.create_subscription(cls, topic, receive(key), qos_profile_sensor_data)
+        node.create_subscription(cls, topic, receive(key), live_qos)
     status_pub = node.create_publisher(String, '/tank/status', 10)
     prediction_pub = node.create_publisher(String, '/tank/prediction', 10)
     command_pub = node.create_publisher(String, '/water_trial/command', 10)
@@ -91,18 +99,25 @@ def main(argv=None):
                  'Collision rollout is provisional; stopping response requires tank validation.']})
     log = Journal(directory)
     print(('EXECUTE' if args.execute else 'PREVIEW (no actuator services)')+' LOG='+str(directory),flush=True)
-    started = time.monotonic(); goal = 0; legs = 0; dwell_until = 0.; path = []
-    previous_state = None; previous_pose = None; settle_until = started+1.
+    started = time.monotonic(); goal = 0; legs = 0; path = []
+    departure = DepartureRest(minimum=args.dwell,enabled=args.dwell>0); departure_reference=None; departure_id=0
+    previous_state = None; previous_pose = None; settle_until = started
     futures = []; arm_future = None; last_plan = 0.; need_arm = True
     acknowledgement = None; disk_check = 0.; disk_ok = True
     motion_history = deque(maxlen=12); chart_history = deque(maxlen=300)
-    velocity_history = deque(maxlen=12); experiment_time = 0.; last_tick = started; io_error = None
+    experiment_time = 0.; last_tick = started; io_error = None
     analysis = None; analysis_started = started; analysis_stream = (directory/'analysis.log').open('a',encoding='utf-8')
     analysis_env = dict(os.environ,OPENBLAS_NUM_THREADS='1',OMP_NUM_THREADS='1')
     try:
         while not exits.requested and rclpy.ok():
             tick = time.monotonic()+.1
             rclpy.spin_once(node,timeout_sec=.02)
+            # Drain ready callbacks even when planning overran the previous tick.
+            # A bounded batch prevents IMU traffic from starving command output.
+            drain_until=time.monotonic()+.015
+            for _ in range(32):
+                if time.monotonic()>=drain_until:break
+                rclpy.spin_once(node,timeout_sec=0.)
             now = time.monotonic()
             if analysis and analysis.poll() is None and now-analysis_started>120:
                 analysis.kill(); analysis.wait()
@@ -119,20 +134,13 @@ def main(argv=None):
             reason = ''; state = 'WAITING'; output = (1500,1500); position = None; heading = None
             mcu = None
             velocity = None; odom_row = None; prediction_data = {}; phase = 'hold'
+            departure_event=None
             if 'odom' in latest:
                 o = latest['odom'][1]; p = o.pose.pose
                 stamp = o.header.stamp.sec+o.header.stamp.nanosec/1e9
                 odom_row = {'x':p.position.x,'y':p.position.y,'yaw_rad':yaw(p.orientation),
                             'stamp_s':stamp,'age_s':now-latest['odom'][0]}
-                sample = (stamp,p.position.x,p.position.y,yaw(p.orientation)+forward)
-                if all(math.isfinite(v) for v in sample):
-                    if velocity_history and (stamp<velocity_history[-1][0] or stamp-velocity_history[-1][0]>.5): velocity_history.clear()
-                    if not velocity_history or stamp>velocity_history[-1][0]: velocity_history.append(sample)
-                    while velocity_history and stamp-velocity_history[0][0]>.6: velocity_history.popleft()
-                    if len(velocity_history)>1 and stamp-velocity_history[0][0]>.15 and odom_row['age_s']<.4:
-                        a,b = velocity_history[0],velocity_history[-1]; dt = b[0]-a[0]
-                        vx,vy = (b[1]-a[1])/dt,(b[2]-a[2])/dt; co,si = math.cos(b[3]),math.sin(b[3])
-                        velocity = (vx*co+vy*si,-vx*si+vy*co,wrap(b[3]-a[3])/dt)
+                velocity=velocity_estimator.estimate(now,node.get_clock().now().nanoseconds/1e9)
             if 'mcu' in latest and now-latest['mcu'][0] < .7:
                 try:
                     mcu = json.loads(latest['mcu'][1].data)
@@ -159,8 +167,14 @@ def main(argv=None):
                     if not -.1<=age<.6: ready = False
                 if latest['scan'][1].header.frame_id != 'velodyne': ready = False
             if not disk_ok: reason = '기록 공간 부족'
+            elif args.execute and mcu and mcu.get('receiving') and mcu.get('mode')==1:
+                state='RC'; reason='수동 조종 중 · 위치 추적·재지정 가능'
+                path=[];need_arm=True
+                if previous_state is None or previous_state[0]!='RC':departure.begin()
             elif grid is None: reason = map_error or '지도 대기'
-            elif not ready: reason = '위치·오도메트리·스캔 데이터 대기'
+            elif not ready:
+                missing=[k for k in ('pose','odom','scan','imu') if k not in latest or now-latest[k][0]>=.5]
+                reason=('위치 정합 대기: '+session.get('localization_reason','현재 위치 미확정')) if session.get('fixed_map') and not session.get('localization_ready') else '센서 수신·시각 확인: '+', '.join(missing or ['odom','scan','imu'])
             elif args.execute and (not mcu or not mcu.get('receiving')):
                 reason = '제어보드 응답 대기'
             elif ('session' not in latest or now-latest['session'][0]>3
@@ -175,39 +189,54 @@ def main(argv=None):
                 if msg.header.frame_id != grid.frame or grid.frame != 'tank_map': reason = '지도 좌표계 불일치'
                 elif not all(math.isfinite(v) for v in (*position,heading)) or not -.1 <= stamp_age < .6: reason = '위치 시각·값 확인 필요'
                 elif previous_pose and (math.dist(position,previous_pose[1])>max(.4,2*(now-previous_pose[0])) or abs(wrap(heading-previous_pose[2]))>1.):
-                    settle_until = now+2.; path = []; reason = '위치 보정 후 안정화 대기'
+                    settle_until = now+.3; path = []; reason = '큰 위치 변화 재확인'
                 previous_pose = (now,position,heading)
-                if not reason and now<settle_until: reason = '위치 안정화 대기'
-                if not reason and args.execute and mcu and mcu.get('mode') == 1:
-                    state = 'RC'; reason = '수동 조종 중'; path = []; need_arm = True
-                if not reason and now<dwell_until:
-                    state = 'DWELL'; reason = '도착·중립 유지'
+                if not reason and now<settle_until: reason = '큰 위치 변화 재확인'
+                if not reason and departure.active:
+                    imu=latest['imu'][1]
+                    imu_stamp=imu.header.stamp.sec+imu.header.stamp.nanosec/1e9
+                    neutral=not args.execute or bool(mcu and mcu.get('mode')==2 and mcu.get('receiving') and mcu.get('left')==1500 and mcu.get('right')==1500)
+                    reference=departure.update(now,(odom_row['stamp_s'],imu_stamp),velocity,
+                        tuple(getattr(imu.angular_velocity,k) for k in ('x','y','z')),
+                        tuple(getattr(imu.orientation,k) for k in ('x','y','z','w')),neutral)
+                    state='DWELL'; phase='departure_rest'
+                    reason=f'출발 준비 · 중립 {departure.minimum:g}초 이상, 이동 {departure.speed:g}m/s·회전 {math.degrees(departure.rate):g}°/s 이하 {departure.stable:g}초 확인'
+                    if reference is not None:
+                        departure_id+=1
+                        departure_reference=dict(reference,departure_id=departure_id,goal='AB'[goal],
+                            map_position_m=position,heading_rad=heading,imu_frame=imu.header.frame_id,
+                            ros_ns=node.get_clock().now().nanoseconds)
+                        departure_event=departure_reference; reason='출발 기준 자세·잔여 움직임 저장 완료'
                 if not reason:
                     try:
-                        if not path or now-last_plan>2:
-                            # Both goals must remain usable, including the return leg.
-                            grid.path(points[0],points[1])
-                            path = grid.path(position,points[goal]); last_plan = now
                         if math.dist(position,points[goal]) <= args.arrival:
-                            legs += 1; goal = 1-goal; path = []; dwell_until = now+args.dwell
-                            state = 'DWELL'; reason = '도착·중립 유지'
-                        else:
+                            legs += 1; goal = 1-goal; path = []; departure.begin()
+                            if departure.active:
+                                state = 'DWELL'; phase='departure_rest'; reason = '도착 · 중립 유지 후 정지 확인'
+                        if not reason:
+                            if not path or now-last_plan>2:
+                                control_grid,path,approach,margin_recovery=grid.trial_path(position,points[goal],args.arrival)
+                                last_plan = now
                             while len(path)>1 and math.dist(position,path[0]) < .5: path.pop(0)
                             target = path[0] if math.dist(position,path[0]) >= .5 else path[-1]
-                            (left,right),prediction_data = select_command(grid,latest['scan'][1],position,heading,
-                                velocity,target,points[goal],forward,experiment_time,args.percent,args.clearance,
-                                excite=not args.no_excitation)
+                            (left,right),prediction_data = select_command(control_grid,latest['scan'][1],position,heading,
+                                velocity,target,approach,forward,experiment_time,args.percent,control_grid.clearance,
+                                excite=not args.no_excitation,margin_recovery=margin_recovery)
+                            prediction_data.update(requested_goal_m=points[goal],approach_goal_m=approach,
+                                                   clearance_m=control_grid.clearance)
                             phase = prediction_data['phase']
                             if prediction_data['reason']:
                                 state = 'BLOCKED'; reason = prediction_data['reason']
-                            elif not grid.line_clear(position,target):
+                            elif not control_grid.line_clear(position,target):
                                 path = []; state = 'BLOCKED'; reason = '경로 재탐색'
                             else:
                                 state = 'RUNNING' if args.execute else 'PREVIEW'; output = (pwm(left),pwm(right))
                     except ValueError as exc:
                         state = 'BLOCKED'; reason = str(exc); path = []
-            if reason and state == 'WAITING': need_arm = True
-            if state=='RUNNING' and phase not in ('hold','HOLD','avoidance','transit'):
+            if reason and state == 'WAITING':
+                need_arm = True
+                if mcu and mcu.get('mode')==1:reason='RC 모드 · '+reason
+            if state=='RUNNING' and phase not in ('hold','HOLD','avoidance','transit','clearance_recovery'):
                 experiment_time += min(.2,now-last_tick)
             last_tick = now
             if args.execute:
@@ -224,11 +253,14 @@ def main(argv=None):
                         state = 'WAITING'; reason = '추진기 서비스 연결 대기'; output = (1500,1500); need_arm = True
                 except (RuntimeError,OSError):
                     state = 'WAITING'; reason = '추진기 통신 복구 대기'; output = (1500,1500); need_arm = True
+            if departure.active and state!='DWELL': departure.interrupt()
             row = {'t':now-started,'ros_ns':node.get_clock().now().nanoseconds,'state':state,'reason':reason,
                    'goal':'AB'[goal],'legs':legs,'map_position_m':position,'heading_rad':heading,
                    'phase':phase,'velocity_body':velocity,'experiment_s':experiment_time,
                    'left':output[0],'right':output[1],'execute':args.execute,'ack':acknowledgement,
-                   'mcu':mcu,'pose_age_s':now-latest['pose'][0] if 'pose' in latest else None}
+                   'mcu':mcu,'pose_age_s':now-latest['pose'][0] if 'pose' in latest else None,
+                   'departure_id':departure_id}
+            if departure_event is not None: row['departure_reference']=departure_event
             if odom_row: row['odom'] = odom_row
             if 'imu' in latest:
                 row['imu'] = {'gyro_sensor_z_rad_s':latest['imu'][1].angular_velocity.z,
@@ -238,6 +270,9 @@ def main(argv=None):
                     gyro_rad_s=[getattr(imu.angular_velocity,k) for k in ('x','y','z')],
                     accel_m_s2=[getattr(imu.linear_acceleration,k) for k in ('x','y','z')],
                     frame=imu.header.frame_id,stamp_s=imu.header.stamp.sec+imu.header.stamp.nanosec/1e9)
+                if departure_reference and departure_reference['imu_frame']==imu.header.frame_id:
+                    q=departure_reference['quaternion_xyzw'];reference_yaw=math.atan2(2*(q[3]*q[2]+q[0]*q[1]),1-2*(q[1]*q[1]+q[2]*q[2]))
+                    row['imu']['yaw_from_departure_rad']=wrap(yaw(imu.orientation)-reference_yaw)
             try: log.write(clean_json(row))
             except OSError as exc:
                 io_error = str(exc); disk_ok = False
@@ -247,7 +282,7 @@ def main(argv=None):
             status_pub.publish(String(data=json.dumps(clean_json({'state':state,'reason':reason,'goal':'AB'[goal],
                 'legs':legs,'path_m':path,'execute':args.execute,'phase':phase,'output_limit_percent':args.percent,
                 'log_directory':str(directory),'history':list(chart_history)[::3],
-                'storage_error':io_error,'velocity_body':velocity}),ensure_ascii=False,allow_nan=False)))
+                'storage_error':io_error,'velocity_body':velocity,'departure_reference':departure_reference}),ensure_ascii=False,allow_nan=False)))
             command_pub.publish(String(data=json.dumps({'source':'indoor_trial','left':output[0],'right':output[1],
                                                         'execute':args.execute,'state':state})))
             if prediction_data.get('points_m'):

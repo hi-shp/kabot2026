@@ -65,6 +65,7 @@ def nodes(context):
         result.append(Node(package='isv_water_trials',executable='tank_fixed_map',output='log',parameters=[{'file':fixed_file}]))
         result.append(Node(package='isv_water_trials',executable='tank_localize',output='log',
                            parameters=[{'file':fixed_file,'automatic':True,
+                                        'map_correction':LaunchConfiguration('map_correction').perform(context).lower()=='true',
                                         'accept_score':float(LaunchConfiguration('localization_score').perform(context)),
                                         'accept_margin':float(LaunchConfiguration('localization_margin').perform(context))}],
                            additional_env={'OPENBLAS_NUM_THREADS':'1','OMP_NUM_THREADS':'1'}))
@@ -80,4 +81,5 @@ def generate_launch_description():
         DeclareLaunchArgument('autosave', default_value='true'),
         DeclareLaunchArgument('localization_score', default_value='0.80'),
         DeclareLaunchArgument('localization_margin', default_value='0.05'),
+        DeclareLaunchArgument('map_correction', default_value='false'),
         OpaqueFunction(function=nodes)])

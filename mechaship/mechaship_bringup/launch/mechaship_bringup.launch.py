@@ -85,7 +85,7 @@ def generate_launch_description():
         DeclareLaunchArgument('use_lidar', default_value='true'),
         DeclareLaunchArgument('velodyne_model', default_value='VLP16'),
         DeclareLaunchArgument('velodyne_ip', default_value='192.168.1.201'),
-        DeclareLaunchArgument('velodyne_ring', default_value='-1'),
+        DeclareLaunchArgument('velodyne_ring', default_value='8'),
         DeclareLaunchArgument('use_lidar_odom', default_value='false'),
     ]
     lidar_driver_node = IncludeLaunchDescription(

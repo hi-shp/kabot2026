@@ -2,6 +2,7 @@ from setuptools import setup, find_packages
 from glob import glob
 
 setup(name='isv_water_trials', version='0.1.0', packages=find_packages(),
+      package_data={'isv_water_trials.codex_nav': ['UPSTREAM.md', 'UPSTREAM.json']},
       data_files=[('share/ament_index/resource_index/packages', ['resource/isv_water_trials']),
                   ('share/isv_water_trials', ['package.xml', 'README_KO.md', 'ANALYSIS_KO.md', 'TESTING.md']),
                   ('share/isv_water_trials/config', glob('config/*')),
@@ -9,6 +10,8 @@ setup(name='isv_water_trials', version='0.1.0', packages=find_packages(),
       install_requires=['setuptools'], zip_safe=True,
       maintainer='ISV', maintainer_email='maintainer@example.org', license='MIT',
       entry_points={'console_scripts': [
+          'outdoor = isv_water_trials.outdoor:main',
+          'outdoor_ctl = isv_water_trials.outdoor_ctl:main',
           'tank_pose = isv_water_trials.tank_pose:main',
           'tank_save = isv_water_trials.tank_save:main',
           'tank_fixed_map = isv_water_trials.tank_fixed_map:main',

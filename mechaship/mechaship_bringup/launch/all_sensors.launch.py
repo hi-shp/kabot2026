@@ -1,4 +1,4 @@
-"""Sensor-only bringup. No actuator enable/configuration or control nodes."""
+"""Sensors and passive outdoor recording. Driving requires an explicit start."""
 import os
 import signal
 import runpy
@@ -70,6 +70,10 @@ def nodes(context):
         Node(package='isv_water_trials',executable='arduino_bridge',name='arduino_actuator_bridge',
              condition=IfCondition(LaunchConfiguration('use_arduino')),
              arguments=['--port',value('arduino_device')],**common),
+        Node(package='isv_water_trials',executable='outdoor',name='outdoor_water_trial',
+             condition=IfCondition(LaunchConfiguration('use_outdoor')),
+             output='screen',respawn=True,respawn_delay=5.0,
+             sigterm_timeout='25',sigkill_timeout='3'),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(bringup,'launch','velodyne_water_trial.launch.py')),
              condition=IfCondition(LaunchConfiguration('use_lidar')),
              launch_arguments={name:LaunchConfiguration(name) for name in ('velodyne_model','velodyne_ip','velodyne_ring')}.items()),
@@ -86,12 +90,12 @@ def generate_launch_description():
     gps='/dev/serial/by-id/usb-u-blox_AG_-_www.u-blox.com_u-blox_GNSS_receiver-if00'
     imu='/dev/serial/by-id/usb-FTDI_USB-RS232-WE_AV0LG0SE-if00-port0'
     defaults={
-        'use_gps':'true','use_camera':'false','use_imu':'true','use_mcu':'true','use_lidar':'true',
+        'use_gps':'true','use_camera':'false','use_imu':'true','use_mcu':'true','use_lidar':'true','use_outdoor':'true',
         'gps_device':gps if Path(gps).exists() else '/dev/ttyACM0',
         'camera_device':'/dev/video0','imu_device':imu if Path(imu).exists() else '/dev/ttyUSB1','imu_baud':'115200',
         'mcu_device':'/dev/ttyTHS1','mcu_baud':'115200',
         'use_arduino':'true','arduino_device':'/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0',
-        'velodyne_model':'VLP16','velodyne_ip':'192.168.1.201','velodyne_ring':'-1',
+        'velodyne_model':'VLP16','velodyne_ip':'192.168.1.201','velodyne_ring':'8',
     }
     return LaunchDescription([*(DeclareLaunchArgument(k,default_value=v) for k,v in defaults.items()),
                               OpaqueFunction(function=nodes)])

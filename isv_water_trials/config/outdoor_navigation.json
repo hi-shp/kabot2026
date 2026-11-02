@@ -1,0 +1,14 @@
+{
+  "lidar_lever_arm_m": [
+    0.0,
+    0.0
+  ],
+  "lidar_yaw_deg": 0.0,
+  "scan_max_age_s": 0.5,
+  "scan_range_m": 0.0,
+  "recovery_margin_m": 0.1,
+  "arrival_radius_m": 2.0,
+  "obstacle_margin_m": 0.4,
+  "percent": 20.0,
+  "planner_deadline_s": 0.35
+}

@@ -1,5 +1,6 @@
 """Pure geometry, conservative grid planning and low-speed tank guidance (SI)."""
 import heapq
+import copy
 import math
 import numpy as np
 from scipy.ndimage import distance_transform_edt
@@ -28,7 +29,42 @@ class Grid:
         free = (self.cells >= 0) & (self.cells < 35)
         # Padding treats map boundaries and unknown cells as obstacles.
         distance = distance_transform_edt(np.pad(free, 1, constant_values=False))[1:-1, 1:-1]*self.resolution
+        self.observed_free=free;self.distance=distance;self.clearance=clearance
         self.free = free & (distance >= clearance)
+
+    def nearest_safe(self, point, limit):
+        if self.safe(self.index(point)):return tuple(point)
+        x,y=self.index(point);n=math.ceil(limit/self.resolution)+1
+        x0,x1=max(0,x-n),min(self.width,x+n+1)
+        y0,y1=max(0,y-n),min(self.height,y+n+1)
+        if x0>=x1 or y0>=y1:raise ValueError('관측된 이동 공간 안에서 지점을 지정해 주세요.')
+        ys,xs=np.nonzero(self.free[y0:y1,x0:x1])
+        candidates=[self.point((int(a+x0),int(b+y0))) for a,b in zip(xs,ys)]
+        closest=min(candidates,key=lambda p:math.dist(p,point),default=None)
+        if closest is None or math.dist(closest,point)>limit:
+            raise ValueError('주변에 선체가 통과할 수 있는 관측 공간이 없습니다.')
+        return closest
+
+    def trial_path(self,start,goal,arrival=.5):
+        # Keep the requested waypoint and saved map intact. Approach a free
+        # point inside its arrival circle instead of requiring its exact cell.
+        target=self.nearest_safe(goal,arrival*.9)
+        if self.safe(self.index(start)):
+            return self,self.path(start,target),target,False
+        # Only the extra navigation margin may shrink, never the hull envelope.
+        # 1.1 x .5 m hull: circumscribed radius .604 m, rounded up to .65 m.
+        escape=copy.copy(self)
+        escape.clearance=max(.65,self.clearance-.1)
+        escape.free=self.observed_free & (self.distance>=escape.clearance)
+        if not escape.safe(escape.index(start)):
+            x,y=escape.index(start)
+            if not (0<=x<self.width and 0<=y<self.height):raise ValueError('현재 위치가 저장 지도 범위를 벗어났습니다.')
+            if not self.observed_free[y,x]:raise ValueError('현재 위치가 저장 지도의 장애물·미관측 칸에 있습니다.')
+            raise ValueError(f'저장 지도상 벽·미관측 영역까지 {self.distance[y,x]:.2f}m · 선체에 필요한 여유 {escape.clearance:.2f}m. 실제 라이다와 위치를 비교해 주세요.')
+        anchor=self.nearest_safe(start,1.)
+        if not escape.line_clear(start,anchor):
+            raise ValueError('관측된 공간으로 빠져나갈 경로가 없습니다.')
+        return escape,[tuple(start)]+self.path(anchor,target),target,True
 
     def index(self, point):
         x, y = point[0]-self.ox, point[1]-self.oy

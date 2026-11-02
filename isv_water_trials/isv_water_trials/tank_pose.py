@@ -40,9 +40,11 @@ def main():
                 _,_,files=read_bundle(self.get_parameter('map_file').value)
                 self.map_info=json.loads(files['grid.json']);self.map_cells=files['grid.bin']
             self.requested=None;self.matches=0;self.last_match=0;self.saved=0.
+            self.manual_locked=False;self.manual_report={};self.manual_received=0.
             self.create_subscription(PoseWithCovarianceStamped,'/initialpose',self.initial,1)
             self.create_subscription(PoseWithCovarianceStamped,'/pose',self.matched,10)
             self.create_subscription(Empty,'/tank/localize/request',self.relocalize,1)
+            self.create_subscription(String,'/tank/localization_candidates',self.manual_tracking,10)
             self.session_pub = self.create_publisher(String,'/tank/session',1)
             self.create_timer(1.,lambda:self.session_pub.publish(String(data=json.dumps({
                 'session_id':self.get_parameter('session_id').value,'mode':self.get_parameter('mode').value,
@@ -51,8 +53,23 @@ def main():
             self.create_timer(.1, self.update)
 
         def relocalize(self,_):
+            was_manual=self.manual_locked
+            p=self.manual_report.get('display_pose')
+            self.manual_locked=False;self.manual_report={}
+            if was_manual:
+                self.ready=False
+                if p is not None:
+                    self.requested=(self.get_clock().now().nanoseconds,p['x'],p['y'],math.radians(p['yaw_deg']))
+                    self.matches=0;self.last_match=0
             if self.get_parameter('fixed_map').value:
-                self.ready=False;self.requested=None;self.matches=0;self.reason='자동 위치·방향 탐색 중'
+                self.reason='현재 위치 유지 · 주변 정합 보정 중' if self.ready else '자동 위치·방향 탐색 중'
+
+        def manual_tracking(self,msg):
+            try:report=json.loads(msg.data)
+            except (ValueError,TypeError):return
+            if report.get('map_id')!=self.get_parameter('session_id').value:return
+            self.manual_locked=bool(report.get('manual_locked'))
+            self.manual_report=report;self.manual_received=time.monotonic()
 
         def initial(self,msg):
             if not self.get_parameter('fixed_map').value or msg.header.frame_id!='tank_map':return
@@ -62,18 +79,28 @@ def main():
             self.matches=0;self.last_match=0;self.ready=False;self.reason='지정 위치에서 라이다 정합 확인 중'
 
         def matched(self,msg):
+            if self.manual_locked:return
             if msg.header.frame_id!='tank_map':return
-            self.last_slam=msg.header.stamp.sec*10**9+msg.header.stamp.nanosec
+            stamp=msg.header.stamp.sec*10**9+msg.header.stamp.nanosec
+            age=(self.get_clock().now().nanoseconds-stamp)/1e9
+            if not -.1<=age<1. or (self.last_slam is not None and stamp<=self.last_slam):return
+            self.last_slam=stamp
             if not self.requested:return
             from .tank_core import yaw,wrap
             stamp=msg.header.stamp.sec*10**9+msg.header.stamp.nanosec;p=msg.pose.pose
             when,x,y,angle=self.requested
             if stamp<=max(self.last_match,when+200_000_000):return
             self.last_match=stamp
-            if math.hypot(p.position.x-x,p.position.y-y)<1. and abs(wrap(yaw(p.orientation)-angle))<.6:
+            if known_position(self.map_info,self.map_cells,p.position.x,p.position.y) and math.hypot(p.position.x-x,p.position.y-y)<1. and abs(wrap(yaw(p.orientation)-angle))<.6:
                 self.matches+=1
                 if self.matches>=3:self.ready=True;self.requested=None;self.reason=''
             else:self.matches=0
+
+        def wait_for_recovery(self,msg):
+            from .tank_core import yaw
+            p=msg.pose.pose
+            self.requested=(self.get_clock().now().nanoseconds,p.position.x,p.position.y,yaw(p.orientation))
+            self.matches=0;self.last_match=0
 
         def update(self):
             seed = Odometry(); seed.header.stamp = self.get_clock().now().to_msg()
@@ -81,6 +108,20 @@ def main():
             seed.pose.pose.orientation.w = 1.0
             # RF2O consumes only its first seed; repeating also permits a node restart.
             self.seed.publish(seed)
+            if self.manual_locked:
+                p=self.manual_report.get('display_pose')
+                now=self.get_clock().now().nanoseconds/1e9
+                valid=isinstance(p,dict) and all(isinstance(p.get(k),(int,float)) and math.isfinite(p[k]) for k in ('x','y','yaw_deg','stamp_s'))
+                fresh=valid and not p.get('held') and self.manual_report.get('tracking_valid',True) and self.manual_report.get('map_tracking_ready',False) and time.monotonic()-self.manual_received<.5 and -.1<=now-p['stamp_s']<.5
+                self.ready=bool(fresh and known_position(self.map_info,self.map_cells,p['x'],p['y']))
+                self.reason='' if self.ready else self.manual_report.get('reason','수동 기준 유지 · 주변 지도 정합 대기')
+                if not self.ready:return
+                msg=PoseWithCovarianceStamped();msg.header.frame_id='tank_map'
+                ns=round(p['stamp_s']*1e9);msg.header.stamp.sec=ns//10**9;msg.header.stamp.nanosec=ns%10**9
+                msg.pose.pose.position.x=p['x'];msg.pose.pose.position.y=p['y']
+                a=math.radians(p['yaw_deg']);msg.pose.pose.orientation.z=math.sin(a/2);msg.pose.pose.orientation.w=math.cos(a/2)
+                self.pose_pub.publish(msg)
+                return
             try:
                 tf = self.tf.lookup_transform('tank_map', 'velodyne', rclpy.time.Time())
             except TransformException:
@@ -100,6 +141,8 @@ def main():
                 fresh=self.last_slam is not None and -.1<=(self.get_clock().now().nanoseconds-self.last_slam)/1e9<1.
                 valid=known_position(self.map_info,self.map_cells,msg.pose.pose.position.x,msg.pose.pose.position.y)
                 if not fresh or not valid:
+                    if not fresh and valid:self.wait_for_recovery(msg)
+                    elif not valid:self.requested=None
                     self.ready=False;self.reason='라이다 정합 수신 지연' if not fresh else '추정 위치가 지도 내 관측된 빈 공간을 벗어남'
                     return
             # SLAM provides no calibrated pose covariance here. Do not invent one.

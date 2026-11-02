@@ -1,5 +1,7 @@
 # KABOAT 2026
 
+[야외 RC 기록·모델 학습·GPS 순환 주행](codex/docs/OUTDOOR_RC.md): 브링업과 함께 위치·방향·경로를 표시하고, RC 기록으로 모델을 학습합니다. 대시보드에서 현재 모델을 적용하고 여러 목적지를 순서대로 반복 운항합니다.
+
 [PC 센서 화면·실내 수조 SLAM·왕복 시험](codex/docs/INDOOR_TANK.md): 라이다·IMU·전체 토픽을 PC에서 보고, GPS 없이 지도에서 A·B 지점을 정합니다.
 
 ## 필수 명령어
@@ -20,6 +22,16 @@ ros2 run isv_water_trials tank_session start sensors
 
 기존 `ros2 launch mechaship_bringup all_sensors.launch.py`도 같은 센서를 켭니다. 두 방식 중 하나만 사용하세요. 직접 launch한 경우 해당 터미널의 Ctrl+C로 종료합니다. 카메라를 연결했다면 `use_camera:=true`를 추가합니다.
 
+PC 대시보드 프로그램을 켜 두면 브링업 시 자동으로 연결됩니다. `stop all` 뒤에도 화면은 대기 상태로 유지됩니다. 닫아 둔 대시보드 탭은 다음 브링업 때 다시 열립니다. 처음 실행하는 방법은 [PC 센서 화면](codex/docs/INDOOR_TANK.md#1-pc-센서-화면)에 있습니다.
+
+**PC 대시보드** — 저장소 폴더의 PowerShell에서 실행합니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File codex\sensor_viewer\start_viewer.ps1
+```
+
+`http://127.0.0.1:8765/`에서 실제 센서·기록·학습을 확인합니다. 젯슨 주소가 바뀌면 실행 명령에 `-Jetson 새주소`를 붙입니다. 학습 모델을 **현재 모델 적용**으로 선택하고 지도에 지점을 저장한 뒤 **순환 주행 시작**을 누릅니다. 아래 수조 지도 명령은 실내 시험에 사용합니다.
+
 **새 지도 작성** — 센서 브링업 뒤 실행합니다. 지도를 바꾸기 전에는 왕복을 종료하세요.
 
 ```bash
@@ -28,7 +40,7 @@ ros2 run isv_water_trials tank_session stop mapping
 ros2 run isv_water_trials tank_session start mapping mode:=mapping
 ```
 
-RC로 천천히 이동하며 벽·모서리를 관측합니다. 새 지도 작성은 저장할 때까지 이어집니다.
+RC로 천천히 이동하며 벽·모서리를 관측합니다. 새 지도 작성은 저장할 때까지 이어집니다. `tank_session`의 매핑 시작·종료에 맞춰 원본 센서 기록도 자동으로 켜지고 꺼집니다.
 
 **지도 저장·고정** — 작성한 지도를 `tank_pnu.tankmap` 하나로 저장하고, 같은 지도에서 자동 위치추정으로 전환합니다.
 
@@ -51,7 +63,7 @@ ros2 run isv_water_trials tank_session stop mapping
 ros2 run isv_water_trials tank_session start mapping mode:=localization map_file:=~/water_trials/tank_maps/tank_pnu.tankmap
 ```
 
-초기 위치·방향은 자동으로 찾습니다. 대시보드의 **자동 위치 찾기**는 기존 추정을 비우고 다시 탐색하는 버튼입니다. 현재 위치와 방향이 실제 배와 맞는지 확인한 뒤 왕복을 시작하세요.
+초기 위치·방향은 자동으로 찾습니다. **자동 위치 찾기**를 누르면 현재 추정과 경로를 유지하며 주변 정합을 보정합니다. 후보 화살표를 비교하려면 **후보 1·2…**를 선택하고, 실제 위치와 맞으면 **선택 후보를 현재 위치로 지정**을 누르세요. 위치와 방향을 확인한 뒤 왕복을 시작합니다.
 
 **A·B 왕복·응답 기록** — 대시보드에서 **A 지점 → B 지점 → 왕복 경로 저장** 후 실행합니다.
 
@@ -70,11 +82,10 @@ ros2 run isv_water_trials tank_session status
 ros2 run isv_water_trials tank_session stop trial  # 왕복 종료·중립
 ros2 run isv_water_trials tank_session stop mapping  # 지도 작성·위치추정 종료
 ros2 run isv_water_trials tank_session stop sensors  # 센서 브링업 종료
-ros2 run isv_water_trials tank_session stop record   # 원본 센서 기록 종료
 ros2 run isv_water_trials tank_session stop all      # 왕복·기록·지도·센서 전부 종료
 ```
 
-개별 명령은 필요한 것만 실행하세요. 센서나 매핑을 끄기 전에는 왕복부터 종료합니다. 새 지도를 남기려면 종료 전에 `freeze`로 고정 저장하세요. 저장한 `.tankmap` 파일은 종료 후에도 유지됩니다.
+개별 명령은 필요한 것만 실행하세요. 센서나 매핑을 끄기 전에는 왕복부터 종료합니다. 매핑을 종료하면 원본 센서 기록도 저장을 마치고 종료합니다. 새 지도를 남기려면 종료 전에 `freeze`로 고정 저장하세요. 저장한 `.tankmap` 파일은 종료 후에도 유지됩니다.
 
 위 종료 명령은 `tank_session`으로 실행한 세션에 적용됩니다. `ros2 launch ...`로 직접 실행한 브링업·매핑이나 `mode_test`는 해당 터미널에서 Ctrl+C로 종료합니다.
 

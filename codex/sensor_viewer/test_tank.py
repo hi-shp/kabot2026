@@ -124,5 +124,20 @@ class MapApiTests(unittest.TestCase):
         status,_ = self.request('/api/initial_pose',{'x':3.,'y':0.,'yaw_deg':90})
         self.assertEqual(status,400); self.assertEqual(self.sent,[])
 
+    def test_candidate_selection_uses_latest_server_pose(self):
+        self.feed.node.get_subscriptions_info_by_topic=lambda _:[N(node_name='slam_toolbox')]
+        self.feed.node.get_clock=lambda:N(now=lambda:N(nanoseconds=100_000_000_000,to_msg=lambda:None))
+        self.feed.store.value('tank_localization_candidates',dict(map_id='test',live_candidates=[
+            dict(candidate_id='stable-id',x=3.5,y=.5,yaw_deg=120.,stamp_s=99.9)]))
+        status,_=self.request('/api/initial_pose',dict(map_id='test',candidate_id='stable-id',x=999,y=999,yaw_deg=0))
+        self.assertEqual(status,200)
+        self.assertEqual(self.sent[0].pose.pose.position.x,3.5)
+        self.assertAlmostEqual(self.sent[0].pose.pose.orientation.z,math.sin(math.pi/3))
+        for data in [dict(map_id='old-map',candidate_id='stable-id'),dict(map_id='test',candidate_id='removed')]:
+            self.assertEqual(self.request('/api/initial_pose',data)[0],400)
+        self.feed.store.values['tank_localization_candidates']['live_candidates'][0]['stamp_s']=98.
+        self.assertEqual(self.request('/api/initial_pose',dict(map_id='test',candidate_id='stable-id'))[0],400)
+        self.assertEqual(len(self.sent),1)
+
 
 if __name__=='__main__': unittest.main()

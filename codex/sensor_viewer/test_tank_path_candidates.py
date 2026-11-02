@@ -2,10 +2,64 @@ import math
 import unittest
 import numpy as np
 from test_tank_global_match import fixture
-from isv_water_trials.tank_global_match import GlobalMatcher,DisplayTrack,MotionHistory
+from isv_water_trials.tank_global_match import GlobalMatcher,DisplayTrack,MotionHistory,handoff_ready,retain_display_candidate
 
 
 class PathCandidatesTests(unittest.TestCase):
+    def test_all_rejected_keeps_highest_for_display_only(self):
+        grid,info=fixture(False);grid[10:50,50]=100
+        matcher=GlobalMatcher(info,grid.tobytes())
+        best=dict(x=7,y=3,yaw_deg=0,score=.95,inliers=.9,known=1.,free=1.)
+        points=np.array([[1.,0.],[0.,1.],[-1.,0.]])
+        result=matcher.constrain_path(dict(candidates=[dict(best,y=2,score=.8),best]),
+                                      [(0,0,0),(4,0,0)],(4,0,0),points)
+        self.assertEqual(len(result['candidates']),1)
+        self.assertEqual(result['candidates'][0]['score'],.95)
+        self.assertTrue(result['display_fallback'])
+        self.assertFalse(handoff_ready(result))
+        track=DisplayTrack()
+        self.assertTrue(track.adopt(result,(4,0,0),(4,0,0),1.))
+        self.assertEqual(track.pose((5,0,0))['x'],8)
+        self.assertTrue(track.pose((5,0,0))['display_fallback'])
+
+    def test_retracing_and_near_wall_do_not_remove_candidate(self):
+        grid,info=fixture(False);grid[10:50,50]=100
+        matcher=GlobalMatcher(info,grid.tobytes())
+        c=dict(x=4.9,y=3,yaw_deg=0,score=.9,inliers=.9,known=1.,free=1.)
+        history=[(0,0,0),(0,1,0),(0,0,0),(0,1,0),(0,0,0)]
+        metric=matcher.path_metrics([c],history,(0,0,0))[0]
+        self.assertTrue(metric['plausible']);self.assertFalse(metric['valid'])
+        result=matcher.constrain_path(dict(candidates=[c]),history,(0,0,0),np.array([[1.,0.]]))
+        self.assertEqual(len(result['candidates']),1)
+        self.assertEqual(result['path_rejected'],0)
+
+    def test_one_noisy_cell_is_tolerated_but_navigation_remains_strict(self):
+        grid,info=fixture(False);grid[40,50]=100
+        matcher=GlobalMatcher(info,grid.tobytes())
+        c=dict(x=9,y=4.05,yaw_deg=0)
+        metric=matcher.path_metrics([c],[(0,0,0),(8,0,0)],(8,0,0))[0]
+        self.assertTrue(metric['plausible']);self.assertFalse(metric['valid'])
+
+    def test_empty_result_retains_previous_and_preserves_score_age(self):
+        best=dict(x=3,y=4,yaw_deg=0,score=.2,inliers=.3,known=.6,free=.7,matched_stamp_s=1.)
+        result=retain_display_candidate(dict(state='ERROR',candidates=[]),[best])
+        self.assertEqual(len(result['candidates']),1)
+        self.assertTrue(result['candidates'][0]['score_stale'])
+        track=DisplayTrack()
+        self.assertTrue(track.adopt(result,(0,0,0),(1,0,0),10.))
+        self.assertEqual(track.pose((1,0,0))['matched_stamp_s'],1.)
+        self.assertFalse(handoff_ready(dict(result,candidates=[best,dict(best,score=.1)])))
+        self.assertEqual(retain_display_candidate(dict(candidates=[]))['candidates'],[])
+
+    def test_good_evidence_replaces_fallback_and_can_handoff(self):
+        track=DisplayTrack();c=dict(x=2,y=2,yaw_deg=0,score=.2,inliers=.3,known=.6,free=.7)
+        track.adopt(dict(candidates=[c],display_fallback=True),(0,0,0),(0,0,0),1.)
+        best=dict(c,x=8,score=.95,inliers=.9,known=1.,free=1.,path_valid=True)
+        result=dict(candidates=[best,dict(best,score=.8)],path_checked=True)
+        self.assertTrue(track.adopt(result,(0,0,0),(0,0,0),2.))
+        self.assertFalse(track.pose((0,0,0))['display_fallback'])
+        self.assertTrue(handoff_ready(result))
+
     def test_thin_wall_crossing_rejected_even_with_free_endpoints(self):
         grid,info=fixture(False);grid[10:50,50]=100
         matcher=GlobalMatcher(info,grid.tobytes())
