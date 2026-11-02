@@ -79,7 +79,6 @@ button.stop{background:#30232a;border-color:#785058;color:#ffadad}
 .layer-controls{border-color:#263543}.charts canvas{background:#0e1923}
 
 .model-strip{display:grid;grid-template-columns:220px minmax(0,1fr) minmax(0,1fr);gap:0}
-.header-controls{display:flex;align-items:center;gap:12px}.header-controls>strong{font-size:16px}
 .model-actions{display:flex;flex-direction:column;justify-content:center;gap:8px;padding:12px}
 .model-actions>strong{font-size:14px}.model-actions>div{display:flex;gap:6px}.model-actions>button{align-self:flex-start}
 .model-spec{padding:10px 14px;border-left:1px solid var(--border);min-width:0}
