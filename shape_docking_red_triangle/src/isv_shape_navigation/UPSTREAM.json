@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/hi-shp/kabot2026",
+  "commit": "6797c384d4ab1ea99d9f23dc918a448d25d0c89e",
+  "checked_on": "2026-11-02",
+  "interfaces": {
+    "scan": "/scan sensor_msgs/msg/LaserScan frame=velodyne",
+    "pose": "/tank/pose geometry_msgs/msg/PoseWithCovarianceStamped frame=tank_map",
+    "map": "/map nav_msgs/msg/OccupancyGrid frame=tank_map",
+    "session": "/tank/session std_msgs/msg/String JSON",
+    "image": "/camera/image_raw sensor_msgs/msg/Image frame=camera_frame",
+    "camera_info": "/camera/camera_info sensor_msgs/msg/CameraInfo",
+    "telemetry": "/actuators/status std_msgs/msg/String JSON",
+    "arm": "/actuators/arm std_srvs/srv/SetBool",
+    "stop": "/actuators/stop std_srvs/srv/Trigger",
+    "left": "/actuators/throttle_left/set_pulse_width mechaship_interfaces/srv/ThrottlePulseWidth",
+    "right": "/actuators/throttle_right/set_pulse_width mechaship_interfaces/srv/ThrottlePulseWidth"
+  },
+  "geometry_source": "User-supplied docking_geometry.py, preserved for later U-shaped docking"
+}

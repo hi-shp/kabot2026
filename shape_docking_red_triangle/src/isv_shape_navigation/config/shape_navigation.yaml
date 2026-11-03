@@ -1,0 +1,66 @@
+shape_navigation:
+  ros__parameters:
+    enable_output: false
+    detector_source: contour  # contour now; yolo after training yolo_msgs classes
+    target_label: triangle   # triangle, square, rectangle, circle, pentagon, cross
+    target_color: red        # red, green, blue, yellow, white, black (contour only)
+    score_threshold: 0.75
+    min_shape_area: 250.0
+    stable_observations: 4
+    association_distance: 0.65
+    target_timeout: 2.0
+    target_memory_timeout: 30.0 # retain the locked SLAM goal during brief visual occlusion
+
+    image_topic: /camera/image_raw
+    camera_info_topic: /camera/camera_info
+    scan_topic: /scan
+    scan_frame: velodyne
+    pose_topic: /tank/pose
+    map_topic: /map
+    map_frame: tank_map
+    camera_frame: camera_frame
+    session_topic: /tank/session
+    require_session: true
+    session_timeout: 3.0
+    map_timeout: 5.0  # increase for a static map published only once
+    yolo_topic: /yolo/detections
+    actuator_status_topic: /actuators/status
+
+    # Upstream camera defaults are uncalibrated. Supply valid CameraInfo, OR
+    # rectified images with manually measured fx,cx and EXACT dimensions.
+    camera_fx: 0.0
+    camera_cx: 0.0
+    camera_width: 640
+    camera_height: 480
+    camera_yaw_deg: 0.0  # CCW left positive, relative to the SLAM pose reference
+    camera_x: 0.0       # metres forward from velodyne
+    camera_y: 0.0       # metres left from velodyne
+    scan_yaw_deg: 0.0
+    scan_x: 0.0
+    scan_y: 0.0
+    pose_yaw_offset_deg: 0.0 # boat forward relative to upstream pose yaw; if changed,
+                            # scan_yaw_deg must describe scan relative to that heading
+    sync_tolerance: 0.20
+    max_target_range: 20.0
+    min_target_returns: 3
+    fusion_range_spread: 0.35
+
+    approach_standoff: 2.5
+    entry_standoff: 1.2
+    goal_tolerance: 0.25
+    arrival_hold: 1.0
+    # Radius must include the entire 1.10m x 0.50m hull AND the displacement
+    # of velodyne from the hull centre. 0.62m assumes a near-central sensor.
+    footprint_radius: 0.62
+    clearance: 0.15
+    stop_distance: 0.40
+    lookahead: 0.65
+    max_forward: 0.16  # normalized thrust fraction, NOT m/s
+    max_turn: 0.12
+    output_limit: 0.25
+    turn_gain: 0.32
+    turn_in_place_angle: 0.6
+    pose_timeout: 0.5
+    scan_timeout: 0.5
+    control_rate: 10.0
+    log_directory: '' # e.g. /home/isv/water_trials/shape; empty disables JSONL files

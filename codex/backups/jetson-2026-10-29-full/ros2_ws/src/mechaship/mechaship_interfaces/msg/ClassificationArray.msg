@@ -1,2 +1,0 @@
-std_msgs/Header header
-mechaship_interfaces/Classification[] classifications

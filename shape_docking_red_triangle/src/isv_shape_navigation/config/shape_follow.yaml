@@ -1,0 +1,31 @@
+shape_follow:
+  ros__parameters:
+    enable_output: false
+    target_label: red triangle
+    # Ordered exactly as the Jetson best3.pt model. Change this only for a new model.
+    class_names: [blue circle, blue cross, blue triangle, green circle, green cross, green triangle, red circle, red cross, red triangle]
+    fusion_topic: /fusion/roi_center
+    yolo_topic: /yolo/tracking
+    scan_topic: /scan
+    scan_frame: velodyne
+    camera_frame: camera_frame
+    actuator_status_topic: /actuators/status
+    score_threshold: 0.65
+    stable_observations: 4
+    target_timeout: 0.8
+    scan_timeout: 0.5
+    sync_tolerance: 0.25
+    target_standoff: 1.5
+    resume_margin: 0.2
+    max_percent: 16.0
+    association_distance: 0.8
+    footprint_radius: 0.62
+    clearance: 0.15
+    stop_distance: 0.4
+    camera_yaw_deg: 0.0
+    camera_x: 0.0
+    camera_y: 0.0
+    scan_yaw_deg: 0.0
+    scan_x: 0.0
+    scan_y: 0.0
+    control_rate: 10.0

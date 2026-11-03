@@ -1,0 +1,23 @@
+/map:
+  durability: transient_local
+  reliability: reliable
+  history: keep_last
+  depth: 1
+/shape_navigation/config:
+  durability: transient_local
+  reliability: reliable
+  history: keep_last
+  depth: 1
+/tf_static:
+  durability: transient_local
+  reliability: reliable
+  history: keep_last
+  depth: 100
+/scan:
+  reliability: best_effort
+  history: keep_last
+  depth: 10
+/camera/image_raw:
+  reliability: best_effort
+  history: keep_last
+  depth: 10

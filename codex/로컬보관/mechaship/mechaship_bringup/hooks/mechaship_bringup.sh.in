@@ -1,3 +1,0 @@
-export ROS_DOMAIN_ID=7
-export MODEL_NAME="mechaship"
-export WORLD_NAME="empty"
