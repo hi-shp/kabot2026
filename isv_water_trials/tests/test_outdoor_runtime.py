@@ -81,6 +81,25 @@ class RuntimeTests(unittest.TestCase):
         self.assertTrue(self.request('start',percent=20)['ok'])
         self.assertEqual(self.n.planner.model.data['id'],'0123456789abcdef')
 
+    def test_model_test_requires_area_keeps_learning_and_restores_route(self):
+        from isv_water_trials.outdoor_model import latlon
+        n=self.n;self.request('apply_model');before=json.loads(json.dumps(n.route))
+        self.assertFalse(self.request('start_model_test',percent=20)['ok'])
+        n.scan=dict(stamp=100,angles=np.linspace(-np.pi,np.pi,720,endpoint=False),ranges=np.full(720,np.inf),range_min=.1,range_max=30.)
+        area=[latlon(x,y,n.state.origin) for x,y in [(-12,-12),(12,-12),(12,12),(-12,12)]]
+        self.assertFalse(self.request('start_model_test',percent=101,area=area)['ok'])
+        self.assertTrue(self.request('start_model_test',percent=20,area=area)['ok'],n.ack)
+        self.assertTrue(n.execute);self.assertTrue(n.learning)
+        self.assertEqual(n.test_course['model_id'],n.validation_model.data['id'])
+        self.assertNotEqual(n.route,before)
+        n.plan_at=0;n.actuator_at=n.scan_at=time.monotonic()
+        n.tick()
+        self.assertEqual(n.plan_pool.submit.call_args.args[1]['test_area'],n.test_course['area'])
+        n.state.snapshot.return_value=None;n.plan_job=None;n.tick()
+        self.assertTrue(n.execute);self.assertEqual(n.sent[-1][0],[0,0])
+        self.assertTrue(self.request('stop')['ok'])
+        self.assertFalse(n.test_course['running']);self.assertEqual(n.route,before)
+
     def test_route_is_cyclic_one_two_three_one(self):
         n=self.n;n.execute=True;seen=[]
         for i in (0,1,2,0):

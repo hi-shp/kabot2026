@@ -240,10 +240,13 @@ def make_handler(bridge, args):
 
         def do_GET(self):
             path = urlsplit(self.path).path
+            if path == '/api/capture':
+                capture=getattr(bridge,'capture',None)
+                self.send(200,json.dumps(capture.status() if capture else {'phase':'unavailable'},ensure_ascii=False).encode());return
             if path == '/api/connection':
                 self.send(200,json.dumps(bridge.metadata(),ensure_ascii=False).encode());return
             if path in ('/api/state','/api/cloud','/api/map'):
-                if path=='/api/state':bridge.browser.viewed()
+                if path=='/api/state' and 'capture=1' not in urlsplit(self.path).query:bridge.browser.viewed()
                 self.proxy('GET');return
             if path == '/outdoor':
                 self.send_response(302);self.send_header('Location','/');self.send_header('Content-Length','0');self.end_headers();return
@@ -252,7 +255,8 @@ def make_handler(bridge, args):
                      '/outdoor.js':('outdoor.js','text/javascript; charset=utf-8'),
                      '/outdoor.css':('outdoor.css','text/css; charset=utf-8'),
                      '/viewer.js':('viewer.js','text/javascript; charset=utf-8'),
-                     '/viewer.css':('viewer.css','text/css; charset=utf-8')}
+                     '/viewer.css':('viewer.css','text/css; charset=utf-8'),
+                     '/theme.css':('theme.css','text/css; charset=utf-8')}
             if path in files:
                 name,content_type = files[path]
                 self.send(200,(ROOT/'web'/name).read_bytes(),content_type)
@@ -262,12 +266,20 @@ def make_handler(bridge, args):
         def do_POST(self):
             origin = self.headers.get('Origin')
             allowed = ('http://127.0.0.1:'+str(args.port),'http://localhost:'+str(args.port))
-            if origin not in allowed or urlsplit(self.path).path not in ('/api/select','/api/route','/api/initial_pose','/api/localize','/api/outdoor'):
+            if origin not in allowed or urlsplit(self.path).path not in ('/api/select','/api/route','/api/initial_pose','/api/localize','/api/outdoor','/api/capture'):
                 self.send(403,b'{}');return
-            size = int(self.headers.get('Content-Length','0'))
-            if not 0 < size <= (16384 if urlsplit(self.path).path == '/api/outdoor' else 1024):
+            try:size = int(self.headers.get('Content-Length','0'))
+            except ValueError:self.send(400,b'{}');return
+            if not 0 < size <= (32768 if urlsplit(self.path).path in ('/api/outdoor','/api/capture') else 1024):
                 self.send(400,b'{}');return
-            self.proxy('POST',self.rfile.read(size))
+            body=self.rfile.read(size)
+            if urlsplit(self.path).path=='/api/capture':
+                try:data=json.loads(body)
+                except (ValueError,UnicodeError):self.send(400,b'{}');return
+                capture=getattr(bridge,'capture',None)
+                status,payload=capture.request(data) if capture else (503,{'error':'촬영 기능 준비 필요'})
+                self.send(status,json.dumps(payload,ensure_ascii=False).encode());return
+            self.proxy('POST',body)
 
         def proxy(self, method, body=None):
             try:
@@ -290,6 +302,7 @@ def main():
     parser.add_argument('--hz',type=float,default=5.)
     parser.add_argument('--key',action='store_true',help='Use SSH key or agent instead of password')
     parser.add_argument('--no-browser',action='store_true')
+    parser.add_argument('--capture-dir',type=Path,help='PC screenshot/video output folder')
     args = parser.parse_args()
     if not 1 <= args.port <= 65535 or not 0 <= args.domain <= 232 or not 500 <= args.max_points <= 30000 or not 1 <= args.hz <= 10:
         parser.error('Invalid port, domain or display limits')
@@ -299,6 +312,8 @@ def main():
         parser.error('Run start_viewer.ps1 to prepare the SSH dependency')
     password = None if args.key else getpass.getpass('Jetson SSH password: ')
     bridge = RemoteBridge(args,password)
+    from dashboard_capture import CaptureService,DEFAULT_ROOT
+    bridge.capture=CaptureService('http://127.0.0.1:'+str(args.port),args.capture_dir or DEFAULT_ROOT)
     try:
         server = ThreadingHTTPServer(('127.0.0.1',args.port),make_handler(bridge,args))
     except OSError as exc:
@@ -318,7 +333,7 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        bridge.close();server.shutdown();server.server_close()
+        bridge.capture.close();bridge.close();server.shutdown();server.server_close()
 
 
 if __name__ == '__main__':

@@ -14,7 +14,7 @@ class OutdoorFeed:
         self.queue = Queue(maxsize=16); node.create_timer(.1, self.work)
 
     def request(self, data):
-        if data.get('action') not in ('pause','resume','apply_model','freeze','load','route','start','stop','clear_trail'):
+        if data.get('action') not in ('pause','resume','apply_model','freeze','load','route','start','stop','clear_trail','start_model_test'):
             return 400, {'error': '알 수 없는 요청'}
         with self.store.lock:
             status = self.store.values.get('outdoor', {})

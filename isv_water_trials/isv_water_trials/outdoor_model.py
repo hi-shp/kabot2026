@@ -86,11 +86,23 @@ class ResponseModel:
         return np.asarray(result)
 
 
+def eligible_row(row):
+    if not row.get('valid') or row.get('learning') is False or row.get('mode') not in ('RC','AUTO'):
+        return False
+    try:
+        velocity=np.asarray(row['velocity'],dtype=float)
+        commands=np.asarray(row.get('commands',[]),dtype=float)
+        return bool(math.isfinite(row['t']) and velocity.shape==(3,) and np.isfinite(velocity).all()
+                and commands.ndim==2 and commands.shape[1]==3 and len(commands)>0
+                and np.isfinite(commands).all() and np.max(abs(commands[:,1:]))<=1.001)
+    except (KeyError,ValueError,TypeError):return False
+
+
 def _grid(rows, dt):
     """Interpolate only bounded, continuous native GNSS intervals; never bridge outages."""
     runs, run = [], []
     for row in rows:
-        valid = row.get('valid') and row.get('mode') == 'RC'
+        valid = eligible_row(row)
         if run and (not valid or row.get('segment') != run[-1].get('segment') or row['t']-run[-1]['t'] > 1.6 or row['t'] <= run[-1]['t']):
             runs.append(run); run = []
         if valid: run.append(row)
@@ -192,11 +204,11 @@ def fit_model(rows, config, parent=None, lineage=None):
         original=[r for r in rows if r['t']<=cutoff]
         fresh=[r for r in rows if r['t']>cutoff]
     else: original=[];fresh=rows
-    native = sum(bool(r.get('valid')) and r.get('mode') == 'RC' for r in fresh)
-    if native < 120: raise ValueError(f'RC 유효 GPS 속도 표본 {native}/120')
+    native = sum(eligible_row(r) for r in fresh)
+    if native < 120: raise ValueError(f'유효 주행 속도 표본 {native}/120')
     dt = config['prediction_dt_s']; runs = _grid(fresh, dt); old_runs=_grid(original,dt)
     pairs = sum(len(t) for t, *_ in runs)
-    if pairs < 300: raise ValueError('연속 RC 기록 60초 이상 필요')
+    if pairs < 300: raise ValueError('연속 주행 기록 60초 이상 필요')
     # Split each continuous run; leave 3 s plus max delay between blocks.
     gap = math.ceil(5/dt); candidates = []
     def objective(score):
@@ -222,12 +234,21 @@ def fit_model(rows, config, parent=None, lineage=None):
         keys = bins[:, 0]*4+bins[:, 1]; groups = [np.flatnonzero(keys==k) for k in np.unique(keys)]
         quota = max(30, int(np.median([len(g) for g in groups])))
         balanced = np.concatenate([g[np.linspace(0, len(g)-1, min(quota, len(g)), dtype=int)] for g in groups])
-        subsets = [('전체', np.arange(len(x))), ('최근', np.arange(max(0, len(x)-max(240, len(x)//2)), len(x))), ('균형', balanced)]
+        subsets = [('전체', np.arange(len(x))), ('최근', np.arange(max(0, len(x)-max(240, len(x)//2)), len(x))), ('균형', balanced), ('강건', np.arange(len(x)))]
         for label, indices in subsets:
             for family in ('선형','비선형'):
                 columns=list(range(8)) if family=='비선형' else [0,1,2,3,4,7]
                 design, target = x[indices][:, columns], y[indices]
                 solved=np.linalg.solve(design.T@design+np.eye(len(columns))*.005,design.T@target)
+                if label=='강건':
+                    # Train-only Huber weighting; selection/test observations never set weights.
+                    for _ in range(3):
+                        residual=design@solved-target
+                        scale=np.maximum(np.median(abs(residual),axis=0)*1.4826,[.005,.005,.003])
+                        size=np.max(abs(residual)/scale,axis=1)
+                        weight=np.minimum(1.,1.5/np.maximum(size,1e-9))
+                        solved=np.linalg.solve(design.T@(design*weight[:,None])+np.eye(len(columns))*.005,
+                                               design.T@(target*weight[:,None]))
                 coefficients = np.zeros((8, 3)); coefficients[columns] = solved
                 data = {'schema': 'outdoor-response-v1', 'dt_s': dt, 'delay_steps': delay,
                         'coefficients': coefficients.tolist(), 'signature': fingerprint(config),
@@ -277,13 +298,15 @@ def fit_model(rows, config, parent=None, lineage=None):
             reasons.append('2초 예측 오차가 운용 기준 초과')
         if sum(np.array(e)**2) >= sum(np.array(m['persistence_rmse'])**2):
             reasons.append('현재 속도 유지 예측보다 개선되지 않음')
-    stamps = np.array([r['t'] for r in rows if r.get('valid')])
+    used=[r for r in rows if eligible_row(r)]
+    stamps = np.array([r['t'] for r in used])
     model.data.update(metrics=metrics, qualified=not reasons, reasons=reasons,
         synthetic=any(r.get('synthetic',False) for r in rows),
         name=model.data.get('candidate_name',model.data['variant']),
         speed_coverage={'mean_m_s':float(np.mean(speeds)),'seconds':float(len(speeds)*dt),'definition':'measured planar speed sqrt(u^2+v^2)'},
-        recording_segments=len({r.get('segment') for r in rows if r.get('valid') and r.get('mode')=='RC'}),
-        continuous_runs=len(old_runs+runs),training_samples=sum(bool(r.get('valid')) and r.get('mode')=='RC' for r in rows),
+        recording_segments=len({r.get('segment') for r in used}),
+        continuous_runs=len(old_runs+runs),training_samples=len(used),
+        mode_samples={mode:sum(r.get('mode')==mode for r in used) for mode in ('RC','AUTO')},
         output_coverage={'mean_percent':average,'peak_band':peak,'bands':coverage,
             'total_seconds':float(len(levels)*dt),'definition':'max(abs(left),abs(right))'},
         signature=fingerprint(config), learning_settings=learning_identity(config),
@@ -293,7 +316,7 @@ def fit_model(rows, config, parent=None, lineage=None):
         native_period_s=float(np.median(np.diff(stamps))),
         delay_resolution_note='수신 시각 기준 유효 지연. GPS 주기보다 짧은 지연은 구분이 어려움.',
         training_end_t=float(max(r['t'] for r in rows)),
-        velocity_limit=np.max(np.abs(np.array([r['velocity'] for r in rows if r.get('valid')])), axis=0).tolist())
+        velocity_limit=np.max(np.abs(np.array([r['velocity'] for r in used])), axis=0).tolist())
     if parent:
         model.data['parent_comparison']=score_rollouts(ResponseModel(parent),runs,.70,1.)
     model.data.pop('id',None)

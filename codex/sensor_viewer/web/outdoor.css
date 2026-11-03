@@ -86,3 +86,7 @@ button.stop{background:#30232a;border-color:#785058;color:#ffadad}
 .model-speeds{display:flex;gap:26px;margin:8px 0}.model-speeds>div{display:flex;flex-direction:column;gap:3px}.model-speeds span{font-size:11px;color:var(--muted)}.model-speeds b{font-size:18px;color:#81b6ff;font-variant-numeric:tabular-nums}
 .spec-detail{font-size:11px;color:#bac9d5;line-height:1.7}.model-controls .stats{border-top:1px solid var(--border)}
 #candidateList{border-top:1px solid var(--border);padding:8px 10px}#candidateList summary{cursor:pointer;color:#bac9d5}.candidate-scroll{max-height:220px;overflow:auto;margin-top:8px}#candidateList table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}#candidateList th,#candidateList td{padding:5px 10px;text-align:left;border-bottom:1px solid var(--border)}#candidateList th{color:var(--muted);background:var(--panel);position:sticky;top:0}#candidateList .selected{color:#48e5c2;background:#143132}
+
+.capture-tools{display:flex;align-items:center;gap:7px;padding:6px 10px;min-height:34px}.capture-tools span{color:var(--muted,#a4b6c6);font-size:12px;overflow-wrap:anywhere}.capture-tools[hidden]{display:none}
+
+.map-coordinate{position:absolute;right:6px;top:6px;background:#111d28ed;font:12px Consolas,"Malgun Gothic",monospace;color:#e7eef4;padding:5px 7px;max-width:60%;z-index:2}.map-coordinate:disabled{opacity:.85}

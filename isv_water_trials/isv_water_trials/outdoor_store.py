@@ -4,6 +4,7 @@ from pathlib import Path
 import sqlite3
 import time
 import uuid
+import random
 from datetime import datetime, timezone, timedelta
 from .outdoor_model import fingerprint
 from .outdoor_config import compatible_signatures, learning_identity
@@ -86,8 +87,11 @@ class OutdoorStore:
             if len(recent)<15000:return [json.loads(r[1]) for r in reversed(recent)]
             first=self.db.execute(f'SELECT MIN(id) FROM frames WHERE signature IN ({marks})',self.signatures).fetchone()[0]
             boundary=recent[-1][0]; selected=dict(recent)
+            rng=random.SystemRandom()
             for i in range(50):
-                anchor=first+(boundary-first)*i//50
+                low=first+(boundary-first)*i//50
+                high=first+(boundary-first)*(i+1)//50
+                anchor=first if i==0 else rng.randrange(low,max(low+1,high))
                 block=self.db.execute(f'SELECT id,payload FROM frames WHERE signature IN ({marks}) AND id>=? AND id<? ORDER BY id LIMIT 300',(*self.signatures,anchor,boundary)).fetchall()
                 selected.update(block)
             return [json.loads(selected[k]) for k in sorted(selected)]

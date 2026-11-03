@@ -15,6 +15,7 @@ from .codex_nav.vessel_dynamics import VesselParameters
 from .codex_nav.navigation_map import NavigationMap
 from .codex_nav.control_path import smooth_path
 from .outdoor_obstacles import ObstacleTracker, compact_obstacles
+from .outdoor_test_course import polygon, hull_clearance, fence
 
 
 class LearnedNavigator(SamplingNavigator):
@@ -42,7 +43,7 @@ class LearnedNavigator(SamplingNavigator):
         self.route_goal = None
         self.now = 0.
         self.recovery = False
-        self.normal_margin = cfg.margin
+        self.normal_margin = cfg.margin; self.base_margin=cfg.margin; self.test_boundary=None
 
     def guidance(self, state, observation, goal, frame):
         # Cache in ENU, never in the sliding local-map coordinate system.
@@ -98,7 +99,9 @@ class LearnedNavigator(SamplingNavigator):
 
     def safety_clearance(self, states, obstacles, width, height):
         z = np.atleast_2d(states)
-        if not len(obstacles): return np.full(len(z), np.inf)
+        boundary=(hull_clearance(z,self.test_boundary,self.boat['length_m'],self.boat['width_m'])-max(0.,self.normal_margin-self.cfg.margin)
+                  if self.test_boundary is not None else np.full(len(z),np.inf))
+        if not len(obstacles): return boundary
         # Oriented full-hull rectangle; obstacles are surface discs. Substeps
         # inflate by distance travelled so samples cover the swept motion.
         delta = obstacles[None, :, :2]-z[:, None, :2]
@@ -107,7 +110,7 @@ class LearnedNavigator(SamplingNavigator):
         y = -delta[:, :, 0]*s+delta[:, :, 1]*c
         dx = np.maximum(abs(x)-self.boat['length_m']/2, 0)
         dy = np.maximum(abs(y)-self.boat['width_m']/2, 0)
-        return np.min(np.hypot(dx, dy)-obstacles[None, :, 2], axis=1)
+        return np.minimum(boundary,np.min(np.hypot(dx, dy)-obstacles[None, :, 2], axis=1))
 
     def rollout(self, initial, sequences, obstacles, width, height, goal=None):
         n, horizon, _ = sequences.shape
@@ -197,6 +200,16 @@ class OutdoorPlanner:
                             yaw+math.radians(self.config['lidar_yaw_deg']),
                             float(scan.get('stamp',now_ros)),max_range)
         self.navigator.dynamic, tracks = self.tracker.prediction(now_ros,origin)
+        self.navigator.test_boundary=None;self.navigator.normal_margin=self.navigator.base_margin
+        if state.get('test_area') is not None:
+            boundary=polygon(state['test_area'])-origin
+            virtual=np.asarray(state.get('virtual_obstacles',[]),dtype=float).reshape(-1,3)
+            if len(virtual)>8 or not np.isfinite(virtual).all() or np.any(virtual[:,2]<=0):raise ValueError('가상 장애물 설정 오류')
+            virtual=virtual.copy();virtual[:,:2]-=origin
+            self.navigator.test_boundary=boundary
+            self.navigator.normal_margin+=2*float(state['position_sigma_m'])
+            observation.obstacles=np.concatenate([observation.obstacles,virtual,fence(boundary)])
+            # Never replace sensor returns with the virtual course.
         self.navigator.origin = origin; self.navigator.now = now_ros
         self.navigator.recovery = False
         self.navigator.cfg = replace(self.navigator.cfg,margin=self.navigator.normal_margin)
@@ -240,4 +253,5 @@ class OutdoorPlanner:
                 'obstacles':tracks, 'recovery':recovery,
                 'planning_ms':(time.perf_counter()-started)*1000,
                 'scan_range_m':max_range, 'obstacle_discs':len(observation.obstacles),
+                'plan_stamp':now_ros,'dt_s':self.model.dt,
                 'planner': 'CODEX SamplingNavigator + learned PWM response'}

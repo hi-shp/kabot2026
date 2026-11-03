@@ -22,6 +22,7 @@ from .outdoor_store import OutdoorStore
 from .outdoor_planner import OutdoorPlanner
 from .outdoor_config import load_config
 from .outdoor_layers import LidarLayers
+from .outdoor_test_course import create_course, PlanComparison
 from .tank_storage import atomic_json
 
 
@@ -71,6 +72,7 @@ def main(argv=None):
             self.last_fix_t = None
             self.comparison = LiveComparison(); self.model = None; self.validation_model = None; self.frozen = False; self.learning = True
             self.lineage=None; self.baseline_model=None
+            self.test_course=None;self.test_comparison=None;self.pre_test_route=None
             self.fit_job = None; self.fit_generation = 0; self.fit_at = time.monotonic()
             self.fit_pool = ProcessPoolExecutor(max_workers=1, mp_context=multiprocessing.get_context('spawn'))
             self.plan_pool = ThreadPoolExecutor(max_workers=1)
@@ -78,7 +80,7 @@ def main(argv=None):
             self.execute = False; self.planner = None; self.plan_result = None; self.goal = 0; self.direction = 1; self.arrivals = 0
             self.actuator = {}; self.actuator_at = 0.; self.scan = None; self.scan_at = 0.
             self.command = [0., 0.]; self.command_at = 0.; self.pending = []; self.pending_at = 0.
-            self.error = ''; self.fit_status = 'RC 기록 수집 중'; self.ack = None; self.ready_since = None
+            self.error = ''; self.fit_status = '주행 기록 수집 중'; self.ack = None; self.ready_since = None
             self.last_frame_t = None; self.last_valid = False; self.route = None; self.bag = None; self.bag_at = 0.
             self.bag_log = None; self.bag_status = '대기'; self.last_disk = 0.; self.disk_ok = True
             try:
@@ -163,6 +165,7 @@ def main(argv=None):
             if frame is None: self.last_valid = False; return
             if self.last_frame_t is not None and (frame['t']-self.last_frame_t > 1.6 or frame['t'] <= self.last_frame_t):
                 self.store.new_segment('sensor_gap'); self.comparison = LiveComparison(); self.ready_since = None
+                if getattr(self,'test_comparison',None):self.test_comparison.plans.clear()
             self.last_frame_t = frame['t']
             valid = now-self.actuator_at < .3 and applied_command(self.actuator, config) is not None
             row = {'t': frame['t'], 'velocity': frame['velocity'], 'position': frame['position'], 'yaw': frame['yaw'],
@@ -176,6 +179,11 @@ def main(argv=None):
             if self.disk_ok:
                 try: row = self.store.add(row); self.rows.append(row)
                 except (OSError, sqlite3.Error) as exc: self.disk_ok = False; self.error = '기록 저장 오류: '+str(exc)
+            if getattr(self,'test_course',None) and self.test_course['running']:
+                if valid and self.actuator.get('mode_name')=='AUTO':
+                    for event in self.test_comparison.observe(frame['t'],frame['position']):
+                        self.record_test_event('model_test_comparison',test_id=self.test_course['id'],**event)
+                else:self.test_comparison.plans.clear()
             comparison = self.comparison.update(self.model, frame['t'], frame['velocity'], list(self.commands)) if self.commands else None
             applied = applied_command(self.actuator, config)
             self.chart.append({'t': frame['t'], 'command': applied, 'measured': frame['velocity'],
@@ -201,11 +209,21 @@ def main(argv=None):
             self.store.save_live_selection(self.model.data if self.model else None,
                 self.validation_model.data if self.validation_model else None,self.learning)
 
+        def record_test_event(self, action, **values):
+            try:self.store.event(action,**values)
+            except (OSError,sqlite3.Error) as exc:
+                self.disk_ok=False;self.command_at=0.;self.error='시험 기록 저장 오류: '+str(exc)
+
         def stop_trial(self):
             was_running = self.execute
             self.execute = False; self.command = [0., 0.]; self.command_at = time.monotonic()
             self.plan_generation += 1; self.plan_result = None
             if was_running: self.stopping = True
+            if getattr(self,'test_course',None) and self.test_course['running']:
+                self.test_course['running']=False
+                self.record_test_event('model_test_stopped',test_id=self.test_course['id'],metrics=self.test_comparison.summary())
+                self.route=self.pre_test_route;self.goal=0
+
 
         def request(self, msg):
             data = {}; ok = False
@@ -214,9 +232,9 @@ def main(argv=None):
                 if action in ('pause', 'resume'):
                     self.fit_generation += 1; self.learning = action == 'resume'
                     self.store.new_segment(action); self.save_selection()
-                    self.fit_status='학습 일시정지 · 원본 기록 유지' if not self.learning else '누적 RC 기록 비교 중'
+                    self.fit_status='학습 일시정지 · 원본 기록 유지' if not self.learning else '누적 주행 기록 비교 중'
                 elif action in ('apply_model','freeze'):
-                    if self.model is None: raise ValueError('먼저 RC 기록으로 모델을 학습하세요')
+                    if self.model is None: raise ValueError('먼저 주행 기록으로 모델을 학습하세요')
                     if not self.model.data.get('qualified'):raise ValueError('검증 기준을 통과한 학습 모델이 필요합니다')
                     if self.execute:raise ValueError('주행 정지 후 새 검증 모델을 적용하세요')
                     self.store.finalize_model(self.model.data)
@@ -227,12 +245,35 @@ def main(argv=None):
                 elif action == 'route':
                     self.stop_trial(); self.route = self.validate_route(data); self.goal = 0; self.direction = 1; self.arrivals = 0
                     atomic_json(root/'route.json', self.route)
+                elif action == 'start_model_test':
+                    if self.execute:raise ValueError('현재 주행을 정지한 뒤 모델 시험을 시작하세요')
+                    if not self.validation_model:raise ValueError('검증할 모델을 먼저 적용하세요')
+                    percent=float(data.get('percent',20))
+                    if not 0<percent<=100:raise ValueError('출력 상한은 0 초과 100% 이하로 지정하세요')
+                    conflicts={'rc_auto_mode_test','tank_round_trip','water_trial_runner','water_trial_avoid_preview'} & set(self.get_node_names())
+                    if conflicts:raise ValueError('기존 추진 노드를 먼저 종료하세요: '+', '.join(sorted(conflicts)))
+                    now=time.monotonic();state=self.state.snapshot(now)
+                    if state is None or self.scan is None or now-self.scan_at>config['scan_max_age_s']:raise ValueError('GPS·IMU·라이다 수신 대기')
+                    pose=self.state.pose_at(self.scan['stamp'])
+                    if pose is None or state['position_sigma_m']>config['arrival_radius_m']:raise ValueError('시험구역 위치 정확도 확인 대기')
+                    points=np.asarray(data.get('area',[]),dtype=float)
+                    if points.ndim!=2 or points.shape[1]!=2 or not 3<=len(points)<=12 or not np.isfinite(points).all():raise ValueError('지도에서 시험구역을 먼저 지정하세요')
+                    if np.any(abs(points[:,0])>=85) or np.any(abs(points[:,1])>180):raise ValueError('시험구역 GPS 좌표 오류')
+                    area=[local_xy(*p,self.state.origin) for p in points]
+                    course=create_course(area,state,dict(self.scan,pose=pose),config)
+                    planner=OutdoorPlanner(self.validation_model.data,config,percent)
+                    course.update(id=uuid.uuid4().hex,model_id=self.validation_model.data['id'],running=True,origin=list(self.state.origin),percent=percent)
+                    self.store.event('model_test_started',course=course)
+                    self.pre_test_route=deepcopy(self.route);self.test_course=course;self.test_comparison=PlanComparison()
+                    self.route={'points':[latlon(*xy,self.state.origin) for xy in course['goals']]}
+                    self.goal=0;self.arrivals=0;self.planner=planner;self.execute=True;self.stopping=False;self.plan_generation+=1
                 elif action == 'start':
                     if not self.validation_model: raise ValueError('현재 모델을 검증에 적용한 뒤 시작하세요')
                     if not self.route: raise ValueError('GPS 지도에서 A/B 지점을 저장하세요')
                     conflicts = {'rc_auto_mode_test','tank_round_trip','water_trial_runner','water_trial_avoid_preview'} & set(self.get_node_names())
                     if conflicts: raise ValueError('기존 추진 노드를 먼저 종료하세요: '+', '.join(sorted(conflicts)))
                     self.planner = OutdoorPlanner(self.validation_model.data, config, float(data.get('percent', config['percent'])))
+                    self.test_course=None;self.test_comparison=None
                     self.execute = True; self.stopping = False; self.plan_generation += 1
                 elif action == 'stop': self.stop_trial()
                 elif action == 'clear_trail':
@@ -240,7 +281,7 @@ def main(argv=None):
                     atomic_json(root/'display.json', {'trail_after_t': self.ros_now()})
                 else: raise ValueError('알 수 없는 요청')
                 self.store.event(action, model=self.model.data['id'] if self.model else None); self.error = ''; ok = True
-            except (ValueError, TypeError, KeyError, OSError) as exc: self.error = str(exc)
+            except (ValueError, TypeError, KeyError, OSError,sqlite3.Error) as exc: self.error = str(exc)
             self.ack = {'id': data.get('request_id'), 'ok': ok, 'message': self.error if not ok else '적용됨'}
 
         def manage_bag(self, now):
@@ -300,6 +341,10 @@ def main(argv=None):
                     result = self.plan_job.result()
                     if self.plan_job_generation == self.plan_generation and self.execute and now-self.plan_started <= config['planner_deadline_s']:
                         self.plan_result = result; self.command = result['command']; self.command_at = now; self.error = ''
+                        if getattr(self,'test_course',None) and self.test_course['running'] and self.actuator.get('mode_name')=='AUTO':
+                            self.test_comparison.plan(result['plan_stamp'],result['path'],result['dt_s'])
+                            if self.test_comparison.last_plan==result['plan_stamp']:
+                                self.record_test_event('model_test_plan',test_id=self.test_course['id'],stamp=result['plan_stamp'],path=result['path'],dt_s=result['dt_s'])
                     elif now-self.plan_started > config['planner_deadline_s']: self.error = '경로 계산 시간 초과 · 중립 대기'
                 except (ValueError, RuntimeError, np.linalg.LinAlgError) as exc:
                     self.command_at = 0.; self.error = str(exc)
@@ -315,6 +360,7 @@ def main(argv=None):
                      now-self.actuator_at < .3 and applied_command(self.actuator, config) is not None and self.disk_ok and
                      state['position_sigma_m'] <= config['arrival_radius_m'] and scan_pose is not None)
             if not ready:
+                if getattr(self,'test_comparison',None):self.test_comparison.plans.clear()
                 self.command_at = 0.; self.error = 'GPS·IMU·라이다·추진 상태 수신 대기'
                 self.send([0., 0.], now); return
             goal = local_xy(*self.route['points'][self.goal], self.state.origin)
@@ -323,6 +369,8 @@ def main(argv=None):
                 goal = local_xy(*self.route['points'][self.goal], self.state.origin)
                 self.plan_generation += 1; self.command_at = 0.
             state['goal'] = goal.tolist()
+            if getattr(self,'test_course',None) and self.test_course['running']:
+                state['test_area']=self.test_course['area'];state['virtual_obstacles']=self.test_course['obstacles']
             if self.plan_job is None and now-self.plan_at >= self.model.dt:
                 self.plan_at = now; self.plan_started = now; self.plan_job_generation = self.plan_generation
                 self.plan_job = self.plan_pool.submit(self.planner.plan, state, dict(self.scan, pose=scan_pose), list(self.commands), self.ros_now())
@@ -366,6 +414,7 @@ def main(argv=None):
             value = {'state': state, 'state_reason': self.state.reason, 'mode': self.actuator.get('mode_name'),
                 'learning': self.learning, 'frozen': self.frozen, 'fit_running': self.fit_job is not None,
                 'learning_branch':self.lineage,
+                'model_test':dict(self.test_course,metrics=self.test_comparison.summary()) if self.test_course else None,
                 'fit_status': self.fit_status, 'model': model, 'execute': self.execute,
                 'goal': self.goal, 'arrivals': self.arrivals, 'route': self.route, 'prediction': paths, 'preview': preview,
                 'obstacle_tracks':tracks, 'guidance':guidance, 'planning':planning,

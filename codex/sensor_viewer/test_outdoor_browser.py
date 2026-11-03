@@ -58,7 +58,10 @@ class Bridge:
         if action=='clear_trail':self.state['trail']=[]
         if action=='route':self.state['route']={'points':value['points']}
         if action=='start':self.state['execute']=True
-        if action=='stop':self.state['execute']=False
+        if action=='start_model_test':self.state['execute']=True;self.state['model_test']=dict(running=True,origin=[35.232,129.083],area=[[-12,-12],[12,-12],[12,12],[-12,12]],obstacles=[[4,0,.45]],metrics=dict(samples=8,rmse_m=.25,max_error_m=.7));self.test_area=value['area']
+        if action=='stop':
+            self.state['execute']=False
+            if self.state.get('model_test'):self.state['model_test']['running']=False
         return 202,{'Content-Type':'application/json'},json.dumps({'request_id':'fixture-request'}).encode()
 
 
@@ -73,6 +76,13 @@ class OutdoorBrowser(unittest.TestCase):
         try:
             driver.get(f'http://127.0.0.1:{args.port}/');wait=WebDriverWait(driver,15)
             wait.until(lambda d:'42.0' in d.find_element(By.ID,'position').text)
+            driver.execute_script("window.testCopied=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>window.testCopied.push(text)}})")
+            driver.execute_script("const c=document.getElementById('map'),r=c.getBoundingClientRect();const p={clientX:r.left+r.width/2,clientY:r.top+r.height/2,pointerId:1,bubbles:true};c.dispatchEvent(new PointerEvent('pointermove',p));c.dispatchEvent(new PointerEvent('pointerdown',p));c.dispatchEvent(new PointerEvent('pointerup',p));")
+            wait.until(lambda d:'복사됨' in d.find_element(By.ID,'copyCoordinate').text)
+            self.assertEqual(driver.execute_script('return window.testCopied[0]'),'35.2320000, 129.0830000')
+            driver.execute_script("const c=document.getElementById('map'),r=c.getBoundingClientRect();const p={clientX:r.left+100,clientY:r.top+100,pointerId:1,bubbles:true};c.dispatchEvent(new PointerEvent('pointerdown',p));p.clientX+=30;c.dispatchEvent(new PointerEvent('pointermove',p));c.dispatchEvent(new PointerEvent('pointerup',p));")
+            self.assertEqual(driver.execute_script('return window.testCopied.length'),1)
+            driver.find_element(By.ID,'follow').click()
             self.assertEqual(driver.title,'KABOAT 2026')
             self.assertFalse(driver.find_elements(By.TAG_NAME,'header'))
             self.assertFalse(driver.find_elements(By.ID,'demoBanner'))
@@ -122,6 +132,13 @@ class OutdoorBrowser(unittest.TestCase):
             artifacts=Path(tempfile.gettempdir())/'kabot-outdoor-review';artifacts.mkdir(exist_ok=True)
             driver.execute_script('window.scrollTo(0,0)');driver.save_screenshot(str(artifacts/'desktop.png'))
             driver.execute_script('window.scrollTo(0,document.body.scrollHeight)');driver.save_screenshot(str(artifacts/'graphs.png'))
+            driver.find_element(By.ID,'defineTestArea').click()
+            driver.execute_script("const c=document.getElementById('map'),r=c.getBoundingClientRect();for(const [x,y] of [[.2,.2],[.8,.2],[.8,.8],[.2,.8]]){const p={clientX:r.left+r.width*x,clientY:r.top+r.height*y,pointerId:1,bubbles:true};c.dispatchEvent(new PointerEvent('pointerdown',p));c.dispatchEvent(new PointerEvent('pointerup',p));}")
+            self.assertTrue(driver.find_element(By.ID,'startModelTest').is_enabled())
+            driver.find_element(By.ID,'startModelTest').click();wait.until(lambda d:'시험 중' in d.find_element(By.ID,'testInfo').text)
+            self.assertEqual(len(bridge.test_area),4);self.assertTrue(bridge.state['learning'])
+            self.assertIn('0.25m',driver.find_element(By.ID,'testInfo').text)
+            driver.find_element(By.ID,'stopModelTest').click();wait.until(lambda d:'시험 종료' in d.find_element(By.ID,'testInfo').text)
             driver.find_element(By.ID,'clearTrail').click();wait.until(lambda d:not bridge.state['trail'])
             self.assertEqual(bridge.state['valid_frames'],900)
             failures=[v for v in driver.get_log('browser') if v['level']=='SEVERE' and 'tile.openstreetmap.org' not in v['message'] and 'favicon' not in v['message']]

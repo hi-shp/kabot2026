@@ -137,6 +137,21 @@ class OutdoorTests(unittest.TestCase):
         self.assertLess(data['metrics']['horizons']['2']['velocity_rmse'][0],.03)
         self.assertGreater(data['metrics']['windows'],20)
 
+    def test_auto_and_rc_fit_without_paused_or_invalid_rows(self):
+        rows=synthetic_rows()
+        for i,row in enumerate(rows):row['mode']='AUTO' if i>=550 else 'RC'
+        rows[200]['learning']=False;rows[800]['velocity'][0]=float('nan')
+        data=fit_model(rows,CONFIG)
+        self.assertEqual(data['mode_samples'],{'RC':549,'AUTO':549})
+        self.assertTrue(data['qualified'],data['reasons'])
+        self.assertTrue(any('강건' in item['name'] for item in data['candidate_catalog']))
+        self.assertLess(data['metrics']['horizons']['2']['velocity_rmse'][0],.04)
+        auto=synthetic_rows(100)
+        for row in auto:row['mode']='AUTO'
+        self.assertEqual(len(_grid(auto,.2)),1)
+        for row in auto:row['learning']=False
+        self.assertEqual(len(_grid(auto,.2)),0)
+
     def test_insufficient_data_rejected(self):
         with self.assertRaises(ValueError):fit_model(synthetic_rows(20),CONFIG)
 
