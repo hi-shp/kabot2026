@@ -1,14 +1,5 @@
 # KABOAT 2026
 
-## 통합 브링업 프로필 (구현 준비 중)
-
-```bash
-ros2 launch isv bringup.a.launch.py  # 수조·GPS·SLAM 대시보드
-ros2 launch isv bringup.b.launch.py  # V2·V3·V4 대시보드
-```
-
-두 명령은 A/B 프로필 통합을 위한 예정 인터페이스입니다. 런치 파일 통합과 젯슨 검증이 끝나기 전까지는 현재 아래에 적힌 기존 실행 방법을 사용하세요.
-
 [야외 RC 기록·모델 학습·GPS 순환 주행](codex/docs/OUTDOOR_RC.md): 브링업과 함께 위치·방향·경로를 표시하고, RC 기록으로 모델을 학습합니다. 대시보드에서 현재 모델을 적용하고 여러 목적지를 순서대로 반복 운항합니다.
 
 [PC 센서 화면·실내 수조 SLAM·왕복 시험](codex/docs/INDOOR_TANK.md): 라이다·IMU·전체 토픽을 PC에서 보고, GPS 없이 지도에서 A·B 지점을 정합니다.
