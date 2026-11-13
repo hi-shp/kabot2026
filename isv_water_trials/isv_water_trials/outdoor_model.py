@@ -53,7 +53,7 @@ def features(state, command):
 
 
 class ResponseModel:
-    def __init__(self, data):
+    def __init__(self, data, inertia_scales=(1., 1., 1.)):
         if data.get('schema') != 'outdoor-response-v1':
             raise ValueError('지원하지 않는 모델 형식')
         self.data = data
@@ -62,10 +62,24 @@ class ResponseModel:
         self.coefficients = np.array(data['coefficients'], dtype=float)
         if self.coefficients.shape != (8, 3) or not np.isfinite(self.coefficients).all():
             raise ValueError('모델 계수 오류')
+        scales = np.asarray(inertia_scales, dtype=float)
+        if scales.shape != (3,) or not np.isfinite(scales).all() or np.any(scales <= 0):
+            raise ValueError('Invalid prediction inertia scales')
+        self.inertia_scales = tuple(scales)
+        # Scale acceleration, including drag, while preserving steady motion.
+        # Keep the identified data unchanged for learning and model comparison.
+        self.coefficients /= scales
+        self.coefficients[:3] += np.diag(1.-1./scales)
         if not .05 <= self.dt <= 1 or not 0 <= self.delay <= 30:
             raise ValueError('모델 시간 간격 오류')
         if max(abs(np.linalg.eigvals(self.coefficients[:3].T))) >= 1.001:
             raise ValueError('불안정한 응답 모델')
+
+    def for_navigation(self, config):
+        mass = float(config.get('prediction_mass_scale', 1.))
+        yaw = float(config.get('prediction_yaw_inertia_scale', 1.))
+        scales = (mass, mass, yaw)
+        return self if self.inertia_scales == scales else ResponseModel(self.data, scales)
 
     def step(self, state, delayed_command):
         with np.errstate(over='ignore',invalid='ignore'):

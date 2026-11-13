@@ -1,0 +1,189 @@
+"""Pure geometry, conservative grid planning and low-speed tank guidance (SI)."""
+import heapq
+import copy
+import math
+import numpy as np
+from scipy.ndimage import distance_transform_edt
+
+
+def wrap(angle):
+    return math.atan2(math.sin(angle), math.cos(angle))
+
+
+def yaw(q):
+    return math.atan2(2*(q.w*q.z+q.x*q.y), 1-2*(q.y*q.y+q.z*q.z))
+
+
+class Grid:
+    def __init__(self, message, clearance=.75):
+        info = message.info
+        self.width, self.height = int(info.width), int(info.height)
+        self.resolution = float(info.resolution)
+        if not 0 < self.width*self.height <= 8_000_000 or not .005 <= self.resolution <= 1:
+            raise ValueError('Invalid occupancy grid dimensions')
+        self.frame = message.header.frame_id
+        self.ox, self.oy = info.origin.position.x, info.origin.position.y
+        self.angle = yaw(info.origin.orientation)
+        self.co, self.si = math.cos(self.angle), math.sin(self.angle)
+        self.cells = np.asarray(message.data, dtype=np.int8).reshape(self.height, self.width)
+        free = (self.cells >= 0) & (self.cells < 35)
+        # Padding treats map boundaries and unknown cells as obstacles.
+        distance = distance_transform_edt(np.pad(free, 1, constant_values=False))[1:-1, 1:-1]*self.resolution
+        self.observed_free=free;self.distance=distance;self.clearance=clearance
+        self.free = free & (distance >= clearance)
+
+    def with_live_scan(self, position, goal, scan, heading, forward=0.):
+        """Extend a cropped map using observed scan rays, retaining occupied cells."""
+        padding=math.ceil((self.clearance+4.)/self.resolution)
+        start,end=self.index(position),self.index(goal)
+        x0=min(0,start[0]-padding,end[0]-padding)
+        y0=min(0,start[1]-padding,end[1]-padding)
+        x1=max(self.width,start[0]+padding+1,end[0]+padding+1)
+        y1=max(self.height,start[1]+padding+1,end[1]+padding+1)
+        if (x1-x0)*(y1-y0)>8_000_000:
+            raise ValueError('Live navigation grid is too large')
+        result=copy.copy(self)
+        result.width,result.height=x1-x0,y1-y0
+        dx,dy=x0*self.resolution,y0*self.resolution
+        result.ox=self.ox+self.co*dx-self.si*dy
+        result.oy=self.oy+self.si*dx+self.co*dy
+        result.cells=np.pad(self.cells,((-y0,y1-self.height),(-x0,x1-self.width)),constant_values=-1)
+        endpoints=[]
+        for i,distance in enumerate(scan.ranges):
+            no_return=math.isinf(distance) and distance>0
+            if not no_return and not (math.isfinite(distance) and max(.05,scan.range_min)<distance<=scan.range_max):
+                continue
+            reach=scan.range_max if no_return else distance
+            if not math.isfinite(reach) or reach<=0:
+                continue
+            angle=heading+scan.angle_min+i*scan.angle_increment-forward
+            # Only paint the local canvas; unobserved space stays unknown.
+            reach=min(reach,math.hypot(result.width,result.height)*result.resolution)
+            steps=max(1,math.ceil(reach/(result.resolution*.5)))
+            radial=np.linspace(0.,reach,steps+1)
+            wx=position[0]+radial*math.cos(angle)-result.ox
+            wy=position[1]+radial*math.sin(angle)-result.oy
+            xs=np.floor((result.co*wx+result.si*wy)/result.resolution).astype(int)
+            ys=np.floor((-result.si*wx+result.co*wy)/result.resolution).astype(int)
+            inside=(xs>=0)&(xs<result.width)&(ys>=0)&(ys<result.height)
+            xx,yy=xs[inside],ys[inside]
+            unknown=result.cells[yy,xx]<0
+            result.cells[yy[unknown],xx[unknown]]=0
+            if not no_return and distance<=reach and inside[-1]:
+                endpoints.append((int(xs[-1]),int(ys[-1])))
+        for x,y in endpoints:
+            result.cells[y,x]=100
+        free=(result.cells>=0)&(result.cells<35)
+        result.distance=distance_transform_edt(np.pad(free,1,constant_values=False))[1:-1,1:-1]*result.resolution
+        result.observed_free=free
+        result.free=free&(result.distance>=result.clearance)
+        return result
+
+    def nearest_safe(self, point, limit):
+        if self.safe(self.index(point)):return tuple(point)
+        x,y=self.index(point);n=math.ceil(limit/self.resolution)+1
+        x0,x1=max(0,x-n),min(self.width,x+n+1)
+        y0,y1=max(0,y-n),min(self.height,y+n+1)
+        if x0>=x1 or y0>=y1:raise ValueError('관측된 이동 공간 안에서 지점을 지정해 주세요.')
+        ys,xs=np.nonzero(self.free[y0:y1,x0:x1])
+        candidates=[self.point((int(a+x0),int(b+y0))) for a,b in zip(xs,ys)]
+        closest=min(candidates,key=lambda p:math.dist(p,point),default=None)
+        if closest is None or math.dist(closest,point)>limit:
+            raise ValueError('주변에 선체가 통과할 수 있는 관측 공간이 없습니다.')
+        return closest
+
+    def trial_path(self,start,goal,arrival=.5):
+        # Keep the requested waypoint and saved map intact. Approach a free
+        # point inside its arrival circle instead of requiring its exact cell.
+        target=self.nearest_safe(goal,arrival*.9)
+        if self.safe(self.index(start)):
+            return self,self.path(start,target),target,False
+        # Only the extra navigation margin may shrink, never the hull envelope.
+        # 1.1 x .5 m hull: circumscribed radius .604 m, rounded up to .65 m.
+        escape=copy.copy(self)
+        escape.clearance=max(.65,self.clearance-.1)
+        escape.free=self.observed_free & (self.distance>=escape.clearance)
+        if not escape.safe(escape.index(start)):
+            x,y=escape.index(start)
+            if not (0<=x<self.width and 0<=y<self.height):raise ValueError('현재 위치가 저장 지도 범위를 벗어났습니다.')
+            if not self.observed_free[y,x]:raise ValueError('현재 위치가 저장 지도의 장애물·미관측 칸에 있습니다.')
+            raise ValueError(f'저장 지도상 벽·미관측 영역까지 {self.distance[y,x]:.2f}m · 선체에 필요한 여유 {escape.clearance:.2f}m. 실제 라이다와 위치를 비교해 주세요.')
+        anchor=self.nearest_safe(start,1.)
+        if not escape.line_clear(start,anchor):
+            raise ValueError('관측된 공간으로 빠져나갈 경로가 없습니다.')
+        return escape,[tuple(start)]+self.path(anchor,target),target,True
+
+    def index(self, point):
+        x, y = point[0]-self.ox, point[1]-self.oy
+        if not math.isfinite(x+y): raise ValueError('Non-finite coordinate')
+        return (math.floor((self.co*x+self.si*y)/self.resolution),
+                math.floor((-self.si*x+self.co*y)/self.resolution))
+
+    def point(self, index):
+        x, y = (index[0]+.5)*self.resolution, (index[1]+.5)*self.resolution
+        return (self.ox+self.co*x-self.si*y, self.oy+self.si*x+self.co*y)
+
+    def safe(self, index):
+        x, y = index
+        return 0 <= x < self.width and 0 <= y < self.height and bool(self.free[y, x])
+
+    def line_clear(self, start, end):
+        n = max(1, math.ceil(math.dist(start, end)/(self.resolution*.4)))
+        return all(self.safe(self.index((start[0]+(end[0]-start[0])*i/n,
+                                         start[1]+(end[1]-start[1])*i/n))) for i in range(n+1))
+
+    def path(self, start, goal):
+        a, b = self.index(start), self.index(goal)
+        if not self.safe(a) or not self.safe(b):
+            raise ValueError('위치 또는 목적지가 벽·미관측 영역에 너무 가깝습니다.')
+        if self.line_clear(start, goal): return [tuple(start), tuple(goal)]
+        queue = [(0., a)]; costs = {a: 0.}; parent = {}
+        moves = [(1,0), (-1,0), (0,1), (0,-1), (1,1), (1,-1), (-1,1), (-1,-1)]
+        while queue:
+            _, current = heapq.heappop(queue)
+            if current == b: break
+            for dx, dy in moves:
+                nxt = (current[0]+dx, current[1]+dy)
+                if not self.safe(nxt): continue
+                if dx and dy and (not self.safe((current[0]+dx,current[1])) or not self.safe((current[0],current[1]+dy))): continue
+                cost = costs[current] + math.hypot(dx,dy)
+                if cost < costs.get(nxt, float('inf')):
+                    costs[nxt] = cost; parent[nxt] = current
+                    heapq.heappush(queue, (cost+math.dist(nxt,b), nxt))
+            if len(costs) > 200_000: raise ValueError('경로 탐색 범위가 너무 큽니다.')
+        if b not in costs: raise ValueError('A와 B 사이에 통과할 수 있는 경로가 없습니다.')
+        indices = [b]
+        while indices[-1] != a: indices.append(parent[indices[-1]])
+        result = [tuple(start)]
+        points = [self.point(i) for i in reversed(indices)] + [tuple(goal)]
+        i = 0
+        while i < len(points)-1:
+            j = i+1
+            while j+1 < len(points) and self.line_clear(result[-1], points[j+1]): j += 1
+            result.append(points[j]); i = j
+        return result
+
+
+def guidance(position, heading, target, percent=20.):
+    error = wrap(math.atan2(target[1]-position[1], target[0]-position[0])-heading)
+    base = percent*max(0., math.cos(error))
+    if abs(error) > math.radians(55): base = 0.
+    turn = max(-percent, min(percent, percent*error/.8))
+    # Positive yaw is CCW: starboard forward and port reverse create positive yaw.
+    left, right = base-turn, base+turn
+    scale = max(1., abs(left)/percent, abs(right)/percent)
+    return left/scale, right/scale
+
+
+def pwm(percent):
+    if not math.isfinite(percent) or abs(percent)>100: raise ValueError('Invalid percent')
+    return 1500+round(4*percent)
+
+
+def projected_clearance(scan, forward_angle, turning=False):
+    points = []
+    for i, distance in enumerate(scan.ranges):
+        if not math.isfinite(distance) or not max(scan.range_min,.05) < distance <= scan.range_max: continue
+        angle = wrap(scan.angle_min+i*scan.angle_increment-forward_angle)
+        if turning or abs(angle) < math.radians(50): points.append(distance)
+    return min(points) if len(points)>=4 else None

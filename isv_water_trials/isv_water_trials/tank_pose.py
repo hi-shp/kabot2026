@@ -38,13 +38,16 @@ def main():
             if self.get_parameter('fixed_map').value:
                 from .tank_map_file import read_bundle
                 _,_,files=read_bundle(self.get_parameter('map_file').value)
-                self.map_info=json.loads(files['grid.json']);self.map_cells=files['grid.bin']
+                self.map_info=json.loads(files.get('navigation_grid.json',files['grid.json']))
+                self.map_cells=files.get('navigation_grid.bin',files['grid.bin'])
             self.requested=None;self.matches=0;self.last_match=0;self.saved=0.
             self.manual_locked=False;self.manual_report={};self.manual_received=0.
+            self.gps_docking=None;self.gps_received=0.
             self.create_subscription(PoseWithCovarianceStamped,'/initialpose',self.initial,1)
             self.create_subscription(PoseWithCovarianceStamped,'/pose',self.matched,10)
             self.create_subscription(Empty,'/tank/localize/request',self.relocalize,1)
             self.create_subscription(String,'/tank/localization_candidates',self.manual_tracking,10)
+            self.create_subscription(String,'/outdoor/status',self.gps_tracking,10)
             self.session_pub = self.create_publisher(String,'/tank/session',1)
             self.create_timer(1.,lambda:self.session_pub.publish(String(data=json.dumps({
                 'session_id':self.get_parameter('session_id').value,'mode':self.get_parameter('mode').value,
@@ -70,6 +73,14 @@ def main():
             if report.get('map_id')!=self.get_parameter('session_id').value:return
             self.manual_locked=bool(report.get('manual_locked'))
             self.manual_report=report;self.manual_received=time.monotonic()
+
+        def gps_tracking(self,msg):
+            try:report=json.loads(msg.data)
+            except (ValueError,TypeError):return
+            value=report.get('gps_docking')
+            observing=(report.get('docking_observation') or {}).get('active')
+            self.gps_docking=value if isinstance(value,dict) and value.get('active') and not observing else None
+            self.gps_received=time.monotonic()
 
         def initial(self,msg):
             if not self.get_parameter('fixed_map').value or msg.header.frame_id!='tank_map':return
@@ -108,6 +119,19 @@ def main():
             seed.pose.pose.orientation.w = 1.0
             # RF2O consumes only its first seed; repeating also permits a node restart.
             self.seed.publish(seed)
+            docking=self.gps_docking
+            if docking is not None and docking.get('map_id')==self.get_parameter('session_id').value:
+                p=docking.get('display_pose');now=self.get_clock().now().nanoseconds/1e9
+                valid=isinstance(p,dict) and all(isinstance(p.get(k),(int,float)) and math.isfinite(p[k]) for k in ('x','y','yaw_deg','stamp_s'))
+                fresh=valid and not p.get('held') and time.monotonic()-self.gps_received<.5 and -.1<=now-p['stamp_s']<.5
+                self.ready=bool(fresh);self.reason='' if fresh else 'GPS·IMU 도킹 위치 수신 대기'
+                if fresh:
+                    msg=PoseWithCovarianceStamped();msg.header.frame_id='tank_map'
+                    ns=round(p['stamp_s']*1e9);msg.header.stamp.sec=ns//10**9;msg.header.stamp.nanosec=ns%10**9
+                    msg.pose.pose.position.x=p['x'];msg.pose.pose.position.y=p['y']
+                    a=math.radians(p['yaw_deg']);msg.pose.pose.orientation.z=math.sin(a/2);msg.pose.pose.orientation.w=math.cos(a/2)
+                    self.pose_pub.publish(msg)
+                return
             if self.manual_locked:
                 p=self.manual_report.get('display_pose')
                 now=self.get_clock().now().nanoseconds/1e9

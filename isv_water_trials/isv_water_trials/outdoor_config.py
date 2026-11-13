@@ -1,7 +1,37 @@
 """Separate response-model identity from navigation and display tuning."""
 import hashlib
 import json
+import math
 from pathlib import Path
+
+
+def validate_arrival_radius(value):
+    if isinstance(value,bool):raise ValueError('GPS 도달 범위는 0보다 큰 m 값으로 입력하세요')
+    radius=float(value)
+    if not math.isfinite(radius) or radius<=0:raise ValueError('GPS 도달 범위는 0보다 큰 m 값으로 입력하세요')
+    return radius
+
+
+def read_arrival_radius(path,default):
+    try:data=json.loads(Path(path).read_text(encoding='utf-8'))
+    except FileNotFoundError:return float(default)
+    return validate_arrival_radius(data['arrival_radius_m'])
+
+
+def validate_drive_limits(values):
+    result={}
+    for name in ('point','dock','path'):
+        value=values[name]
+        if isinstance(value,bool):raise ValueError('출력은 0~100%로 입력하세요')
+        value=float(value)
+        if not math.isfinite(value) or not 0<=value<=100:raise ValueError('출력은 0~100%로 입력하세요')
+        result[name]=value
+    return result
+
+
+def read_drive_limits(path,default=20.):
+    try:return validate_drive_limits(json.loads(Path(path).read_text(encoding='utf-8')))
+    except FileNotFoundError:return dict(point=default,dock=default,path=default)
 
 IDENTITY_KEYS = (
     'mass_kg','length_m','width_m','thruster_spacing_m',
@@ -13,7 +43,12 @@ IDENTITY_KEYS = (
 
 
 def learning_identity(config):
-    return {key:config[key] for key in IDENTITY_KEYS}
+    result = {key:config[key] for key in IDENTITY_KEYS}
+    # Old records retain their original signature and unknown hardware mode.
+    for key in ('imu_heading_mode','imu_calibration_id'):
+        if key in config:
+            result[key] = config[key]
+    return result
 
 
 def fingerprint(config):

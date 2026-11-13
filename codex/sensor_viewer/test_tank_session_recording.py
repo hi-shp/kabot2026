@@ -12,6 +12,17 @@ from isv_water_trials import tank_session as session
 
 
 class SessionRecordingTests(unittest.TestCase):
+    def test_repeated_sensor_start_requests_focus_without_restarting(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder,patch.object(session,'ROOT',Path(folder)),\
+                patch.object(session,'running',return_value={'pid':999}),patch.object(session.subprocess,'Popen') as child,\
+                contextlib.redirect_stdout(io.StringIO()):
+            session.main(['start','sensors'])
+            first=json.loads((Path(folder)/'dashboard_wake.json').read_text())['id']
+            session.main(['start','sensors'])
+            second=json.loads((Path(folder)/'dashboard_wake.json').read_text())['id']
+            self.assertNotEqual(first,second);child.assert_not_called()
+
     def run_mapping_worker(self,fail=False):
         with tempfile.TemporaryDirectory() as folder:
             child=Mock();child.poll.return_value=0;child.returncode=0

@@ -33,7 +33,7 @@ import message_filters
 from cv_bridge import CvBridge
 from ultralytics.utils.plotting import Annotator, colors
 
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from visualization_msgs.msg import Marker
 from visualization_msgs.msg import MarkerArray
 from yolo_msgs.msg import BoundingBox2D
@@ -67,7 +67,7 @@ class DebugNode(LifecycleNode):
         )
 
         # pubs
-        self._dbg_pub = self.create_publisher(Image, "dbg_image", 10)
+        self._dbg_pub = self.create_publisher(CompressedImage, "dbg_image/compressed", 10)
         self._bb_markers_pub = self.create_publisher(MarkerArray, "dgb_bb_markers", 10)
         self._kp_markers_pub = self.create_publisher(MarkerArray, "dgb_kp_markers", 10)
 
@@ -79,9 +79,14 @@ class DebugNode(LifecycleNode):
     def on_activate(self, state: LifecycleState) -> TransitionCallbackReturn:
         self.get_logger().info(f"[{self.get_name()}] Activating...")
 
+        compressed_input = self.resolve_topic_name("image_raw").endswith("/compressed")
+        self.image_message_type = CompressedImage if compressed_input else Image
+        self.decode_image = (self.cv_bridge.compressed_imgmsg_to_cv2 if compressed_input
+                             else self.cv_bridge.imgmsg_to_cv2)
+
         # subs
         self.image_sub = message_filters.Subscriber(
-            self, Image, "image_raw", qos_profile=self.image_qos_profile
+            self, self.image_message_type, "image_raw", qos_profile=self.image_qos_profile
         )
         self.detections_sub = message_filters.Subscriber(
             self, DetectionArray, "detections", qos_profile=10
@@ -331,7 +336,7 @@ class DebugNode(LifecycleNode):
         return marker
 
     def detections_cb(self, img_msg: Image, detection_msg: DetectionArray) -> None:
-        cv_image = self.cv_bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
+        cv_image = self.decode_image(img_msg, desired_encoding="bgr8")
         bb_marker_array = MarkerArray()
         kp_marker_array = MarkerArray()
 
@@ -368,9 +373,9 @@ class DebugNode(LifecycleNode):
                     kp_marker_array.markers.append(marker)
 
         # publish dbg image
-        self._dbg_pub.publish(
-            self.cv_bridge.cv2_to_imgmsg(cv_image, encoding="bgr8", header=img_msg.header)
-        )
+        debug_image = self.cv_bridge.cv2_to_compressed_imgmsg(cv_image, dst_format="jpg")
+        debug_image.header = img_msg.header
+        self._dbg_pub.publish(debug_image)
         self._bb_markers_pub.publish(bb_marker_array)
         self._kp_markers_pub.publish(kp_marker_array)
 

@@ -1,0 +1,6 @@
+float32 target_percentage
+float32 percentages_per_second
+---
+bool status
+---
+float32 current_percentage

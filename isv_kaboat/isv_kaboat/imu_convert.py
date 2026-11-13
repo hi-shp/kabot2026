@@ -16,12 +16,7 @@ class ImuHeadingLogger(Node):
         )
 
         # VectorNav CommonGroup 구독 (/vectornav/raw/common)
-        self.sub_vn = self.create_subscription(
-            CommonGroup,
-            '/vectornav/raw/common',
-            self.vectornav_callback,
-            qos
-        )
+        self.sub_vn = self.create_subscription(CommonGroup,'/vectornav/raw/common',self.vectornav_callback,qos)
 
         self.get_logger().info('IMU Heading Logger started (topic: /vectornav/raw/common)')
 

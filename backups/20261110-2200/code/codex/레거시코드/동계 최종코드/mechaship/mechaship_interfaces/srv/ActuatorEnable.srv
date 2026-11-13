@@ -1,0 +1,10 @@
+float32 key_min_degree
+float32 key_max_degree
+
+uint16 key_pulse_0_degree
+uint16 key_pulse_180_degree
+
+uint16 thruster_pulse_0_percentage
+uint16 thruster_pulse_100_percentage
+---
+bool status

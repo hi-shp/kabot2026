@@ -109,15 +109,14 @@ class OutdoorStore:
             current=self.load_compatible_model(catalog[0]['id']) if catalog else None
             chosen=next((m for m in catalog if m['finalized']),None)
             validation=self.load_compatible_model(chosen['id']) if chosen else None
-            return current,validation,True
+            return current,validation,False
         current_id=saved.get('current_model_id',saved.get('model_id'))
         validation_id=saved.get('validation_model_id')
         if saved.get('schema')!='live-models-v2' and saved.get('frozen'):validation_id=current_id
         current=self.load_compatible_model(current_id) if current_id else None
         validation=self.load_compatible_model(validation_id) if validation_id else None
-        # Old freeze stopped learning; migration resumes continuous learning.
-        learning=bool(saved.get('learning',True)) if saved.get('schema')=='live-models-v2' else True
-        return current,validation,learning
+        # Every bringup waits for an explicit learning start; models still restore.
+        return current,validation,False
 
     def save_live_selection(self,current,validation,learning):
         atomic_json(self.root/'selection.json',dict(schema='live-models-v2',

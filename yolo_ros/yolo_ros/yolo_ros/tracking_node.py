@@ -34,7 +34,7 @@ from ultralytics.trackers import BOTSORT, BYTETracker
 from ultralytics.utils import IterableSimpleNamespace, YAML
 from ultralytics.utils.checks import check_requirements, check_yaml
 
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from yolo_msgs.msg import Detection
 from yolo_msgs.msg import DetectionArray
 
@@ -77,9 +77,14 @@ class TrackingNode(LifecycleNode):
             depth=1,
         )
 
+        compressed_input = self.resolve_topic_name("image_raw").endswith("/compressed")
+        self.image_message_type = CompressedImage if compressed_input else Image
+        self.decode_image = (self.cv_bridge.compressed_imgmsg_to_cv2 if compressed_input
+                             else self.cv_bridge.imgmsg_to_cv2)
+
         # subs
         image_sub = message_filters.Subscriber(
-            self, Image, "image_raw", qos_profile=image_qos_profile
+            self, self.image_message_type, "image_raw", qos_profile=image_qos_profile
         )
         detections_sub = message_filters.Subscriber(
             self, DetectionArray, "detections", qos_profile=10
@@ -146,7 +151,7 @@ class TrackingNode(LifecycleNode):
         tracked_detections_msg.header = img_msg.header
 
         # convert image
-        cv_image = self.cv_bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
+        cv_image = self.decode_image(img_msg, desired_encoding="bgr8")
         cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
 
         # parse detections
@@ -168,14 +173,14 @@ class TrackingNode(LifecycleNode):
         # tracking
         if len(detection_list) > 0:
 
-            det = Boxes(np.array(detection_list), (img_msg.height, img_msg.width))
+            det = Boxes(np.array(detection_list), cv_image.shape[:2])
             tracks = self.tracker.update(det, cv_image)
 
             if len(tracks) > 0:
 
                 for t in tracks:
 
-                    tracked_box = Boxes(t[:-1], (img_msg.height, img_msg.width))
+                    tracked_box = Boxes(t[:-1], cv_image.shape[:2])
                     tracked_detection: Detection = detections_msg.detections[int(t[-1])]
 
                     # get boxes values

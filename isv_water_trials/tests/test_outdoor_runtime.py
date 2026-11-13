@@ -7,7 +7,7 @@ import tempfile
 import time
 from types import SimpleNamespace as N
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock,patch
 import numpy as np
 from isv_water_trials import outdoor
 from isv_water_trials.outdoor_model import ResponseModel, local_xy
@@ -49,11 +49,43 @@ class RuntimeTests(unittest.TestCase):
     def test_passive_bringup_never_sends_actuator_commands(self):
         self.n.tick();self.assertFalse(self.n.sent)
 
+    def test_regions_persist_without_driving_and_invalid_edits_preserve_file(self):
+        from isv_water_trials.outdoor_model import latlon
+        regions=[{'kind':'include','points':[latlon(x,y,[35,129]) for x,y in [(-12,-12),(12,-12),(12,12),(-12,12)]]},
+                 {'kind':'exclude','points':[latlon(x,y,[35,129]) for x,y in [(3,3),(5,3),(5,5),(3,5)]]}]
+        self.assertTrue(self.request('regions',regions=regions)['ok'])
+        saved=Path(self.tmp.name)/'regions.json';original=saved.read_bytes()
+        self.assertEqual(json.loads(original),regions);self.assertFalse(self.n.sent)
+        self.assertFalse(self.request('regions',regions=regions[1:])['ok'])
+        self.assertEqual(saved.read_bytes(),original)
+        self.n.execute=True
+        self.assertFalse(self.request('regions',regions=regions)['ok'])
+        self.assertTrue(self.n.execute);self.assertEqual(saved.read_bytes(),original)
+
     def test_pause_keeps_history_and_does_not_reboot_sensors(self):
         self.n.rows=[{'keep':True}];self.n.trail=[[1,2,3,4]]
         self.assertTrue(self.request('pause')['ok']);self.assertFalse(self.n.learning)
         self.assertEqual(len(self.n.rows),1);self.assertEqual(len(self.n.trail),1)
         self.n.state.reset.assert_not_called()
+
+    def test_paused_frames_update_display_without_saving_training(self):
+        n=self.n;n.learning=False;n.last_frame_t=None;n.commands=[[99.9,0.,0.]];n.chart=[]
+        n.stamp=lambda *_:100.;n.comparison=Mock();n.comparison.update.return_value=None
+        n.state.velocity.return_value=dict(t=100.,velocity=[.1,0.,0.],position=[0.,0.],yaw=0.,
+            position_sigma_m=.2,velocity_sigma_m_s=.1,imu_skew_s=.01)
+        msg=N(twist=N(twist=N(linear=N(x=.1,y=0.)),covariance=[0.]*36))
+        n.on_velocity(msg);n.store.add.assert_not_called();self.assertEqual(len(n.chart),1)
+        self.assertTrue(self.request('resume')['ok'])
+        n.store.add.side_effect=lambda row:row
+        n.on_velocity(msg);n.store.add.assert_called_once()
+        self.request('pause');n.on_velocity(msg);n.store.add.assert_called_once()
+
+    def test_pause_stops_raw_recorder_once_without_touching_driving(self):
+        n=self.n;n.bag=Mock(pid=123456);n.bag.poll.return_value=None;n.execute=True
+        with patch.object(outdoor.os,'killpg',create=True) as kill:
+            self.assertTrue(self.request('pause')['ok']);n.stop_recording()
+            kill.assert_called_once_with(123456,outdoor.signal.SIGINT)
+        self.assertTrue(n.execute);self.assertEqual(n.bag_status,'학습 중지')
 
     def test_resume_keeps_validation_and_running_trial(self):
         self.n.execute=True;self.n.learning=False;self.n.validation_model=self.n.model

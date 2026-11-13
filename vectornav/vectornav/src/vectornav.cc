@@ -146,6 +146,8 @@ Vectornav::Vectornav(const rclcpp::NodeOptions & options) : Node("vectornav", op
 
   // Message Header
   declare_parameter<std::string>("frame_id", "vectornav");
+  // -1 preserves the sensor setting; 0/1/2 select absolute/relative/indoor.
+  declare_parameter<int>("heading_mode", -1);
 
   // Composite Data Publisher
   pub_common_ =
@@ -582,6 +584,25 @@ bool Vectornav::connect(const std::string port, const int baud)
   */
 bool Vectornav::configure_sensor()
 {
+  const auto heading_mode = get_parameter("heading_mode").as_int();
+  if (heading_mode < -1 || heading_mode > 2) {
+    RCLCPP_ERROR(get_logger(), "heading_mode must be -1, 0, 1 or 2");
+    return false;
+  }
+  if (heading_mode >= 0) {
+    auto vpe = vs_->readVpeBasicControl();
+    if (static_cast<int>(vpe.headingMode) != heading_mode) {
+      vpe.headingMode = static_cast<vn::protocol::uart::HeadingMode>(heading_mode);
+      vs_->writeVpeBasicControl(vpe);
+    }
+    const auto verified = vs_->readVpeBasicControl();
+    if (static_cast<int>(verified.headingMode) != heading_mode) {
+      RCLCPP_ERROR(get_logger(), "Sensor heading mode readback mismatch");
+      return false;
+    }
+    RCLCPP_INFO(get_logger(), "Heading mode confirmed: %d (0=absolute, 1=relative, 2=indoor)",
+      static_cast<int>(verified.headingMode));
+  }
   // TODO(Dereck): Move writeUserTag to Service Call?
   // 5.2.1
   // vs_->writeUserTag("");

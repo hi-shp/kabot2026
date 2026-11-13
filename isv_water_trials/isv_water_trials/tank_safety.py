@@ -80,10 +80,11 @@ def excitation(t, cruise=20.):
             (cruise-abs(turn), -turn, 'weave_reverse'), (cruise, 0., 'step_high')][phase]
 
 
-def scan_points(scan, position, heading, forward):
+def scan_points(scan, position, heading, forward,open_water=False):
     """Require returns around the hull; unknown sectors inhibit autonomous motion."""
     sectors = set(); points = []
     for i, distance in enumerate(scan.ranges):
+        if open_water and math.isinf(distance) and distance>0:distance=min(10.,scan.range_max)
         if not math.isfinite(distance) or not max(.05, scan.range_min) < distance <= scan.range_max:
             continue
         angle = wrap(scan.angle_min+i*scan.angle_increment-forward)
@@ -129,15 +130,15 @@ def trajectory_clear(grid, points, obstacles, radius):
     return True
 
 
-def select_command(grid, scan, position, heading, velocity, target, goal, forward,
-                   elapsed, cap=20., radius=.75, excite=True, margin_recovery=False):
-    if not 0 < cap <= 20: raise ValueError('Tank output cap must be <=20%')
+def _checked_command(grid, scan, position, heading, velocity, target, goal, forward,
+                   elapsed, cap=20., radius=.75, excite=True, margin_recovery=False, reverse_only=False,open_water=False):
+    if not 0 < cap <= (100 if open_water else 20): raise ValueError('Invalid docking output cap')
     if velocity is None or not all(math.isfinite(v) for v in velocity):
         return (0.,0.), {'phase':'HOLD','reason':'연속 속도 추정 대기','points_m':[]}
     u,v,r = velocity
     if math.hypot(u,v)>.6 or abs(r)>1.2:
         return (0.,0.), {'phase':'HOLD','reason':'시험 속도 범위 초과','points_m':[]}
-    try: obstacles = scan_points(scan,position,heading,forward)
+    try: obstacles = scan_points(scan,position,heading,forward,open_water=open_water)
     except ValueError as exc:
         return (0.,0.), {'phase':'HOLD','reason':str(exc),'points_m':[]}
     # Allow reaction/communication latency plus 3 s of unbraked motion. This is
@@ -149,20 +150,25 @@ def select_command(grid, scan, position, heading, velocity, target, goal, forwar
     if recovery and (math.hypot(u,v)>.15 or abs(r)>.4):
         return (0.,0.), {'phase':'HOLD','reason':'타력 이동 여유 부족','points_m':coast}
     desired = guidance(position,heading,target,cap)
+    if reverse_only:
+        error=wrap(math.atan2(target[1]-position[1],target[0]-position[0])-heading-math.pi)
+        turn=cap*max(-1.,min(1.,error/.8))
+        surge=-cap*max(0.,math.cos(error))
+        desired=(max(-cap,min(0.,surge-turn)),max(-cap,min(0.,surge+turn)))
     if math.dist(position,goal)<1.5 and abs(wrap(math.atan2(target[1]-position[1],target[0]-position[0])-heading))<.5:
         scale = max(.2,math.dist(position,goal)/1.5)
         desired = tuple(v*scale for v in desired)
     error = wrap(math.atan2(target[1]-position[1],target[0]-position[0])-heading)
     nearest = float(np.min(np.linalg.norm(obstacles-np.asarray(position),axis=1)))
     phase = 'transit'
-    if excite and not recovery and nearest > radius+1.2 and math.dist(position,goal)>2. and abs(error)<.18:
+    if excite and not reverse_only and not recovery and nearest > radius+1.2 and math.dist(position,goal)>2. and abs(error)<.18:
         base,turn,phase = excitation(elapsed,cap)
         base = min(cap,max(0.,base)); turn += cap*error/.8
         desired = (max(-cap,min(cap,base-turn)),max(-cap,min(cap,base+turn)))
     candidates = [(desired,phase)]
     # Tracking/avoidance takes priority over excitation. Keep alternatives bounded.
     for turn in (0., -cap*.5, cap*.5, -cap, cap):
-        for base in (cap*.5, 0.):
+        for base in ((-cap*.5,0.) if reverse_only else (cap*.5,0.)):
             scale = max(1.,abs(base-turn)/cap,abs(base+turn)/cap)
             candidates.append((((base-turn)/scale,(base+turn)/scale),'avoidance'))
     if recovery:
@@ -174,6 +180,7 @@ def select_command(grid, scan, position, heading, velocity, target, goal, forwar
             (-limit,0.),(0.,-limit),(limit,0.),(0.,limit))]
     best = None
     for order,(command,label) in enumerate(candidates):
+        if reverse_only and max(command)>1e-9:continue
         points = rollout(position,heading,velocity,command,cap)
         if not trajectory_clear(grid,points,obstacles,radius): continue
         score = math.dist(points[-1],target) + .01*(abs(command[0]-desired[0])+abs(command[1]-desired[1]))
@@ -183,3 +190,21 @@ def select_command(grid, scan, position, heading, velocity, target, goal, forwar
         return (0.,0.), {'phase':'HOLD','reason':'충돌 여유를 만족하는 조향 없음','points_m':coast}
     return best[1], {'phase':best[2], 'reason':'', 'points_m':best[3],
                      'nearest_m':nearest,'coast_clear':coast_safe,'kind':'provisional_safety_rollout','seconds':3.}
+
+
+def select_command(grid, scan, position, heading, velocity, target, goal, forward,
+                   elapsed, cap=20., radius=.75, excite=True, margin_recovery=False,
+                   reverse_only=False, open_water=False, buoy_course=False):
+    if buoy_course and not open_water:
+        raise ValueError('Buoy contact mode requires the open-water course')
+    command,result=_checked_command(grid,scan,position,heading,velocity,target,goal,forward,
+        elapsed,cap,radius,excite,margin_recovery,reverse_only,open_water)
+    if not buoy_course or (not result.get('reason') and result.get('phase')!='clearance_recovery'
+                           and max(abs(v) for v in command)>1e-9):
+        return command,result
+    from .outdoor_follow import buoy_goal_command
+    state={'position':position,'yaw':heading,'velocity':velocity}
+    command,_,error=buoy_goal_command(state,goal,cap,reverse_only=reverse_only)
+    return tuple(value*100 for value in command),dict(phase='buoy_goal',reason='',points_m=[],
+        kind='buoy_goal_fallback',heading_error_deg=error,
+        obstacle_advisory=result.get('reason') or result.get('phase','zero_candidate'))

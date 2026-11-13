@@ -7,10 +7,15 @@ import signal
 import subprocess
 import sys
 import time
+import uuid
 from .tank_storage import atomic_json
 
 ROOT = Path.home()/'water_trials/runtime'
-NAMES = ('trial','record','mapping','sensors')
+NAMES = ('trial','record','mapping','outdoor','sensors')
+
+
+def wake_dashboard():
+    atomic_json(ROOT/'dashboard_wake.json',{'id':uuid.uuid4().hex})
 
 
 def identity(pid):
@@ -26,6 +31,7 @@ def running(name):
 
 def command_for(name, extra):
     if name=='record': return [sys.executable,'-m','isv_water_trials.tank_record',*extra]
+    if name=='outdoor': return [sys.executable,'-m','isv_water_trials.outdoor',*extra]
     if name=='sensors': return ['ros2','launch','mechaship_bringup','all_sensors.launch.py',*extra]
     if name=='mapping': return ['ros2','launch','isv_water_trials','tank_mapping.launch.py',*extra]
     return [sys.executable,'-m','isv_water_trials.indoor_trial',*extra]
@@ -37,6 +43,9 @@ def worker(name, extra):
     try: fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
     except BlockingIOError: lock.close(); return
     stopped = False; child = None
+    sensor_owner = running('sensors') if name=='outdoor' else None
+    if name=='outdoor' and not sensor_owner:
+        lock.close(); return
     def stop(*_):
         nonlocal stopped
         stopped = True
@@ -51,7 +60,10 @@ def worker(name, extra):
         if name=='mapping':main(['start','record'],_internal=True)
         while not stopped:
             child = subprocess.Popen(command,stdin=subprocess.DEVNULL,start_new_session=True)
-            while child.poll() is None: time.sleep(.1)
+            while child.poll() is None:
+                # A supplemental navigation worker belongs to this sensor session.
+                if name=='outdoor' and running('sensors')!=sensor_owner:stop()
+                time.sleep(.1)
             code = child.returncode
             # An orderly exit, bad CLI, missing route or duplicate launch needs
             # operator correction. Only an unexpected runtime exit is retried.
@@ -65,7 +77,6 @@ def worker(name, extra):
                 os.killpg(child.pid,signal.SIGINT)
                 child.wait(timeout=30 if name=='record' else 15)
         finally:
-            if name=='mapping':main(['stop','record'],_internal=True)
             marker = ROOT/(name+'.json')
             if running(name) and running(name)['pid']==os.getpid(): marker.unlink(missing_ok=True)
             lock.close()
@@ -77,7 +88,7 @@ def main(argv=None,*,_internal=False):
         argv.insert(1,'mapping')
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action',choices=('start','status','attach','stop','freeze','_worker'))
-    choices=NAMES if _internal or argv[:1]==['_worker'] else tuple(n for n in NAMES if n!='record')
+    choices=NAMES if _internal or argv[:1]==['_worker'] else tuple(n for n in NAMES if n not in ('record','outdoor'))
     parser.add_argument('name',choices=(*choices,'all'),nargs='?',default='all')
     args,extra = parser.parse_known_args(argv)
     if extra and extra[0]=='--': extra = extra[1:]
@@ -88,10 +99,13 @@ def main(argv=None,*,_internal=False):
     if args.action=='freeze':
         freeze_parser=argparse.ArgumentParser()
         freeze_parser.add_argument('--name',default='~/water_trials/tank_maps/pool.tankmap')
+        freeze_parser.add_argument('--crop',nargs=4,type=float)
         config=freeze_parser.parse_args(extra)
         if running('trial'):main(['stop','trial'])
         if running('trial'):raise RuntimeError('왕복 종료를 먼저 확인하세요.')
-        result=subprocess.run([sys.executable,'-m','isv_water_trials.tank_save','--freeze','--name',config.name])
+        save_command=[sys.executable,'-m','isv_water_trials.tank_save','--freeze','--name',config.name]
+        if config.crop:save_command+=['--crop',*map(str,config.crop)]
+        result=subprocess.run(save_command)
         if result.returncode:raise SystemExit(result.returncode)
         main(['stop','mapping'])
         if running('mapping'):raise RuntimeError('지도 프로세스 종료 대기 중입니다.')
@@ -100,15 +114,18 @@ def main(argv=None,*,_internal=False):
         if args.name=='all': parser.error('Choose sensors, mapping or trial')
         if running(args.name):
             if args.name=='mapping' and not running('record'):main(['start','record'],_internal=True)
+            if args.name=='sensors':wake_dashboard()
             print(args.name+' already running'); return
         with (ROOT/(args.name+'.log')).open('a',encoding='utf-8') as stream:
             subprocess.Popen([sys.executable,'-m','isv_water_trials.tank_session','_worker',args.name,'--',*extra],
                 start_new_session=True,stdin=subprocess.DEVNULL,stdout=stream,stderr=subprocess.STDOUT,close_fds=True)
         time.sleep(.5)
+        if args.name=='sensors' and running('sensors'):wake_dashboard()
         print(args.name+(' started' if running(args.name) else ' not started; inspect '+str(ROOT/(args.name+'.log'))))
     elif args.action=='status':
         for name in names: print(name+': '+('running' if running(name) else 'stopped'))
     elif args.action=='stop':
+        if args.name=='sensors':main(['stop','outdoor'],_internal=True)
         for name in names:
             value = running(name)
             if value:
@@ -116,7 +133,6 @@ def main(argv=None,*,_internal=False):
                 except ProcessLookupError: pass
                 until = time.monotonic()+({'mapping':50,'record':35}.get(name,15))
                 while running(name) and time.monotonic()<until: time.sleep(.1)
-            if name=='mapping' and not running(name) and running('record'):main(['stop','record'],_internal=True)
             if not _internal:print(name+': '+('STOP_PENDING: inspect session log' if running(name) else 'stopped'))
     elif args.action=='attach':
         if args.name=='all': parser.error('Choose one session to attach')

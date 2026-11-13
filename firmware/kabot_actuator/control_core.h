@@ -24,6 +24,7 @@ class Controller {
   bool armed = false;
   uint16_t left, right;
   uint16_t last_sequence = 0;
+  bool automaticActive() const { return mode == AUTOMATIC && armed && has_command_; }
 
   void disarm() {
     armed = false;

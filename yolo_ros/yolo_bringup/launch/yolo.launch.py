@@ -17,7 +17,7 @@
 from launch import LaunchDescription, LaunchContext
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, PythonExpression
-from launch_ros.actions import Node
+from isv_water_trials.launch_once import node as Node, once, GPS_EXECUTABLES
 from launch.conditions import IfCondition
 
 

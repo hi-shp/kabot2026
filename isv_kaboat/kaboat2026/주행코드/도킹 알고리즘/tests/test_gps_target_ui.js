@@ -1,0 +1,23 @@
+const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('assert');
+const root=process.argv[2],html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]),nodes=new Map(ids.map(id=>[id,{value:'',disabled:false,checked:true,textContent:''}]));
+let state={connected:true,controls_enabled:true,map_points:[[35.12,129.1]],map_points_xyz:[[1,2,3]],current_scan:[],rc_path:[],status:{gps_map_loaded:false,gps_map_available:true,initial_mapping_state:'FINISHED',rc_ready:true}};
+const calls=[],timers=[],drawing=[];const ctx=new Proxy({}, {get:(t,k)=>t[k]??((...a)=>drawing.push([k,...a])),set:(t,k,v)=>(t[k]=v,true)});
+const c={window:{localStorage:{getItem:()=>null},dispatchEvent(){}},document:{getElementById:id=>nodes.get(id)},console,Math,Number,JSON,Date,CustomEvent:class{},setTimeout:f=>timers.push(f),fetch:async(url,opt)=>{if(opt)calls.push(JSON.parse(opt.body));return{ok:true,json:async()=>opt?{success:true,request_id:'target-ack'}:state}},confirm:()=>true};
+vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(root,'app.js'),'utf8').split('/* END SATELLITE MAP */')[0],c);vm.runInContext(fs.readFileSync(path.join(root,'docking_map.js'),'utf8'),c);
+const flush=()=>new Promise(r=>setImmediate(r));
+(async()=>{
+ await flush();assert(nodes.get('gpsTargetPick').disabled,'target requires a loaded map');
+ state={...state,status:{...state.status,gps_map_loaded:true,gps_map_name:'map-current'}};await timers.shift()();await flush();
+ const S=vm.runInContext('SatelliteMap',c),map={mapOnly:true,center:S.project([35.12,129.1]),zoom:20,width:800,height:420,schedule(){},screen:()=>[400,210]};
+ c.window.DockingMapUI.bindMap(map);assert.strictEqual(nodes.get('gpsTargetPick').disabled,false);
+ nodes.get('gpsTargetPick').onclick();assert(nodes.get('gpsTargetCoords').textContent.includes('클릭'));
+ assert(c.window.DockingMapUI.mapClick(map,400,210));await flush();
+ assert.strictEqual(calls.length,1);assert.strictEqual(calls[0].action,'set_gps_target');assert.strictEqual(calls[0].map_name,'map-current');
+ assert(Math.abs(calls[0].latitude-35.12)<1e-7);assert(Math.abs(calls[0].longitude-129.1)<1e-7);
+ state={...state,status:{...state.status,gps_target:{latitude:35.12,longitude:129.1},last_gui_result:{request_id:'target-ack',success:true,message:'saved'}}};
+ await timers.shift()();await flush();c.window.DockingMapUI.draw(map,ctx,800,420);
+ assert(drawing.some(x=>x[0]==='fillText'&&x[1]==='목표'));assert(nodes.get('gpsTargetCoords').textContent.includes('맵에 저장됨'));
+ assert(!calls.some(x=>x.action==='auto_start'||x.action==='start'),'no driving command');
+ console.log('GPS_TARGET_UI_OK: loaded-map guard; click coordinates; map identity; persisted marker; no drive command');
+})().catch(e=>{console.error(e);process.exitCode=1});

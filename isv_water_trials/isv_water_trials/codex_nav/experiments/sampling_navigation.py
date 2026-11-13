@@ -216,6 +216,10 @@ class SamplingNavigator:
             states[:, t] = z
         return states, closest
 
+    def reference_cost_adjustment(self, initial, sequences, states):
+        """Adapter-specific preferences; collision feasibility stays separate."""
+        return np.zeros(len(states))
+
     def plan(self, state, observation, goal, frame):
         started = time.perf_counter()
         cfg, p = self.cfg, self.p
@@ -383,6 +387,7 @@ class SamplingNavigator:
             cost += cfg.clearance_weight/np.maximum(clearance+.15, .03)
             cost += .05*np.mean(u[:, :, 0]**2, axis=1)
             cost += terminal_cost(z[:, -1], state[:2], goal, self.goal_heading)
+            cost += self.reference_cost_adjustment(state,u,z)
             return cost
         # The ETA branch never reads this legacy weighted objective. It is a
         # pure calculation, not a safety gate or a source of random draws.

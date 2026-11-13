@@ -2,7 +2,7 @@
 
 .trial-charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:0 20px 20px}.trial-charts canvas{display:block;width:100%;height:210px}.trial-charts h3{font-size:13px;font-weight:500}@media(max-width:900px){.trial-charts{grid-template-columns:1fr}}
 
-.tank-stage{height:clamp(440px,64vh,850px)}.tank-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 14px;color:var(--muted);font-size:12px;flex-wrap:wrap}.tank-toolbar .tools{flex-wrap:wrap}#tankZoomLabel{min-width:42px;text-align:center}#tankMap{touch-action:none;cursor:grab}#tankMap.dragging{cursor:grabbing}.tank-panel.expanded{position:fixed;inset:12px;z-index:1000;margin:0;display:flex;flex-direction:column;box-shadow:0 0 0 30px #091017eb}.tank-panel.expanded .tank-stage{flex:1;height:auto;min-height:0}.tank-panel.expanded .panel-foot{flex-shrink:0}.tank-panel .panel-head .tools{flex-wrap:wrap}@media(max-width:700px){.tank-stage{height:65vh;min-height:350px}.tank-panel.expanded{inset:5px}}
+.tank-stage{height:clamp(440px,64vh,850px)}.tank-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:9px 14px;color:var(--muted);font-size:12px;flex-wrap:wrap}.tank-toolbar .tools{flex-wrap:wrap}#tankZoomLabel{min-width:42px;text-align:center}#tankMap{touch-action:none;cursor:grab}#tankMap.dragging{cursor:grabbing}.map-management{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px 14px;border-bottom:1px solid var(--border)}.map-management input{width:170px;padding:6px 8px}.map-management select{min-width:190px;max-width:35vw}.map-management #mapJobStatus{margin-left:auto}.tank-panel.expanded{position:fixed;inset:12px;z-index:1000;margin:0;display:flex;flex-direction:column;box-shadow:0 0 0 30px #091017eb}.tank-panel.expanded .tank-stage{flex:1;height:auto;min-height:0}.tank-panel.expanded .panel-foot{flex-shrink:0}.tank-panel .panel-head .tools{flex-wrap:wrap}@media(max-width:700px){.tank-stage{height:65vh;min-height:350px}.map-management>*{flex:1 1 42%}.map-management input,.map-management select{width:100%;max-width:none}.map-management #mapJobStatus{flex-basis:100%;margin:0}.tank-panel.expanded{inset:5px}}
 
 .candidate-info{padding:8px 16px;color:var(--amber);font-size:12px;line-height:1.7;max-height:90px;overflow:auto;flex-shrink:0}
 .candidate-controls{padding:0 16px 12px;flex-wrap:wrap;flex-shrink:0}.candidate-controls #candidateButtons{flex-wrap:wrap}.candidate-controls button.active{background:#e8f4f5;color:#102531;border-color:#fff}
@@ -44,6 +44,9 @@ body.sensors-only{--bg:#212121;--panel:#272727;--border:#444;--muted:#aaa;--text
 .section-sensors .panel-foot{padding:6px 10px;gap:12px}
 .section-sensors .imu-panel{display:grid;grid-template-columns:minmax(160px,1.1fr) minmax(125px,1fr);align-content:start}
 .section-sensors .imu-panel>.panel-head,.section-sensors .imu-panel>.sensor-line,.section-sensors .imu-panel>.vector-line,.section-sensors .imu-panel>.trend,.section-sensors .imu-panel>.panel-note{grid-column:1/-1}
+
+.runtime-status .runtime-action{background:transparent;cursor:pointer}.runtime-status .runtime-action.danger{color:#ffaaaa;border-color:#754444}.runtime-status .runtime-action:disabled{cursor:wait}
+@media(max-width:600px){.sensors-only .runtime-status{max-width:100%;justify-content:flex-start}}
 .section-sensors .attitude{height:180px;min-width:0}
 .section-sensors .imu-panel>.angle-grid{display:flex;flex-direction:column;justify-content:space-evenly;padding:0 8px 0 0;min-width:0}
 .section-sensors .imu-panel .angle-grid strong{margin-top:2px;font-size:21px}
@@ -58,7 +61,7 @@ body.sensors-only{--bg:#212121;--panel:#272727;--border:#444;--muted:#aaa;--text
 .section-sensors .scan-panel,.section-sensors .gps-panel{height:242px;position:relative}
 .section-sensors .scan-panel>.panel-head{height:55px;flex:none}
 .section-sensors .scan-canvas{position:absolute;left:0;top:55px;width:100%;height:calc(100% - 55px);min-height:0}
-.section-sensors .header-status{flex-direction:row;align-items:center}.section-sensors header{min-height:36px}
+.section-sensors .header-status{flex-direction:row;align-items:center;justify-content:flex-end;gap:12px}.section-sensors header{min-height:36px}
 
 body.sensors-only{--bg:#181818;--panel:#242424;--border:#454545;--muted:#c7c7c7;--text:#f5f5f5}
 .sensors-only h2{color:#fff;font-size:16px;font-weight:650}.sensors-only .panel-head{border-bottom-color:#454545}
@@ -71,6 +74,17 @@ body.sensors-only{--bg:#181818;--panel:#242424;--border:#454545;--muted:#c7c7c7;
 .section-sensors .imu-panel .angle-grid>div:nth-child(-n+2)>span{font-size:11px;color:#a9a9a9}
 .section-sensors .gps-grid strong{font-size:18px;font-weight:600;color:#fff}
 #actuatorLeft{color:#48e5c2;font-size:23px;font-weight:650}#actuatorRight{color:#ffad56;font-size:23px;font-weight:650}
+.imu-propulsion{grid-column:1/-1;padding:8px 12px;border-top:1px solid var(--border)}
+.propulsion-meta{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;font-size:12px}
+.propulsion-meta span{color:var(--muted)}
+.propulsion-values{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.propulsion-values>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.propulsion-values>div>span{font-size:12px;color:var(--muted)}
+.imu-propulsion #actuatorLeft,.imu-propulsion #actuatorRight{font-size:18px;overflow-wrap:anywhere}
+.yaw-target{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:5px 12px;padding:8px 12px;border-top:1px solid var(--border)}
+.yaw-target>div{display:flex;flex-direction:column;gap:3px;min-width:0}.yaw-target span{font-size:12px;color:var(--muted)}
+.yaw-target strong{font-size:25px;line-height:1.15;color:#48e5c2;font-variant-numeric:tabular-nums}.yaw-target>div:nth-child(2) strong{font-size:20px}
+.yaw-target p{grid-column:1/-1;font-size:12px;color:var(--text);margin:2px 0 0;overflow-wrap:anywhere}
 .sensors-only th{background:#333;color:#eee;font-size:11px}.sensors-only td{color:#eee}.sensors-only td.type{color:#bcbcbc}.sensors-only pre{color:#e5e5e5}
 .section-sensors #runtime-mapping{display:none!important}
 
@@ -88,3 +102,116 @@ body.sensors-only{--bg:#091017;--panel:#111d28;--border:#263543;--muted:#a4b6c6;
 .sensors-only th{background:#172733;color:#b8cbd9}.sensors-only th,.sensors-only td{border-color:#263543}
 .sensors-only tr.selected{background:#173337}.sensors-only .sensor-line,.sensors-only .vector-line{border-color:#263543}
 .sensors-only h2{color:#e7eef4}
+
+.tank-mission{display:flex;align-items:center;flex-wrap:wrap;gap:9px 20px;padding:11px 14px;border-top:1px solid #344958;border-bottom:1px solid #344958;background:linear-gradient(110deg,#18343d,#192d37);font-size:12px;color:#b8cbd4}
+.tank-mission>strong{flex:1 1 210px;font-size:16px;color:#d7e3e9}.tank-mission>span{white-space:nowrap}.tank-mission b{margin-left:6px;font-size:14px;color:#e5eef2}
+.tank-mission[data-state="following"]>strong{color:#7fe6dc}.tank-mission[data-state="arrived"]>strong{color:#b3e2a6}.tank-mission[data-state="stale"]{opacity:.65}
+@media(max-width:650px){.tank-mission{gap:9px 15px;padding:10px}.tank-mission>strong{flex-basis:100%}.tank-mission>span{flex:1 1 40%}}
+
+.hull-controls{flex-wrap:wrap;gap:7px}.hull-controls input{width:100px;min-width:0}.hull-controls #hullStatus{flex-basis:100%;font-size:12px;color:#ccc}
+
+/* One sensor row leaves room for the GPS map on the first screen. */
+.section-sensors header{min-height:28px;padding:3px 8px}
+.section-sensors .metrics{gap:5px;margin-bottom:5px}.section-sensors .metrics>div{padding:4px 8px;display:flex;align-items:baseline;gap:8px}.section-sensors .metrics strong{font-size:16px;margin:0}.section-sensors .metrics span{font-size:11px}
+.section-sensors .main-grid{grid-template-columns:minmax(310px,1.6fr) minmax(260px,1.25fr) minmax(330px,1.5fr) minmax(190px,.85fr);gap:6px;align-items:stretch}
+.section-sensors .lidar-panel{order:1}.section-sensors .scan-panel{order:2}.section-sensors .imu-panel{order:3}.section-sensors .gps-panel{order:4}
+.section-sensors .main-grid>.panel{height:310px;min-height:0}
+.section-sensors .panel-head{min-height:34px;padding:4px 7px;gap:5px}.section-sensors h2{font-size:14px}.section-sensors .panel-head p{font-size:10px;margin:2px 0 0}
+.section-sensors .cloud-stage{flex:1;min-height:120px;height:120px}
+.section-sensors .panel-foot{padding:4px 6px;gap:5px;font-size:10px}.section-sensors #pointSize{width:65px}.section-sensors #decodeInfo{font-size:10px}
+.section-sensors .hull-options{flex:none}.section-sensors .hull-options>summary{padding:4px 7px;cursor:pointer;color:var(--muted);font-size:11px}.section-sensors .hull-options[open]{max-height:140px;overflow:auto}
+.section-sensors .scan-panel>.panel-head{height:44px}.section-sensors .scan-canvas{top:44px;height:calc(100% - 44px)}.section-sensors #nearest{font-size:10px}
+.section-sensors .imu-panel{grid-template-columns:minmax(125px,1fr) minmax(140px,1fr);grid-template-rows:34px 105px auto auto 16px;align-content:start}
+.section-sensors .attitude{height:105px}.section-sensors .imu-panel>.angle-grid{padding:2px 7px 2px 0}.section-sensors .imu-panel .angle-grid>div:nth-child(3)>strong{font-size:29px}.section-sensors .imu-panel .angle-grid>div:nth-child(3)>span{font-size:12px}
+.section-sensors .imu-panel .angle-grid>div:nth-child(-n+2)>strong{font-size:12px}.section-sensors .imu-panel .angle-grid>div:nth-child(-n+2)>span{font-size:10px}
+.section-sensors .yaw-target{padding:5px 8px;gap:3px 8px}.section-sensors .yaw-target strong{font-size:23px}.section-sensors .yaw-target>div:nth-child(2) strong{font-size:19px}.section-sensors .yaw-target span,.section-sensors .yaw-target p{font-size:11px}
+.section-sensors .imu-propulsion{padding:5px 8px}.section-sensors .propulsion-meta{margin-bottom:4px;font-size:11px}.section-sensors .propulsion-values{gap:8px}.section-sensors .propulsion-values>div{gap:2px}.section-sensors .imu-propulsion #actuatorLeft,.section-sensors .imu-propulsion #actuatorRight{font-size:15px}
+.section-sensors #imuTrend{display:none}.section-sensors .imu-panel>.panel-note{font-size:10px;padding:2px 8px;margin:0}
+.section-sensors .gps-grid{padding:8px;gap:12px}.section-sensors .gps-grid strong{font-size:14px;overflow-wrap:anywhere}
+
+.docking-management{border-left:3px solid var(--amber)}.map-management strong{font-size:12px;white-space:nowrap}.docking-management #dockingVersion{min-width:120px}.docking-management #dockingRouteStatus{font-size:12px}
+
+/* The parent dashboard fixes this iframe height; keep sensor readouts inside it. */
+@media(max-width:999px){.section-sensors .main-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.section-sensors .main-grid{grid-template-columns:minmax(0,1fr)}}
+@media(min-width:1000px) and (max-height:380px){
+ html:has(body.section-sensors){height:100%;overflow:hidden}
+ body.section-sensors{height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+ .section-sensors>main{flex:1;min-height:0;padding:0;display:flex;flex-direction:column}
+ .section-sensors .metrics{flex:none;gap:4px;margin-bottom:4px}
+ .section-sensors .metrics>div{padding:3px 6px;gap:5px}
+ .section-sensors .metrics strong{font-size:14px}
+ .section-sensors .main-grid{flex:1;min-height:0;grid-template-columns:minmax(0,1.6fr) minmax(0,1.2fr) minmax(0,1.5fr) minmax(0,.85fr)}
+ .section-sensors .main-grid>.panel{height:100%;min-height:0;margin:0}
+ .section-sensors .panel-head{min-height:28px;padding:3px 5px}
+ .section-sensors .panel-head h2{font-size:12px}
+ .section-sensors .panel-head p{font-size:9px}
+ .section-sensors .cloud-stage{min-height:0;height:0}
+ .section-sensors .panel-foot{padding:2px 4px;gap:3px;font-size:10px}
+ .section-sensors .panel-foot button,.section-sensors .panel-foot select{font-size:10px;padding:3px 4px}
+ .section-sensors .panel-foot input[type=range]{width:40px}
+ .section-sensors .hull-options>summary{padding:2px 5px;font-size:10px}
+ .section-sensors .imu-panel{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:28px minmax(45px,1fr) auto auto;align-content:stretch}
+ .section-sensors .attitude{height:100%;min-height:0}
+ .section-sensors .imu-panel>.angle-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(0,1fr);gap:2px;min-height:0;padding:2px 4px}
+ .section-sensors .imu-panel .angle-grid>div:nth-child(3){grid-row:auto;grid-column:auto}
+ .section-sensors .imu-panel .angle-grid>div:nth-child(3)>span{font-size:9px}
+ .section-sensors .imu-panel>.panel-note{display:none}
+ .section-sensors .imu-panel .angle-grid>div:nth-child(3)>strong{font-size:24px}
+ .section-sensors .yaw-target{padding:3px 6px;gap:2px 6px}
+ .section-sensors .yaw-target strong{font-size:18px}
+ .section-sensors .yaw-target>div:nth-child(2) strong{font-size:16px}
+ .section-sensors .yaw-target span,.section-sensors .yaw-target p{font-size:10px}
+ .section-sensors .imu-propulsion{padding:3px 6px}
+ .section-sensors .propulsion-meta{margin-bottom:2px;font-size:10px}
+ .section-sensors .propulsion-values{gap:6px}
+ .section-sensors .propulsion-values>div>span{font-size:10px}
+ .section-sensors .gps-grid{padding:5px;gap:6px}
+ .section-sensors .gps-grid span{font-size:10px}
+ .section-sensors .gps-grid strong{font-size:12px}
+}
+
+.camera-panel{display:flex;flex-direction:column;min-height:0}
+.camera-switches{display:flex;gap:3px;flex-wrap:wrap;padding:4px;border-bottom:1px solid var(--border);flex:none}
+.camera-switches button{font-size:10px;padding:4px 5px;flex:1;white-space:nowrap}
+.camera-switches button[aria-pressed=true]{color:var(--cyan);border-color:#326864;background:#143132}
+.camera-stage{position:relative;flex:1;min-height:90px;background:var(--surface-plot,#1b1e20);overflow:hidden}
+.camera-stage img{position:absolute;width:100%;height:100%;object-fit:contain}
+.camera-legend{display:flex;gap:8px;padding:3px 5px;font-size:10px;flex:none}
+.hsv-label{color:#8bdda1}.yolo-label{color:#e3a8ff}
+.camera-status{font-size:10px;padding:2px 5px 4px;min-height:16px;flex:none;overflow-wrap:anywhere;max-height:34px;overflow:auto}
+.section-sensors .main-grid{grid-template-columns:minmax(0,1.4fr) minmax(0,1.15fr) minmax(0,1.55fr) minmax(0,1.6fr) minmax(0,.85fr)}
+.section-sensors .camera-panel{order:3}.section-sensors .imu-panel{order:4}.section-sensors .gps-panel{order:5}
+@media(min-width:1000px) and (max-height:380px){.section-sensors .camera-stage{min-height:0}.section-sensors .camera-panel .panel-head p{display:none}.section-sensors .camera-status{max-height:28px}}
+@media(max-width:999px){.section-sensors .main-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.section-sensors .main-grid{grid-template-columns:minmax(0,1fr)}}
+
+.camera-panel>.camera-head{display:flex;align-items:center;flex-wrap:nowrap;gap:4px;flex:none;padding:3px 5px;min-height:28px}
+.camera-head h2{font-size:12px;white-space:nowrap;flex:none}
+.camera-head>.camera-switches{padding:0;border:0;flex:1;min-width:0;flex-wrap:nowrap;gap:3px}
+.camera-head .camera-switches button{min-width:0;flex:1;padding:3px 4px;font-size:10px;letter-spacing:-.4px}
+.camera-panel .camera-stage{border:0}
+.camera-panel>.camera-head{flex-wrap:wrap}
+.camera-head>.camera-switches{flex:1 0 100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.camera-fps{margin-left:auto;display:inline-flex;align-items:center;gap:4px;font-size:10px;white-space:nowrap}
+.camera-fps input{width:42px;padding:2px 3px;font-size:10px;text-align:left}
+
+#cloudFrame,.lidar-display-controls{display:none!important}
+.sensor-zoom{position:absolute;right:6px;top:7px;display:flex;flex-direction:column;gap:3px;z-index:3}
+.sensor-zoom button{width:27px;height:27px;padding:0;border:1px solid #777;background:var(--surface-panel,#25282b);color:#fff;font-size:21px;line-height:1;box-shadow:0 1px 3px #0006}
+.scan-panel{position:relative}.section-sensors .scan-panel>.sensor-zoom{top:50px}
+.cloud-stage>.sensor-zoom{pointer-events:auto}
+.tank-panel:has(#setA.active,#setB.active) #tankMap{cursor:default}
+#toggleSlamProcess,#toggleSlamDisplay{background:#30363b;border-color:#66717a;color:#c5cdd3}
+#toggleSlamProcess[aria-pressed=true],#toggleSlamDisplay[aria-pressed=true]{background:#184d37;border-color:#4cae7c;color:#c0f4d6}
+
+/* Keep the compass unchanged; pack the right-hand readings to the left. */
+.section-sensors .imu-panel>.angle-grid{display:flex;flex-direction:row;justify-content:flex-start;align-items:center;gap:5px;min-width:0;padding:2px 4px 2px 0;container-type:inline-size}
+.section-sensors .imu-panel .angle-grid>div{flex:0 0 auto;min-width:0;text-align:center}
+.section-sensors .imu-panel .angle-grid>div>strong{white-space:nowrap;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:2px}
+.section-sensors .imu-panel .angle-grid>div:nth-child(-n+2)>strong{font-size:clamp(10px,7cqi,12px)}
+.section-sensors .imu-panel .angle-grid>div:nth-child(3)>strong{font-size:clamp(16px,12cqi,24px)}
+.section-sensors .imu-panel .angle-grid>div>span,.section-sensors .imu-panel .angle-grid>div:nth-child(3)>span{font-size:9px;white-space:nowrap}
+
+.tank-panel>.map-management.expected-pose-management{border-left:3px solid #73d8ff;gap:5px;padding:5px 8px;flex-wrap:nowrap;overflow-x:auto;white-space:nowrap}.tank-panel>.map-management.expected-pose-management>*{flex:0 0 auto}.expected-pose-management label{display:inline-flex;align-items:center;gap:3px;font-size:11px;white-space:nowrap}.tank-panel>.map-management.expected-pose-management input{width:43px;padding:4px;text-align:left}.expected-pose-management button{padding:4px 6px;font-size:11px}.expected-pose-management #expectedPoseStatus{font-size:10px}#tankMap.expected-pose-picking{cursor:default}
+.map-eraser-tools{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap}.map-eraser-tools label{display:inline-flex;align-items:center;gap:3px;white-space:nowrap}.map-eraser-tools input{width:51px;padding:3px 4px}#toggleMapEraser[aria-pressed=true]{background:#a34600;border-color:#f58220;color:#fff}#tankMap.map-erasing{cursor:crosshair}

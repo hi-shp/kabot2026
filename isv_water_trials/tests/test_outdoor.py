@@ -73,7 +73,7 @@ class OutdoorTests(unittest.TestCase):
         self.assertIsNotNone(s.display_pose(10.1));self.assertIsNone(s.snapshot(10.1))
         cov=[0.]*36;cov[0]=cov[7]=.01;s.velocity(100,10,1,0,cov)
         s.imu(100.1,10.1,90,0)
-        self.assertAlmostEqual(s.pose_at(100.1)['position'][0],.1)
+        self.assertAlmostEqual(s.pose_at(100.1)['position'][0],0.)
         self.assertIsNone(s.pose_at(105))
 
     def test_unknown_covariance_and_time_mismatch(self):

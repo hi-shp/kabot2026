@@ -17,8 +17,16 @@ def main():
     for k,v in zip(('x','y','z','w'),info['orientation']):setattr(msg.info.origin.orientation,k,v)
     msg.data=array('b',files['grid.bin'])
     publisher=node.create_publisher(OccupancyGrid,'/map',QoSProfile(depth=1,durability=DurabilityPolicy.TRANSIENT_LOCAL))
+    navigation=OccupancyGrid();navigation.header.frame_id='tank_map'
+    nav_info=json.loads(files.get('navigation_grid.json',files['grid.json']))
+    navigation.info.width=nav_info['width'];navigation.info.height=nav_info['height'];navigation.info.resolution=nav_info['resolution']
+    for k,v in zip(('x','y','z'),nav_info['position']):setattr(navigation.info.origin.position,k,v)
+    for k,v in zip(('x','y','z','w'),nav_info['orientation']):setattr(navigation.info.origin.orientation,k,v)
+    navigation.data=array('b',files.get('navigation_grid.bin',files['grid.bin']))
+    nav_publisher=node.create_publisher(OccupancyGrid,'/tank/navigation_map',QoSProfile(depth=1,durability=DurabilityPolicy.TRANSIENT_LOCAL))
     def publish():
         msg.header.stamp=node.get_clock().now().to_msg();publisher.publish(msg)
+        navigation.header.stamp=msg.header.stamp;nav_publisher.publish(navigation)
     node.create_timer(1.,publish);publish()
     try:rclpy.spin(node)
     except KeyboardInterrupt:pass

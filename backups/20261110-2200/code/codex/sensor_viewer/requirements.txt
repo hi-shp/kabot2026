@@ -1,0 +1,5 @@
+paramiko>=3.4,<5
+selenium>=4.25,<5
+pillow>=10,<13
+imageio-ffmpeg>=0.5,<1
+av>=14,<17

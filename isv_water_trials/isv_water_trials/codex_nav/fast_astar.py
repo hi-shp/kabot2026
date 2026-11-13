@@ -14,7 +14,7 @@ except ImportError:
 
 
 if njit is not None:
-    @njit(cache=True)
+    @njit(cache=True, nogil=True)
     def compiled_astar(free, weights, xs, ys, sy, sx, gy, gx, resolution):
         ny, nx = free.shape
         # A cell can be relaxed by at most its eight neighbors before closing.

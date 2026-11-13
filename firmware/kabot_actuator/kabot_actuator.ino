@@ -9,6 +9,7 @@
 #include "esc_output.h"
 #include "esc_pwm.h"
 #include "esc_startup.h"
+#include "status_led.h"
 
 // This firmware is an actuator/RC arbiter. Navigation and MPC run on Jetson.
 kabot::Controller controller(COMMAND_NEUTRAL_US, AUTO_DELTA_LIMIT_US);
@@ -20,6 +21,11 @@ kabot::ManualResponse manualRc(RC_LEFT_MIN_US, RC_LEFT_CENTER_US, RC_LEFT_MAX_US
 volatile uint32_t riseUs[3] = {}, fallUs[3] = {};
 volatile uint16_t pulseUs[3] = {};
 volatile uint8_t inputLevels = 0, inputRiseSeen = 0;
+constexpr uint8_t RC_INPUT_PINS[] = {RC_FIRST_PIN, RC_SECOND_PIN, RC_MODE_PIN};
+constexpr uint8_t RC_INPUT_MASK = _BV(RC_FIRST_PIN) | _BV(RC_SECOND_PIN) | _BV(RC_MODE_PIN);
+volatile uint8_t ledMaskedRise = 0;
+volatile bool ledRefreshing = false;
+StatusLed statusLed;
 volatile uint32_t outputRiseUs[2] = {}, outputFallUs[2] = {};
 volatile uint16_t outputPulseUs[2] = {};
 volatile uint8_t outputLevels = 0;
@@ -29,19 +35,30 @@ uint8_t lineLength = 0;
 bool dropping = false;
 uint32_t lastStatus = 0;
 
-// UNO D2/D3/D4 are PD2/PD3/PD4. Only an edge on that exact bit
+// UNO D6/D3/D4 are PD6/PD3/PD4. Only an edge on that exact bit
 // updates its channel. No external-interrupt or library callback routing.
 ISR(PCINT2_vect) {
   const uint8_t levels = PIND;
-  const uint8_t changed = (levels ^ inputLevels) & (_BV(PD2) | _BV(PD3) | _BV(PD4));
+  const uint8_t changed = (levels ^ inputLevels) & RC_INPUT_MASK;
   inputLevels = levels;
+  if (ledRefreshing) {
+    // Discard an edge delayed by LED transmission without refreshing RC age.
+    inputRiseSeen &= uint8_t(~changed);
+    ledMaskedRise = uint8_t((ledMaskedRise & ~changed) | (changed & levels));
+    return;
+  }
   const uint32_t now = micros();
   for (uint8_t i = 0; i < 3; ++i) {
-    const uint8_t mask = uint8_t(1U << (i + 2));
+    const uint8_t mask = uint8_t(1U << RC_INPUT_PINS[i]);
     if (!(changed & mask)) continue;
     if (levels & mask) {
+      ledMaskedRise &= uint8_t(~mask);
       riseUs[i] = now; inputRiseSeen |= mask;
     } else {
+      if (ledMaskedRise & mask) {
+        ledMaskedRise &= uint8_t(~mask);
+        continue;
+      }
       const uint32_t width = now - riseUs[i];
       pulseUs[i] = (inputRiseSeen & mask) && width >= 900 && width <= 2100 ? uint16_t(width) : 0;
       inputRiseSeen &= uint8_t(~mask);
@@ -76,13 +93,10 @@ void readInputs() {
   bool fresh[3];
   for (uint8_t i = 0; i < 3; ++i)
     fresh[i] = pulses[i] >= 900 && pulses[i] <= 2100 && uint32_t(now - stamps[i]) < 100000;
-  const bool previouslyValid = rcValid;
   rcValid = hardwareReady && fresh[0] && fresh[1] && fresh[2];
-  // Receiver connection initializes both ESCs without ROS or a stick movement.
-  if (!previouslyValid && rcValid) powerOnStartup.start(millis());
-  // A detected receiver-PWM loss also cancels an active AUTO command once.
-  // A later explicit host arm may resume AUTO; no persistent stop lock is used.
-  if (previouslyValid && !rcValid) controller.disarm();
+  // Boot/explicit I initializes ESCs. Receiver pulse recovery must not restart
+  // the seven-second hold or disarm an AUTO command. MANUAL loss/selection
+  // changes still neutralize through controller.inputs; its watchdog is intact.
   const kabot::Mode selected = kabot::selectMode(pulses[2], fresh[2], fresh[0] && fresh[1], hardwareReady);
   const bool manual = selected == kabot::MANUAL;
   // Independent receiver channels follow LEFT_ESC_PIN/RIGHT_ESC_PIN.
@@ -98,12 +112,18 @@ void readInputs() {
 void outputs() {
   if (!hardwareReady) return;
   const bool automatic = controller.mode == kabot::AUTOMATIC;
-  if (powerOnStartup.holding(millis()) || modeSwitchNeutral.holding(millis())) {
-    writeEscPwm(NEUTRAL_US, NEUTRAL_US);
+  if (powerOnStartup.holding(millis())) {
+    // Boot and bringup I-command initialize both ESCs regardless of RC stick position.
+    writeEscPwm(ESC_INITIALIZE_NEUTRAL_US, ESC_INITIALIZE_NEUTRAL_US);
+    return;
+  }
+  if (modeSwitchNeutral.holding(millis())) {
+    writeEscPwm(NEUTRAL_US, RIGHT_NEUTRAL_US);
     return;
   }
   writeEscPwm(kabot::escOutput(controller.left, automatic ? AUTO_LEFT_REVERSED : LEFT_REVERSED),
-              kabot::escOutput(controller.right, automatic ? AUTO_RIGHT_REVERSED : RIGHT_REVERSED));
+              kabot::escOutput(controller.right, automatic ? AUTO_RIGHT_REVERSED : RIGHT_REVERSED,
+                               RIGHT_NEUTRAL_US));
 }
 void status() {
   char payload[56], message[64];
@@ -159,7 +179,7 @@ void setup() {
   MCUSR = 0; wdt_disable();
   Serial.begin(115200);
 #if KABOT_WIRING_VERIFIED
-  static_assert(RC_FIRST_PIN == 2 && RC_SECOND_PIN == 3 && RC_MODE_PIN == 4, "UNO inputs must be D2/D3/D4");
+  static_assert(RC_FIRST_PIN == 6 && RC_SECOND_PIN == 3 && RC_MODE_PIN == 4, "UNO inputs must be D6/D3/D4");
   static_assert((LEFT_ESC_PIN == 9 && RIGHT_ESC_PIN == 10) ||
                 (LEFT_ESC_PIN == 10 && RIGHT_ESC_PIN == 9), "UNO ESC outputs must be D9/D10");
   const int pins[] = {LEFT_ESC_PIN, RIGHT_ESC_PIN, RC_FIRST_PIN, RC_SECOND_PIN, RC_MODE_PIN};
@@ -175,11 +195,12 @@ void setup() {
     if (ESTOP_PIN >= 0) pinMode(ESTOP_PIN, INPUT_PULLUP);
     // Load neutral before enabling the hardware outputs.
     beginEscPwm();
+    statusLed.begin();
     powerOnStartup.start(millis());
     pinMode(RC_FIRST_PIN, INPUT); pinMode(RC_SECOND_PIN, INPUT); pinMode(RC_MODE_PIN, INPUT);
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
       inputLevels = PIND; outputLevels = PINB;
-      PCMSK2 = _BV(PD2) | _BV(PD3) | _BV(PD4);
+      PCMSK2 = RC_INPUT_MASK;
       PCMSK0 = _BV(PB1) | _BV(PB2);
       PCIFR = _BV(PCIF2) | _BV(PCIF0);
       PCICR |= _BV(PCIE2) | _BV(PCIE0);
@@ -189,9 +210,28 @@ void setup() {
   wdt_enable(WDTO_250MS);
   // Unconfigured builds deliberately NEVER attach ESC pins or drive any output.
 }
+void emoDiagnostic() {
+  static uint32_t lastReport = 0;
+  const uint32_t now = millis();
+  if (uint32_t(now - lastReport) < 500) return;
+  char payload[32], message[40];
+  const int length = snprintf(payload, sizeof(payload), "E1,%lu,%u,%u",
+      (unsigned long)now, unsigned(digitalRead(11)), unsigned(digitalRead(12)));
+  snprintf(message, sizeof(message), "%s*%04X\n", payload, kabot::crc16(payload, length));
+  if (Serial.availableForWrite() >= int(strlen(message))) {
+    Serial.print(message);
+    lastReport = now;
+  }
+}
 void loop() {
   wdt_reset();
+  emoDiagnostic();
   readInputs(); outputs(); serialInput();
+  if (hardwareReady) {
+    const uint32_t now = millis();
+    const bool inhibited = estopActive || powerOnStartup.holding(now) || modeSwitchNeutral.holding(now);
+    statusLed.update(statusColor(controller.mode, rcValid, controller.automaticActive(), inhibited), ledRefreshing);
+  }
   if (uint32_t(millis() - lastStatus) >= 100) { lastStatus = millis(); status(); }
   // Separate phase keeps the bounded UART buffer from blocking either report.
   static uint32_t lastRaw = 0;

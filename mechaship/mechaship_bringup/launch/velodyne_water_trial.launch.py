@@ -5,7 +5,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction, LogInfo
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from isv_water_trials.launch_once import node as Node, once, GPS_EXECUTABLES
 
 
 def nodes(context):
@@ -25,7 +25,9 @@ def nodes(context):
                               'model': model, 'frame_id': 'velodyne', 'port': 2368, 'rpm': 600.0,
                               'gps_time': False, 'enabled': True}],**recovery),
             Node(package='velodyne_pointcloud', executable='velodyne_transform_node', name='velodyne_transform_node',
-                 output='screen', parameters=[transform],**recovery),
+                 output='screen', parameters=[transform],remappings=[('velodyne_points','velodyne_points_raw')],**recovery),
+            Node(package='isv_water_trials', executable='lidar_self_mask', name='lidar_self_mask',
+                 output='screen',**recovery),
             Node(package='velodyne_laserscan', executable='velodyne_laserscan_node', name='velodyne_laserscan_node',
                  output='screen', parameters=[{'ring': int(LaunchConfiguration('velodyne_ring').perform(context)),
                                                'resolution': 0.007}],**recovery)]

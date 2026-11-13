@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+import os
+import yaml
+import math
+import time
+import sys
+import signal
+from math import degrees
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+import numpy as np
+from vision_msgs.msg import Detection2DArray
+from sensor_msgs.msg import NavSatFix, Imu, LaserScan
+from std_msgs.msg import Float64, String
+from tf_transformations import euler_from_quaternion
+
+def constrain(v, lo, hi):
+    if math.isnan(v): return lo + (hi - lo) / 2.0
+    return lo if v < lo else hi if v > hi else v
+
+def norm_text(s):
+    return " ".join(str(s).strip().lower().split())
+
+class Course3(Node):
+    def __init__(self):
+        super().__init__("Course3")
+        self.load_params_from_yaml()
+        self.key_publisher = self.create_publisher(Float64, "/actuator/key/degree", 10)
+        self.thruster_publisher = self.create_publisher(Float64, "/actuator/thruster/percentage", 10)
+        self.dist_publisher = self.create_publisher(Float64, "/waypoint/distance", 10)
+        self.rel_deg_publisher = self.create_publisher(Float64, "/waypoint/rel_deg", 10)
+        self.goal_publisher = self.create_publisher(NavSatFix, "/waypoint/goal", 10)
+        self.curr_yaw_publisher = self.create_publisher(Float64, "/current_yaw", 10)
+        self.safe_angle_list_publisher = self.create_publisher(String, "/safe_angles_list", 10)
+        self.safe_angle_publisher = self.create_publisher(Float64, "/safe_angle", 10)
+        self.imu_sub = self.create_subscription(Imu, "/imu", self.imu_callback, qos_profile_sensor_data)
+        self.gps_sub = self.create_subscription(NavSatFix, "/gps/fix", self.gps_callback, qos_profile_sensor_data)
+        self.lidar_sub = self.create_subscription(LaserScan, "/scan", self.lidar_callback, qos_profile_sensor_data)
+        self.det_sub = self.create_subscription(Detection2DArray, "/detections", self.detection_callback, qos_profile_sensor_data)
+        self.init_yaw_sub = self.create_subscription(Float64, "/imu/target_yaw", self.init_yaw_callback, 10)
+        self.safe_angles_list = []
+        self.dist_threshold = 2 # 장애물로 인식할 거리 (m)
+        self.side_margin = 25 # 장애물로 처리할 좌우 각도
+        self.initial_yaw_abs = None
+        self.yaw_offset = None
+        self.origin = None
+        self.origin_set = False
+        self.dist_to_goal_m = None
+        self.goal_rel_deg = None  
+        self.arrived_all = False
+        self.wp_index = 2
+        self.current_goal_enu = None
+        self.current_yaw_rel = 0.0
+        self.cmd_key_degree = self.servo_neutral_deg
+        self.cmd_thruster = self.default_thruster
+        self.create_timer(self.timer_period, self.timer_callback)
+        self.get_logger().info("Course 3")
+
+    def load_params_from_yaml(self):
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        yaml_path = os.path.join(script_dir, "isv_params.yaml")
+        with open(yaml_path, "r") as file:
+            params = yaml.safe_load(file)
+        self.timer_period = float(params["node_settings"]["timer_period"])
+        self.servo_neutral_deg = float(params["servo"]["neutral_deg"])
+        self.servo_min_deg = float(params["servo"]["min_deg"])
+        self.servo_max_deg = float(params["servo"]["max_deg"])
+        self.waypoints = params["navigation"]["waypoints"]
+        self.arrival_radii = params["navigation"]["arrival_radius"]
+        self.default_thruster = float(params["thruster"]["course3"])
+        v = params["vision"]
+        self.screen_width = int(v["screen_width"])
+        self.angle_factor = float(v["angle_conversion_factor"])
+        self.available_objects = v["available_objects"]
+        self.hoping_target = v["hoping_target"]
+        self.detection_target = v["detection_target"]
+
+    def normalize_180(self, deg):
+        return (deg + 180.0) % 360.0 - 180.0
+
+    def gps_enu_converter(self, lla):
+        if self.origin is None:
+            return 0.0, 0.0
+        lat, lon, _ = lla
+        lat0, lon0, _ = self.origin
+        R = 6378137.0
+        dlat = math.radians(lat - lat0)
+        dlon = math.radians(lon - lon0)
+        latm = math.radians((lat + lat0) * 0.5)
+        return dlon * R * math.cos(latm), dlat * R
+
+    def imu_callback(self, msg: Imu):
+        if self.initial_yaw_abs is None:
+            return
+        q = (msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w)
+        _, _, yaw_rad = euler_from_quaternion(q)
+        current_yaw_raw_deg = degrees(-yaw_rad)
+        if self.yaw_offset is None:
+            self.yaw_offset = self.initial_yaw_abs - current_yaw_raw_deg
+        corrected_yaw = current_yaw_raw_deg + self.yaw_offset
+        rel_yaw_deg = self.normalize_180(corrected_yaw)
+        self.current_yaw_rel = rel_yaw_deg
+        self.curr_yaw_publisher.publish(Float64(data=float(rel_yaw_deg)))
+
+    def init_yaw_callback(self, msg: Float64):
+        if self.initial_yaw_abs is None:
+            self.initial_yaw_abs = msg.data
+            self.destroy_subscription(self.init_yaw_sub)
+
+    def lidar_callback(self, data):
+        
+        if self.current_yaw_rel is not None:
+            if -180.0 <= self.current_yaw_rel <= -45.0:
+                self.dist_threshold = 2.0
+            else:
+                self.dist_threshold = 1.4
+        ranges = np.array(data.ranges)
+        start_idx, end_idx = 500, 1500
+        subset = ranges[start_idx:end_idx]
+        dist_180 = np.full(181, np.inf)
+        for i in range(len(subset)):
+            length = subset[i]
+            if length <= data.range_min or length >= data.range_max or not np.isfinite(length):
+                continue
+            angle_index = round((len(subset) - 1 - i) * 180 / len(subset))
+            if 0 <= angle_index <= 180:
+                if length < dist_180[angle_index]:
+                    dist_180[angle_index] = length
+        dist_180[np.isinf(dist_180)] = 0.0
+        danger_flags = (dist_180 > 0) & (dist_180 <= self.dist_threshold)
+        expanded_danger = np.copy(danger_flags)
+        n = self.side_margin
+        for i in range(181):
+            if danger_flags[i]:
+                low = max(0, i - n)
+                high = min(181, i + n + 1)
+                expanded_danger[low:high] = True
+        self.safe_angles_list = [int(deg) for deg in range(181) if not expanded_danger[deg]]
+
+        if self.safe_angles_list is not None:
+            list_msg = String()
+            list_msg.data = str(self.safe_angles_list)
+            self.safe_angle_list_publisher.publish(list_msg)
+        if self.safe_angles_list:
+            safe_arr = np.array(self.safe_angles_list)
+            best_angle = safe_arr[np.argmin(np.abs(safe_arr - 90))]
+            self.safe_angle_publisher.publish(Float64(data=float(best_angle)))
+
+    def gps_callback(self, gps: NavSatFix):
+        if math.isnan(gps.latitude) or math.isnan(gps.longitude) or self.initial_yaw_abs is None:
+            return
+        if not self.origin_set:
+            self.origin = [gps.latitude, gps.longitude, gps.altitude]
+            self.origin_set = True
+            self.get_logger().info(f"시작 위치: {self.origin[:2]}")
+            self.update_current_goal()
+        curr_e, curr_n = self.gps_enu_converter([gps.latitude, gps.longitude, gps.altitude])
+        if self.current_goal_enu is not None:
+            goal_e, goal_n = self.current_goal_enu
+            dx, dy = goal_e - curr_e, goal_n - curr_n
+            self.dist_to_goal_m = math.hypot(dx, dy)
+            target_ang_abs = degrees(math.atan2(dx, dy))
+            target_ang_rel = self.normalize_180(target_ang_abs - degrees(self.initial_yaw_abs))
+            self.goal_rel_deg = self.normalize_180(target_ang_rel - self.current_yaw_rel)
+
+    def update_current_goal(self):
+        if self.wp_index == 2:
+            target_lat, target_lon = self.waypoints[self.wp_index]
+            self.current_goal_enu = self.gps_enu_converter([target_lat, target_lon, 0.0])
+            goal_msg = NavSatFix()
+            goal_msg.latitude = target_lat
+            goal_msg.longitude = target_lon
+            self.goal_publisher.publish(goal_msg)
+            self.get_logger().info(f"웨이포인트 목표: {self.wp_index+1}/{len(self.waypoints)}")
+        else:
+            self.cmd_thruster = 0.0
+            self.cmd_key_degree = self.servo_neutral_deg
+            for _ in range(20):
+                self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
+                self.thruster_publisher.publish(Float64(data= -10.0))
+                time.sleep(0.1)
+            self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
+            self.thruster_publisher.publish(Float64(data = 0.0))
+            self.get_logger().info("웨이포인트 도달")
+            self.destroy_node()
+            sys.exit(0)
+
+    def detection_callback(self, msg):
+        self.latest_det = msg
+
+    def timer_callback(self):
+        if not self.arrived_all and self.wp_index == 2:
+            lat, lon = self.waypoints[self.wp_index]
+            self.goal_publisher.publish(NavSatFix(latitude=lat, longitude=lon))
+        if self.arrived_all or self.dist_to_goal_m is None or self.goal_rel_deg is None:
+            self.cmd_thruster = 0.0
+            self.cmd_key_degree = self.servo_neutral_deg
+        else:
+            if self.dist_to_goal_m <= self.arrival_radii[2]:
+                self.wp_index += 1
+                self.update_current_goal()
+
+            if self.safe_angles_list:
+                safe_angles_deg = np.array(self.safe_angles_list) - 90
+                diff = np.abs(safe_angles_deg - self.goal_rel_deg)
+                best_idx = np.argmin(diff)
+                chosen_safe_angle = safe_angles_deg[best_idx]
+                steering_angle = self.servo_neutral_deg + chosen_safe_angle
+                self.cmd_thruster = self.default_thruster
+                self.cmd_key_degree = constrain(steering_angle, self.servo_min_deg, self.servo_max_deg)
+            else:
+                self.cmd_thruster = 0.0
+                self.cmd_key_degree = self.servo_neutral_deg
+
+        self.key_publisher.publish(Float64(data=float(self.cmd_key_degree)))
+        self.thruster_publisher.publish(Float64(data=float(self.cmd_thruster)))
+        if self.dist_to_goal_m is not None:
+            self.dist_publisher.publish(Float64(data=float(self.dist_to_goal_m)))
+        if self.goal_rel_deg is not None:
+            self.rel_deg_publisher.publish(Float64(data=float(self.goal_rel_deg)))
+
+    def send_stop_commands(self):
+        if not rclpy.ok(): return
+        for _ in range(5):
+            self.key_publisher.publish(Float64(data=float(self.servo_neutral_deg)))
+            self.thruster_publisher.publish(Float64(data=0.0))
+            time.sleep(0.1)
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = Course3()
+    def signal_handler(sig, frame):
+        node.get_logger().warn("Stopped")
+        node.send_stop_commands()
+        node.destroy_node()
+        rclpy.shutdown()
+        sys.exit(0)
+    signal.signal(signal.SIGINT, signal_handler)
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+
+if __name__ == "__main__":
+    main()

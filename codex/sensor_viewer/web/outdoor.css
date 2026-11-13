@@ -14,7 +14,7 @@ input[type=number]{width:58px}input[type=checkbox]{vertical-align:middle;accent-
 .stats{display:flex;gap:18px;flex-wrap:wrap;padding:6px 9px;font-family:Consolas,"Malgun Gothic",monospace;font-variant-numeric:tabular-nums}
 #notice{margin:0;padding:2px 9px 5px;color:#d5a779;min-height:0;font-size:11px}#notice:empty{display:none}
 .map-stage{position:relative;height:clamp(260px,calc(100vh - 610px),440px);background:#1b1b1b}
-#map{width:100%;height:100%;touch-action:none;cursor:grab}
+#map{width:100%;height:100%;touch-action:none;cursor:default}
 .map-legend,.map-attribution{position:absolute;background:#242424e8;padding:4px 6px;font-size:10px;line-height:1.5;pointer-events:none;border:1px solid #444}
 .map-legend{left:6px;top:6px}.map-attribution{right:4px;bottom:4px;pointer-events:auto}
 .charts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:4px 9px 7px}
@@ -36,6 +36,19 @@ main>.model-comparison .charts{grid-template-columns:repeat(4,minmax(0,1fr))}.me
 #sensorOverview{margin:8px;border:1px solid #424242;background:#242424}#sensorFrame{display:block;width:100%;height:1500px;border:0;color-scheme:dark}.map-attribution{max-width:80%;font-size:10px;background:#202020df}.map-attribution a{color:#ddd}
 
 #sensorOverview,#topicOverview{margin:8px;border:0;background:transparent;max-width:none}
+#connectionHeader{position:sticky;top:0;z-index:20;min-height:34px;padding:6px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0e1923;border-bottom:1px solid #326864;color:#e7eef4;font-size:12px}
+#connectionPath{color:#90e6df;font-variant-numeric:tabular-nums}
+#connectionPath[data-link="down"]{color:#ffadad}
+.ssh-connect-controls{display:flex;align-items:center;justify-content:flex-start;gap:6px;flex-wrap:wrap}
+.ssh-connect-controls button{padding:5px 9px;font-size:12px;white-space:nowrap;border:1px solid #7b929e;background:#243542;color:#fff}
+.ssh-connect-controls button[aria-pressed="true"]{background:#175b48;border-color:#76e6b0;color:#d9ffe9}
+.ssh-connect-controls button[aria-busy="true"]{background:#60481b;border-color:#e8bd60;color:#fff0c7;opacity:1}
+#connectionActionStatus{font-size:11px;color:#c6d8e1;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#connectionActionStatus[data-state="error"]{color:#ffadad}
+#rocketPowerStatus{font-size:11px;white-space:nowrap;color:#c6d8e1}
+#rocketPowerStatus[data-state="on"]{color:#93f4bd;font-weight:bold}
+#rocketPowerStatus[data-state="starting"]{color:#ffd17a}
+#rocketPowerStatus[data-state="error"]{color:#ffadad}
 #sensorFrame,#topicFrame{display:block;width:100%;border:0;color-scheme:dark}
 #sensorFrame{height:800px}#topicFrame{height:400px}
 #outdoorOverview{max-width:none;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr)}
@@ -87,6 +100,127 @@ button.stop{background:#30232a;border-color:#785058;color:#ffadad}
 .spec-detail{font-size:11px;color:#bac9d5;line-height:1.7}.model-controls .stats{border-top:1px solid var(--border)}
 #candidateList{border-top:1px solid var(--border);padding:8px 10px}#candidateList summary{cursor:pointer;color:#bac9d5}.candidate-scroll{max-height:220px;overflow:auto;margin-top:8px}#candidateList table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}#candidateList th,#candidateList td{padding:5px 10px;text-align:left;border-bottom:1px solid var(--border)}#candidateList th{color:var(--muted);background:var(--panel);position:sticky;top:0}#candidateList .selected{color:#48e5c2;background:#143132}
 
-.capture-tools{display:flex;align-items:center;gap:7px;padding:6px 10px;min-height:34px}.capture-tools span{color:var(--muted,#a4b6c6);font-size:12px;overflow-wrap:anywhere}.capture-tools[hidden]{display:none}
+.region-list{display:flex;flex-wrap:wrap;gap:6px;padding:4px 10px 8px}.region-item{display:flex;align-items:center;gap:7px;border-left:3px solid #48e5c2;padding:4px 7px;background:#303438}.region-item.exclude{border-color:#ffad56}.region-item span{font-size:12px}.region-item button{padding:2px 5px}
 
-.map-coordinate{position:absolute;right:6px;top:6px;background:#111d28ed;font:12px Consolas,"Malgun Gothic",monospace;color:#e7eef4;padding:5px 7px;max-width:60%;z-index:2}.map-coordinate:disabled{opacity:.85}
+
+.map-zoom{position:absolute;right:8px;top:8px;z-index:3;display:flex;flex-direction:column;gap:3px}.map-zoom button,#outdoorOverview .map-zoom button{display:grid;place-items:center;flex:none;width:30px;height:30px;padding:0;font-size:23px;line-height:1;background:#292929;border:1px solid #8997a5;color:#fff;box-shadow:0 1px 4px #0008}.map-zoom button:disabled{opacity:.4}
+
+#start:disabled,#startModelTest:disabled{opacity:1;color:#bec8c8;background:#303438;border-color:#647070}
+#start.running,#startModelTest.running{color:#9ff4d7;background:#164338;border-color:#61b797;box-shadow:inset 3px 0 #61b797}
+
+/* Give the map most of the working area below a compact sensor strip. */
+#sensorOverview{margin:4px 8px 0}#sensorFrame{height:370px}
+#outdoorOverview{padding:4px 8px 8px;grid-template-columns:minmax(0,3fr) minmax(260px,1fr);grid-template-rows:minmax(470px,calc(100vh - 410px)) auto auto}
+#outdoorOverview>.gps-map>.toolbar{padding:4px 8px;min-height:30px;gap:5px}
+#outdoorOverview .map-stage{flex:1;min-height:240px}
+.map-advanced{flex:none;border-top:1px solid var(--border)}.map-advanced>summary{cursor:pointer;padding:5px 9px;font-size:12px;color:var(--muted)}
+.map-overlay-status{margin-left:auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* Keep both live maps visible together; charts and model panels follow below. */
+#outdoorOverview{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(470px,calc(100vh - 410px)) auto auto auto}
+#outdoorOverview>.gps-map{grid-column:1;grid-row:1}
+#outdoorOverview>.slam-map{grid-column:2;grid-row:1;display:flex;flex-direction:column}
+#outdoorOverview>.response-plots{grid-column:1/-1;grid-row:2;display:flex;flex-direction:column}
+#outdoorOverview>.response-plots .charts{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(170px,1fr);gap:8px}
+#outdoorOverview>.response-plots .charts>div{position:relative;min-height:170px}
+#outdoorOverview>.response-plots .charts canvas{position:static;width:100%;height:140px;min-height:0}
+#outdoorOverview>.model-controls{grid-column:1/-1;grid-row:3}
+#outdoorOverview>.model-comparison{grid-column:1/-1;grid-row:4}
+#outdoorOverview>.slam-map .toolbar{justify-content:space-between}
+.slam-map-host{position:relative;flex:1;min-height:0;overflow:hidden;background:#0a151f}
+.slam-map-host>iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+.slam-map-placeholder{position:absolute;inset:0;display:grid;place-items:center;padding:20px;text-align:center;color:#bac9d5;background:radial-gradient(ellipse at 50% 48%,#18303c 0,#0a151f 70%)}
+.slam-map-placeholder[hidden]{display:none}
+@media(max-width:850px){
+ #outdoorOverview{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(380px,55vh) minmax(380px,55vh) auto auto auto}
+ #outdoorOverview>.gps-map{grid-column:1;grid-row:1}
+ #outdoorOverview>.slam-map{grid-column:1;grid-row:2}
+ #outdoorOverview>.response-plots{grid-column:1;grid-row:3}
+ #outdoorOverview>.response-plots .charts{grid-template-columns:1fr;grid-template-rows:repeat(3,minmax(140px,1fr))}
+ #outdoorOverview>.response-plots .charts>div{min-height:140px}
+ #outdoorOverview>.response-plots .charts canvas{height:115px}
+ #outdoorOverview>.model-controls{grid-row:4}
+ #outdoorOverview>.model-comparison{grid-row:5}
+ .slam-map-host{min-height:300px}
+}
+
+.gps-path-tools{gap:6px}.gps-path-tools select{max-width:min(100%,360px)}.gps-path-tools .gps-path-status{flex-basis:100%;font-size:12px}.gps-path-tools #gpsPathNotice{font-size:12px;overflow-wrap:anywhere}
+#outdoorOverview #layers{display:none}
+.gps-mark-details{flex:none;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:3px 6px;font-size:11px}
+.gps-mark-details>summary{cursor:pointer;color:#ff90d5;padding:3px 0}
+.gps-mark-details:not([open]),.gps-mark-details>summary{display:none}
+.gps-mark-actions{display:flex;gap:8px;align-items:center;padding:3px 0;flex-wrap:wrap}
+.gps-mark-actions>span{color:var(--muted)}
+.gps-mark-list{max-height:64px;overflow:auto;overscroll-behavior:contain}
+.gps-mark-row{display:flex;gap:5px;align-items:center;padding:3px;border-left:3px solid transparent}
+.gps-mark-row.selected{border-left-color:#fff2a6;background:#403b28}
+.gps-mark-row>button:first-of-type{min-width:42px;color:#ff90d5}
+#outdoorOverview .gps-mark-row>input:not([type=checkbox]){width:0;flex:1;min-width:0;font-family:Consolas,monospace;user-select:text}
+.gps-mark-row>input[type=checkbox]{width:14px;flex:none;accent-color:#ff90d5}
+.gps-mark-actions>label{display:flex;gap:4px;align-items:center}
+.delete-gps-mark{color:#ffb5ab}
+#gpsMarkStatus{color:#ffb4df;font-size:11px}
+#recordLocation[aria-pressed=true]{background:#623955;color:#ffe1f4;border-color:#ec91c7}
+#showGpsMarks[aria-pressed=false]{opacity:.55}
+
+#connectionHeader{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.ssh-endpoints{display:flex;gap:4px 18px;flex-wrap:wrap;margin-right:auto;font-size:12px}.ssh-endpoints span{display:flex;gap:6px;align-items:center}.ssh-endpoints code{user-select:all;color:#c8d8e5;font-size:12px}
+.map-advanced{display:block}.map-advanced .toolbar{border-top:1px solid var(--border)}
+#points{max-height:100px}.point{display:inline-flex;align-items:center;gap:5px}.point select{font-size:11px;padding:2px}.point input{width:42px;font-size:11px;padding:2px}
+#holdDurationLabel[hidden]{display:none}
+.waypoint-editor[hidden]{display:none}
+.waypoint-editor label{display:inline-flex;align-items:center;gap:4px}
+.waypoint-editor input{width:112px;font-variant-numeric:tabular-nums}
+.point.selected{outline:2px solid #fff;outline-offset:-1px;background:#263e50}
+.point .waypoint-select{padding:1px 2px;border:0;background:transparent;color:inherit;font:inherit}
+@media(max-width:650px){.ssh-endpoints{flex-basis:100%;flex-direction:column}.map-advanced .toolbar{align-items:flex-start}#points{max-height:130px}}
+
+/* Size the sensor strip and both maps from the available desktop viewport. */
+@media(min-width:1000px){
+ html{height:100%;overflow:hidden}
+ body{height:100vh;height:100dvh;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+ #connectionHeader{position:relative;flex:none;min-height:30px;padding:4px 9px;gap:5px 12px;font-size:11px}
+ .ssh-endpoints,.ssh-endpoints code{font-size:11px}
+ #sensorOverview{flex:0 0 clamp(236px,33vh,338px);min-height:0;margin:4px 6px 0;overflow:hidden}
+ #sensorFrame{height:100%!important;min-height:0}
+ #outdoorOverview{flex:1;width:100%;min-height:0;padding:4px 6px 6px;gap:6px;grid-template-rows:minmax(0,1fr);position:relative}
+ #outdoorOverview>.gps-map,#outdoorOverview>.slam-map{min-height:0;margin:0}
+ #outdoorOverview .map-stage{flex:1;min-height:0;height:0}
+ #outdoorOverview>.gps-map>.toolbar,.map-advanced .toolbar{flex:none;padding:3px 6px;gap:3px 5px;min-height:26px}
+ #outdoorOverview .toolbar strong{font-size:12px}
+ #outdoorOverview button,#outdoorOverview select,#outdoorOverview input{font-size:11px;padding:4px 6px}
+ #outdoorOverview .layer-controls{flex:none;padding:3px 6px;gap:2px 7px;font-size:10px}
+ #outdoorOverview .toolbar span{font-size:11px}
+ .gps-path-tools .gps-path-status{flex-basis:auto}
+ #gpsPathStatus:empty,#gpsPathNotice:empty{display:none}
+ #outdoorOverview #points{flex:none;max-height:52px;padding:2px 6px;gap:3px}
+ #outdoorOverview #points:empty{display:none}
+ .slam-map-host{min-height:0}
+ #notice{position:fixed;top:48px;right:10px;z-index:30;max-width:min(420px,calc(100vw - 20px));margin:0;padding:6px 10px;background:var(--panel);border:1px solid var(--border);border-radius:3px;max-height:80px;overflow:auto}
+}
+@media(max-width:850px){
+ #outdoorOverview{grid-template-rows:auto auto}
+ #outdoorOverview>.slam-map{min-height:640px}
+ .slam-map-host{min-height:600px}
+}
+
+.drive-limit{white-space:nowrap;display:inline-flex;align-items:center;gap:3px}.drive-limit input[type=number]{width:42px;padding:4px 3px;text-align:left;appearance:textfield;-moz-appearance:textfield}.drive-limit input::-webkit-inner-spin-button,.drive-limit input::-webkit-outer-spin-button{appearance:none;-webkit-appearance:none;margin:0}
+
+.orbit-selection[hidden],.orbit-editor[hidden]{display:none}
+.orbit-selection{flex:none}.orbit-selection select{max-width:290px}
+#orbitFeedback{font-size:11px;color:var(--muted)}
+.orbit-editor{flex:none;border-top:1px solid var(--border);font-size:11px}
+.orbit-editor summary{padding:4px 6px;cursor:pointer;color:#ffb56d}
+.orbit-candidate-list{max-height:180px;overflow:auto}
+.orbit-candidate-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:4px 6px;border-left:3px solid transparent}
+.orbit-candidate-row.selected{border-left-color:#ff9b45;background:#263442}
+.orbit-candidate-row.editing{outline:2px solid #fff;outline-offset:-2px}
+.orbit-candidate-row [data-action="select"]{font-weight:700;white-space:nowrap}
+.orbit-candidate-row input{width:107px;font-variant-numeric:tabular-nums}
+.orbit-candidate-row select{max-width:210px}
+#notice{position:fixed;top:48px;right:10px;z-index:30;max-width:min(420px,calc(100vw - 20px));margin:0;padding:6px 10px;background:var(--panel);border:1px solid var(--border);border-radius:3px;max-height:80px;overflow:auto}
+#notice:empty{display:none}
+
+.gps-map-actions{margin-left:auto;display:flex;align-items:center;gap:6px}.gps-map-actions label,.gps-map-actions button{white-space:nowrap}
+
+.gps-map-actions .waypoint-timeout-input{width:52px;padding:4px}

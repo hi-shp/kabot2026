@@ -93,13 +93,16 @@ class ObstacleTracker:
             mature = t.hits>=3 and t.stamp-t.first>=.3
             velocity = t.velocity if mature else np.zeros(2)
             speed = float(np.linalg.norm(velocity))
-            # Keep immature and briefly occluded tracks conservatively too.
-            growth = .15+min(.8, t.error/.2)+(0. if mature else .5)
+            # Wall fragments / first sightings remain in measured static
+            # surfaces. Do not turn every fragment into a rapidly expanding
+            # moving obstacle. Predict velocity only after repeated motion.
+            moving = mature and speed >= .15
+            growth = .05+min(.2,t.error) if moving else 0.
             center = t.position+velocity*age
             radius = t.radius+growth*age
-            rows.append([*(center-origin), radius, *velocity, growth])
+            if moving:rows.append([*(center-origin), radius, *velocity, growth])
             display.append({'id':t.id, 'position':center.tolist(), 'velocity':velocity.tolist(),
-                            'radius_m':radius, 'speed_m_s':speed, 'confirmed':mature,
+                            'radius_m':radius, 'speed_m_s':speed, 'confirmed':mature, 'moving':moving,
                             'age_s':age, 'uncertainty_rate_m_s':growth})
         return np.asarray(rows, dtype=float).reshape(-1,6), display
 

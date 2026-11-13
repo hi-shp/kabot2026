@@ -10,6 +10,7 @@ def main():
     parser.add_argument('--name', default='~/water_trials/tank_maps/tank')
     parser.add_argument('--freeze',action='store_true',help='Save one immutable .tankmap and select it as the default map')
     parser.add_argument('--from-snapshot',help='Import an existing saved map prefix into a fixed bundle')
+    parser.add_argument('--crop',nargs=4,type=float,metavar=('X0','Y0','X1','Y1'))
     args = parser.parse_args()
     path = Path(args.name).expanduser().resolve(); path.parent.mkdir(parents=True, exist_ok=True)
     target=path if path.suffix=='.tankmap' else Path(str(path)+'.tankmap')
@@ -17,7 +18,7 @@ def main():
     if args.from_snapshot:
         if not args.freeze:parser.error('--from-snapshot requires --freeze')
         from .tank_map_file import import_snapshot,activate
-        result=import_snapshot(args.from_snapshot,target);activate(result);print('FROZEN '+str(result));return
+        result=import_snapshot(args.from_snapshot,target,args.crop);activate(result);print('FROZEN '+str(result));return
     temporary = tempfile.TemporaryDirectory(prefix='tank-freeze-') if args.freeze else None
     if temporary:path=Path(temporary.name)/'tank'
     import rclpy
@@ -73,7 +74,8 @@ def main():
             files['grid.bin']=grid.data.tobytes()
             from .tank_core import yaw
             p=pose.pose.pose;seed=[p.position.x,p.position.y,yaw(p.orientation)]
-            from .tank_map_file import bundle,activate
+            from .tank_map_file import bundle,activate,crop_files
+            if args.crop:files=crop_files(files,args.crop)
             result=bundle(target,files,seed);activate(result)
             print('FROZEN '+str(result))
         else: print('SAVED '+str(path)+' (.yaml / image / .posegraph / .data)')

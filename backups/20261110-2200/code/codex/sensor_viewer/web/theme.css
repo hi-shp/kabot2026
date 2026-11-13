@@ -1,0 +1,17 @@
+/* Neutral surfaces shared by the dashboard and embedded sensor panels.
+   Signal, trace, status and control-accent colours keep their existing meaning. */
+:root{--surface-page:#191b1d;--surface-panel:#25282b;--surface-plot:#1b1e20;--surface-raised:#303438;--surface-border:#454a50}
+:root,body.sensors-only{--bg:var(--surface-page);--panel:var(--surface-panel);--border:var(--surface-border)}
+body{background:var(--surface-page)}
+header,.sensors-only header,.charts canvas{background:var(--surface-panel);border-color:var(--surface-border)}
+.metrics>div,.sensors-only .metrics>div{background:var(--surface-panel)}
+.cloud-stage,.scan-canvas,.tank-stage,#outdoorOverview .map-stage,.sensors-only .cloud-stage,.sensors-only .scan-canvas{background:var(--surface-plot)}
+.empty,.sensors-only .empty{background:color-mix(in srgb,var(--surface-plot) 60%,transparent)}
+.point-readout,.sensors-only .point-readout,.map-legend,.map-attribution,.map-coordinate{background:color-mix(in srgb,var(--surface-panel) 94%,transparent);border-color:var(--surface-border)}
+button,select,input,.point,.sensors-only button,.sensors-only select,.sensors-only input{background:var(--surface-raised);border-color:var(--surface-border)}
+button:hover,.sensors-only button:hover{background:var(--surface-border)}
+button.active,button.primary,.sensors-only button.active{background:#143132}
+button.stop{background:#30232a}
+.layer-controls,.toolbar,.sensors-only .panel-head,.sensors-only .panel-foot,.sensors-only .sensor-line,.sensors-only .vector-line,.sensors-only th,.sensors-only td{border-color:var(--surface-border)}
+.sensors-only .table-wrap,.sensors-only aside,.sensors-only pre{background:var(--surface-panel)}
+th,.sensors-only th{background:var(--surface-raised)}

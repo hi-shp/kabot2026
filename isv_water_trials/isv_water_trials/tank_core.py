@@ -32,6 +32,53 @@ class Grid:
         self.observed_free=free;self.distance=distance;self.clearance=clearance
         self.free = free & (distance >= clearance)
 
+    def with_live_scan(self, position, goal, scan, heading, forward=0.):
+        """Extend a cropped map using observed scan rays, retaining occupied cells."""
+        padding=math.ceil((self.clearance+4.)/self.resolution)
+        start,end=self.index(position),self.index(goal)
+        x0=min(0,start[0]-padding,end[0]-padding)
+        y0=min(0,start[1]-padding,end[1]-padding)
+        x1=max(self.width,start[0]+padding+1,end[0]+padding+1)
+        y1=max(self.height,start[1]+padding+1,end[1]+padding+1)
+        if (x1-x0)*(y1-y0)>8_000_000:
+            raise ValueError('Live navigation grid is too large')
+        result=copy.copy(self)
+        result.width,result.height=x1-x0,y1-y0
+        dx,dy=x0*self.resolution,y0*self.resolution
+        result.ox=self.ox+self.co*dx-self.si*dy
+        result.oy=self.oy+self.si*dx+self.co*dy
+        result.cells=np.pad(self.cells,((-y0,y1-self.height),(-x0,x1-self.width)),constant_values=-1)
+        endpoints=[]
+        for i,distance in enumerate(scan.ranges):
+            no_return=math.isinf(distance) and distance>0
+            if not no_return and not (math.isfinite(distance) and max(.05,scan.range_min)<distance<=scan.range_max):
+                continue
+            reach=scan.range_max if no_return else distance
+            if not math.isfinite(reach) or reach<=0:
+                continue
+            angle=heading+scan.angle_min+i*scan.angle_increment-forward
+            # Only paint the local canvas; unobserved space stays unknown.
+            reach=min(reach,math.hypot(result.width,result.height)*result.resolution)
+            steps=max(1,math.ceil(reach/(result.resolution*.5)))
+            radial=np.linspace(0.,reach,steps+1)
+            wx=position[0]+radial*math.cos(angle)-result.ox
+            wy=position[1]+radial*math.sin(angle)-result.oy
+            xs=np.floor((result.co*wx+result.si*wy)/result.resolution).astype(int)
+            ys=np.floor((-result.si*wx+result.co*wy)/result.resolution).astype(int)
+            inside=(xs>=0)&(xs<result.width)&(ys>=0)&(ys<result.height)
+            xx,yy=xs[inside],ys[inside]
+            unknown=result.cells[yy,xx]<0
+            result.cells[yy[unknown],xx[unknown]]=0
+            if not no_return and distance<=reach and inside[-1]:
+                endpoints.append((int(xs[-1]),int(ys[-1])))
+        for x,y in endpoints:
+            result.cells[y,x]=100
+        free=(result.cells>=0)&(result.cells<35)
+        result.distance=distance_transform_edt(np.pad(free,1,constant_values=False))[1:-1,1:-1]*result.resolution
+        result.observed_free=free
+        result.free=free&(result.distance>=result.clearance)
+        return result
+
     def nearest_safe(self, point, limit):
         if self.safe(self.index(point)):return tuple(point)
         x,y=self.index(point);n=math.ceil(limit/self.resolution)+1

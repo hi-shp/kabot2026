@@ -1,9 +1,11 @@
 """LiDAR-only odometry and 2D tank mapping/localization. No actuator node."""
 import os
+import signal
 import hashlib
 import uuid
 import json
 import math
+import sys
 from pathlib import Path
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
@@ -60,11 +62,13 @@ def nodes(context):
                  'init_pose_from_topic': '/tank/init_odom', 'freq': 10.0}]),
         Node(package='slam_toolbox', name='slam_toolbox',
              executable='async_slam_toolbox_node' if mode == 'mapping' else 'localization_slam_toolbox_node',
+             prefix=[sys.executable+' -m isv_water_trials.tank_slam_guard --mode '+mode+' --'],
              output='log', parameters=[params, settings],remappings=[('/map','/tank/localization_map')] if fixed_file else [])]
     if fixed_file:
         result.append(Node(package='isv_water_trials',executable='tank_fixed_map',output='log',parameters=[{'file':fixed_file}]))
         result.append(Node(package='isv_water_trials',executable='tank_localize',output='log',
                            parameters=[{'file':fixed_file,'automatic':True,
+                                        'partial_match':LaunchConfiguration('docking_partial_match').perform(context).lower()=='true',
                                         'map_correction':LaunchConfiguration('map_correction').perform(context).lower()=='true',
                                         'accept_score':float(LaunchConfiguration('localization_score').perform(context)),
                                         'accept_margin':float(LaunchConfiguration('localization_margin').perform(context))}],
@@ -75,11 +79,15 @@ def nodes(context):
 
 
 def generate_launch_description():
+    signal.signal(signal.SIGHUP,signal.SIG_IGN)
+    from isv_water_trials.shutdown import protect_console
+    protect_console()
     return LaunchDescription([
         DeclareLaunchArgument('mode', default_value='auto'),
         DeclareLaunchArgument('map_file', default_value=''),
         DeclareLaunchArgument('autosave', default_value='true'),
-        DeclareLaunchArgument('localization_score', default_value='0.80'),
-        DeclareLaunchArgument('localization_margin', default_value='0.05'),
+        DeclareLaunchArgument('localization_score', default_value='0.60'),
+        DeclareLaunchArgument('localization_margin', default_value='0.0375'),
         DeclareLaunchArgument('map_correction', default_value='false'),
+        DeclareLaunchArgument('docking_partial_match', default_value='true'),
         OpaqueFunction(function=nodes)])

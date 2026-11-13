@@ -1,17 +1,18 @@
 """Sensors and passive outdoor recording. Driving requires an explicit start."""
 import os
+import sys
 import signal
 import runpy
 from pathlib import Path
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, LogInfo, EmitEvent, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, LogInfo, EmitEvent, RegisterEventHandler, ExecuteProcess
 from launch.events import Shutdown
 from launch.event_handlers import OnProcessStart, OnShutdown
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from isv_water_trials.launch_once import node as Node, once, GPS_EXECUTABLES
 
 
 
@@ -33,7 +34,6 @@ def nodes(context):
     for option,topics in (
         ('use_gps',['/gps/fix']),
         ('use_imu',['/vectornav/raw/common','/vectornav/imu']),
-        ('use_camera',['/camera/image_raw']),
         ('use_lidar',['/velodyne_packets','/velodyne_points','/scan']),
         ('use_arduino',['/actuators/status'])):
         if value(option).lower()=='true':expected.extend(topics)
@@ -42,8 +42,14 @@ def nodes(context):
     common={'output':'screen','respawn':True,'respawn_delay':4.0,
             'sigterm_timeout':'2','sigkill_timeout':'1'}
     return [
+        ExecuteProcess(cmd=[sys.executable,'-m','isv_water_trials.tank_record'],name='onboard_sensor_record',
+             condition=IfCondition(LaunchConfiguration('use_record')),output='log',respawn=True,respawn_delay=4.,
+             sigterm_timeout='30',sigkill_timeout='3'),
         RegisterEventHandler(OnProcessStart(on_start=_session.started)),
         RegisterEventHandler(OnShutdown(on_shutdown=_session.shutdown)),
+        ExecuteProcess(cmd=[sys.executable,'-m','isv_water_trials.tank_session','start','mapping'],
+             name='start_slam_session',condition=IfCondition(LaunchConfiguration('use_slam')),
+             output='screen'),
         Node(package='ublox_gps',executable='ublox_gps_node',name='ublox_gps_node',
              condition=IfCondition(LaunchConfiguration('use_gps')),
              parameters=[{'device':value('gps_device'),'frame_id':'gps_link',
@@ -51,14 +57,7 @@ def nodes(context):
                           'nav_rate':1,'tmode3':0,'debug':0,'publish.nmea':True}],
              remappings=[('~/fix','/gps/fix'),('~/fix_velocity','/gps/fix_velocity'),
                          ('diagnostics','/gps/diagnostics')],**common),
-        Node(package='usb_cam',executable='usb_cam_node_exe',name='usb_cam',namespace='camera',
-             condition=IfCondition(LaunchConfiguration('use_camera')),
-             parameters=[{'video_device':value('camera_device'),'framerate':15.0,'io_method':'mmap',
-                          'pixel_format':'yuyv2rgb','image_width':640,'image_height':480,
-                          'frame_id':'camera_frame','camera_name':'logitech_c930e','camera_info_url':'',
-                          'brightness':-1,'contrast':-1,'saturation':-1,'sharpness':-1,'gain':-1,
-                          'auto_white_balance':True,'white_balance':4000,'autoexposure':True,
-                          'exposure':100,'autofocus':False,'focus':-1}],**common),
+        # Camera capture follows dashboard selection; VisionRuntime owns its lifetime.
         Node(package='vectornav',executable='vectornav',name='vectornav',
              condition=IfCondition(LaunchConfiguration('use_imu')),
              parameters=[vectornav,{'port':value('imu_device'),'baud':int(value('imu_baud'))}],**common),
@@ -90,9 +89,12 @@ def generate_launch_description():
     gps='/dev/serial/by-id/usb-u-blox_AG_-_www.u-blox.com_u-blox_GNSS_receiver-if00'
     imu='/dev/serial/by-id/usb-FTDI_USB-RS232-WE_AV0LG0SE-if00-port0'
     defaults={
-        'use_gps':'true','use_camera':'false','use_imu':'true','use_mcu':'true','use_lidar':'true','use_outdoor':'true',
-        'gps_device':gps if Path(gps).exists() else '/dev/ttyACM0',
-        'camera_device':'/dev/video0','imu_device':imu if Path(imu).exists() else '/dev/ttyUSB1','imu_baud':'115200',
+        'camera_backend':'d555','use_gps':'true','use_camera':'true','use_imu':'true','use_mcu':'true','use_lidar':'true','use_outdoor':'true','use_record':'true',
+        'use_slam':'true',
+        # Keep device identities even when unplugged; tty numbers belong to other devices after reconnects.
+        'gps_device':gps,
+        'camera_device':'/dev/v4l/by-id/usb-046d_Logitech_Webcam_C930e_8FFCDE5E-video-index0',
+        'imu_device':imu,'imu_baud':'115200',
         'mcu_device':'/dev/ttyTHS1','mcu_baud':'115200',
         'use_arduino':'true','arduino_device':'/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0',
         'velodyne_model':'VLP16','velodyne_ip':'192.168.1.201','velodyne_ring':'8',

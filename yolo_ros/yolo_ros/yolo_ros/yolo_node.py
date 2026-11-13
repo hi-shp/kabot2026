@@ -34,7 +34,7 @@ from ultralytics.engine.results import Masks
 from ultralytics.engine.results import Keypoints
 
 from std_srvs.srv import SetBool
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from yolo_msgs.msg import Point2D
 from yolo_msgs.msg import BoundingBox2D
 from yolo_msgs.msg import Mask
@@ -150,8 +150,13 @@ class YoloNode(LifecycleNode):
                 SetClasses, "set_classes", self.set_classes_cb
             )
 
+        compressed_input = self.resolve_topic_name("image_raw").endswith("/compressed")
+        self.image_message_type = CompressedImage if compressed_input else Image
+        self.decode_image = (self.cv_bridge.compressed_imgmsg_to_cv2 if compressed_input
+                             else self.cv_bridge.imgmsg_to_cv2)
+
         self._sub = self.create_subscription(
-            Image, "image_raw", self.image_cb, self.image_qos_profile
+            self.image_message_type, "image_raw", self.image_cb, self.image_qos_profile
         )
 
         super().on_activate(state)
@@ -330,7 +335,7 @@ class YoloNode(LifecycleNode):
         if self.enable:
 
             # convert image + predict
-            cv_image = self.cv_bridge.imgmsg_to_cv2(
+            cv_image = self.decode_image(
                 msg, desired_encoding=self.yolo_encoding
             )
             results = self.yolo.predict(

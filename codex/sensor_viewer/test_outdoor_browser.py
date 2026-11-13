@@ -56,9 +56,14 @@ class Bridge:
         if action=='load':self.state.update(learning=False,frozen=True,learning_branch=None)
         if action=='apply_model':self.state['validation_model']=deepcopy(self.state['model'])
         if action=='clear_trail':self.state['trail']=[]
-        if action=='route':self.state['route']={'points':value['points']}
+        if action=='route':
+            self.state['route']={'points':value['points']}
+            if getattr(self,'replace_route_ack',False):self.state['ack']={'id':'other-command','ok':True}
+        if action=='regions':self.state['regions']=value['regions']
         if action=='start':self.state['execute']=True
-        if action=='start_model_test':self.state['execute']=True;self.state['model_test']=dict(running=True,origin=[35.232,129.083],area=[[-12,-12],[12,-12],[12,12],[-12,12]],obstacles=[[4,0,.45]],metrics=dict(samples=8,rmse_m=.25,max_error_m=.7));self.test_area=value['area']
+        if action=='start_point_follow':self.state.update(execute=True,navigation_mode='point_follow',point_follow_tracking=value.get('tracking','point'),point_follow_limit_percent=value['percent'],point_follow_position_source=value.get('position_source','gps'))
+        if action=='point_follow_limit':self.state['point_follow_limit_percent']=value['percent']
+        if action=='start_model_test':self.state['execute']=True;self.state['model_test']=dict(running=True,navigation='saved_route',origin=[35.232,129.083],area=None,obstacles=[],metrics=dict(samples=8,rmse_m=.25,max_error_m=.7));self.test_area=None
         if action=='stop':
             self.state['execute']=False
             if self.state.get('model_test'):self.state['model_test']['running']=False
@@ -66,6 +71,90 @@ class Bridge:
 
 
 class OutdoorBrowser(unittest.TestCase):
+    def test_path_follow_button_cap_and_shared_stop(self):
+        bridge=Bridge();args=SimpleNamespace(port=0)
+        server=ThreadingHTTPServer(('127.0.0.1',0),make_handler(bridge,args));args.port=server.server_port
+        threading.Thread(target=server.serve_forever,daemon=True).start()
+        options=webdriver.ChromeOptions();options.add_argument('--headless=new');options.add_argument('--window-size=1600,1100')
+        driver=webdriver.Chrome(options=options)
+        try:
+            driver.get(f'http://127.0.0.1:{args.port}/');wait=WebDriverWait(driver,12)
+            wait.until(lambda d:d.find_element(By.ID,'startPathFollow').is_enabled())
+            self.assertTrue(driver.find_element(By.ID,'startPointFollow').is_enabled())
+            driver.find_element(By.ID,'startPathFollow').click()
+            wait.until(lambda d:bridge.state.get('point_follow_tracking')=='path' and bridge.state['execute'])
+            wait.until(lambda d:d.find_element(By.ID,'startPathFollow').text=='경로 추종 중')
+            self.assertFalse(driver.find_element(By.ID,'startPointFollow').is_enabled())
+            self.assertTrue(driver.find_element(By.ID,'stopPathFollow').is_enabled())
+            self.assertIn('파랑',driver.find_element(By.CSS_SELECTOR,'.map-legend').text)
+            driver.execute_script("const e=document.getElementById('percent');e.value='15';e.dispatchEvent(new Event('change',{bubbles:true}));")
+            wait.until(lambda d:bridge.state.get('point_follow_limit_percent')==15)
+            driver.find_element(By.ID,'stopPathFollow').click();wait.until(lambda d:not bridge.state['execute'])
+            wait.until(lambda d:d.find_element(By.ID,'startPathFollow').is_enabled())
+            self.assertEqual(bridge.actions,['start_point_follow','point_follow_limit','stop'])
+        finally:driver.quit();server.shutdown();server.server_close()
+
+    def test_pc_map_without_gps_and_virtual_gps_toggle(self):
+        class GeoBridge(Bridge):
+            def __init__(self):
+                super().__init__();self.state['state']=None;self.state['route']={'points':[]}
+                self.virtual={'active':False,'age_s':0}
+                self.no_outdoor=False
+            def request(self, method, path, body=None):
+                if method=='GET':
+                    values={'virtual_gps':self.virtual,'heading':{'heading_deg':42.,'age_s':0},'map_reference':{'point':[35.24,129.09]}}
+                    if not self.no_outdoor:values['outdoor']=self.state
+                    return 200,{'Content-Type':'application/json'},json.dumps({'values':values}).encode()
+                value=json.loads(body)
+                if value['action'].startswith('virtual_gps_'):
+                    active=value['action']=='virtual_gps_start'
+                    self.virtual=dict(active=active,point=value.get('point'),age_s=0,topic='/gps/virtual/fix')
+                    self.actions.append(value['action'])
+                    return 200,{'Content-Type':'application/json'},json.dumps(dict(simulation=True,active=active)).encode()
+                return super().request(method,path,body)
+        bridge=GeoBridge();args=SimpleNamespace(port=0)
+        server=ThreadingHTTPServer(('127.0.0.1',0),make_handler(bridge,args));args.port=server.server_port
+        threading.Thread(target=server.serve_forever,daemon=True).start()
+        options=webdriver.ChromeOptions();options.add_argument('--headless=new');options.add_argument('--window-size=1600,1100')
+        driver=webdriver.Chrome(options=options)
+        try:
+            driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument',{'source':"Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition:ok=>ok({coords:{latitude:35.23,longitude:129.08,accuracy:40}})}});Object.defineProperty(navigator,'clipboard',{value:{writeText:async()=>{}}});"})
+            driver.get(f'http://127.0.0.1:{args.port}/');wait=WebDriverWait(driver,12)
+            wait.until(lambda d:d.execute_script('return window.kabotCaptureView?.().center?.[0]===35.23'))
+            self.assertIn('PC',driver.find_element(By.ID,'position').text)
+            driver.execute_script("const c=document.getElementById('map'),r=c.getBoundingClientRect(),p={clientX:r.left+r.width/2,clientY:r.top+r.height/2,pointerId:1,bubbles:true};c.dispatchEvent(new PointerEvent('pointerdown',p));c.dispatchEvent(new PointerEvent('pointerup',p));")
+            self.assertFalse(bridge.virtual['active'])
+            wait.until(lambda d:len(bridge.state['route']['points'])==1)
+            self.assertAlmostEqual(bridge.state['route']['points'][0][0],35.23)
+            driver.find_element(By.ID,'virtualGps').click()
+            self.assertFalse(bridge.virtual['active'])
+            driver.execute_script("const c=document.getElementById('map'),r=c.getBoundingClientRect(),p={clientX:r.left+r.width/2,clientY:r.top+r.height/2,pointerId:1,bubbles:true};c.dispatchEvent(new PointerEvent('pointerdown',p));c.dispatchEvent(new PointerEvent('pointerup',p));")
+            wait.until(lambda d:bridge.virtual['active'])
+            self.assertAlmostEqual(bridge.virtual['point'][0],35.23)
+            wait.until(lambda d:d.find_element(By.ID,'stopVirtualGps').is_enabled())
+            wait.until(lambda d:d.execute_script('return window.kabotCaptureView().selectedCoordinate===null'))
+            self.assertIn('/gps/virtual/fix',driver.find_element(By.ID,'virtualGpsInfo').get_attribute('title'))
+            self.assertIn('가상 GPS',driver.find_element(By.ID,'position').text)
+            bridge.state['route']={'points':[[35.2301,129.08]]}
+            wait.until(lambda d:d.find_element(By.ID,'startPointFollow').is_enabled())
+            driver.find_element(By.ID,'startPointFollow').click()
+            wait.until(lambda d:bridge.state.get('point_follow_position_source')=='virtual')
+            previous=list(bridge.virtual['point'])
+            driver.execute_script("const c=document.getElementById('map'),r=c.getBoundingClientRect(),p={clientX:r.left+r.width*.6,clientY:r.top+r.height*.4,pointerId:1,bubbles:true};c.dispatchEvent(new PointerEvent('pointerdown',p));c.dispatchEvent(new PointerEvent('pointerup',p));")
+            wait.until(lambda d:bridge.virtual['point']!=previous)
+            wait.until(lambda d:d.execute_script('return window.kabotCaptureView().selectedCoordinate===null'))
+            driver.find_element(By.ID,'stopVirtualGps').click();wait.until(lambda d:not bridge.virtual['active'])
+            driver.find_element(By.ID,'stop').click();wait.until(lambda d:not bridge.state['execute'])
+            self.assertEqual([a for a in bridge.actions if a.startswith('virtual_gps_')],['virtual_gps_start','virtual_gps_start','virtual_gps_stop'])
+            self.assertTrue(bridge.state['learning'])
+            bridge.no_outdoor=True
+            driver.execute_script("localStorage.removeItem('outdoor.map.center')")
+            driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument',{'source':"Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition:(ok,fail)=>fail()}});"})
+            driver.refresh()
+            wait.until(lambda d:d.execute_script('return window.kabotCaptureView?.().center?.[0]===35.24'))
+            self.assertFalse(driver.find_element(By.ID,'start').is_enabled())
+        finally:driver.quit();server.shutdown();server.server_close()
+
     def test_desktop_graphs_map_and_controls(self):
         bridge=Bridge();args=SimpleNamespace(port=0)
         server=ThreadingHTTPServer(('127.0.0.1',0),make_handler(bridge,args));args.port=server.server_port
@@ -76,6 +165,14 @@ class OutdoorBrowser(unittest.TestCase):
         try:
             driver.get(f'http://127.0.0.1:{args.port}/');wait=WebDriverWait(driver,15)
             wait.until(lambda d:'42.0' in d.find_element(By.ID,'position').text)
+            wait.until(lambda d:d.find_element(By.ID,'startPointFollow').is_enabled())
+            driver.find_element(By.ID,'startPointFollow').click()
+            wait.until(lambda d:bridge.state.get('navigation_mode')=='point_follow' and bridge.state['execute'])
+            self.assertEqual(bridge.state['point_follow_limit_percent'],20)
+            wait.until(lambda d:d.find_element(By.ID,'startPointFollow').text=='지점 추종 중')
+            driver.execute_script("const e=document.getElementById('percent');e.value='30';e.dispatchEvent(new Event('change',{bubbles:true}));")
+            wait.until(lambda d:bridge.state['point_follow_limit_percent']==30)
+            driver.find_element(By.ID,'stop').click();wait.until(lambda d:not bridge.state['execute'])
             driver.execute_script("window.testCopied=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>window.testCopied.push(text)}})")
             driver.execute_script("const c=document.getElementById('map'),r=c.getBoundingClientRect();const p={clientX:r.left+r.width/2,clientY:r.top+r.height/2,pointerId:1,bubbles:true};c.dispatchEvent(new PointerEvent('pointermove',p));c.dispatchEvent(new PointerEvent('pointerdown',p));c.dispatchEvent(new PointerEvent('pointerup',p));")
             wait.until(lambda d:'복사됨' in d.find_element(By.ID,'copyCoordinate').text)
@@ -95,11 +192,27 @@ class OutdoorBrowser(unittest.TestCase):
             driver.find_element(By.ID,'candidateSummary').click()
             self.assertEqual(len(driver.find_elements(By.CSS_SELECTOR,'#candidateRows tr')),2)
             self.assertIn('전체·비선형',driver.find_element(By.CSS_SELECTOR,'#candidateRows tr.selected').text)
-            self.assertEqual(len(driver.find_elements(By.CSS_SELECTOR,'[data-layer]')),10)
+            self.assertEqual([e.get_attribute('data-layer') for e in driver.find_elements(By.CSS_SELECTOR,'[data-layer]')],['boat','trail','waypoints'])
+            def current_zoom():
+                return driver.execute_script('return window.kabotCaptureView().zoom')
+            z=current_zoom()
+            driver.find_element(By.ID,'zoomIn').click()
+            self.assertEqual(current_zoom(),z+1)
+            driver.find_element(By.ID,'zoomOut').click()
+            self.assertEqual(current_zoom(),z)
+            self.assertEqual(driver.find_element(By.ID,'zoomOut').text,'−')
+            # Old overlay preferences and new survey frames cannot restore debug layers.
+            driver.execute_script("localStorage.setItem('outdoor.layers.v1',JSON.stringify({raw:true,survey:true,prediction:true}));")
+            bridge.state['map_layers']['survey_id']='new-survey'
+            bridge.state['map_layers']['survey']=[[0,1],[1,2]]
+            time.sleep(1)
+            self.assertEqual(len(driver.find_elements(By.CSS_SELECTOR,'[data-layer]')),3)
+            self.assertNotIn('A*',driver.find_element(By.ID,'layers').text)
+            driver.execute_script("window.kabotCaptureView({center:arguments[0],zoom:19,follow:true,layers:{boat:true,trail:true,waypoints:true}})",bridge.state['origin'])
             before=list(bridge.actions)
             for checkbox in driver.find_elements(By.CSS_SELECTOR,'[data-layer]'): checkbox.click()
             self.assertEqual(before,bridge.actions)
-            self.assertTrue(driver.execute_script("return Object.values(JSON.parse(localStorage.getItem('outdoor.layers.v1'))).every(v=>v===false)"))
+            self.assertTrue(driver.execute_script("return Object.values(JSON.parse(localStorage.getItem('outdoor.layers.core.v2'))).every(v=>v===false)"))
             driver.refresh();wait.until(lambda d:'42.0' in d.find_element(By.ID,'position').text)
             self.assertEqual(driver.title,'KABOAT 2026')
             self.assertFalse(driver.find_elements(By.TAG_NAME,'header'))
@@ -110,7 +223,12 @@ class OutdoorBrowser(unittest.TestCase):
             for checkbox in driver.find_elements(By.CSS_SELECTOR,'[data-layer]'): checkbox.click()
             self.assertFalse(driver.find_elements(By.ID,'models'))
             self.assertFalse(driver.find_elements(By.ID,'load'))
+            bridge.state['model']['qualified']=False
+            bridge.state['model']['reasons']=['분리한 검증 기록 부족']
+            wait.until(lambda d:'수동 적용 가능' in d.find_element(By.ID,'applyModel').get_attribute('title'))
+            self.assertTrue(driver.find_element(By.ID,'applyModel').is_enabled())
             driver.find_element(By.ID,'applyModel').click();wait.until(lambda d:'전체·비선형' in d.find_element(By.ID,'validationState').text)
+            self.assertFalse(bridge.state['validation_model']['qualified'])
             self.assertTrue(bridge.state['learning'])
             self.assertIn('0.34 m/s',driver.find_element(By.ID,'validationSpeed').text)
             bridge.state['model']=deepcopy(bridge.state['model']);bridge.state['model'].update(id='new-model',candidate_name='최근·선형')
@@ -125,7 +243,23 @@ class OutdoorBrowser(unittest.TestCase):
             driver.find_element(By.ID,'clearPoints').click();driver.find_element(By.ID,'addPoint').click()
             driver.execute_script("const c=document.getElementById('map'),r=c.getBoundingClientRect();for(const x of [r.width*.25,r.width*.5,r.width*.7]){c.dispatchEvent(new PointerEvent('pointerdown',{clientX:r.left+x,clientY:r.top+r.height*.5,pointerId:1,bubbles:true}));c.dispatchEvent(new PointerEvent('pointerup',{clientX:r.left+x,clientY:r.top+r.height*.5,pointerId:1,bubbles:true}));}")
             wait.until(lambda d:len(d.find_elements(By.CSS_SELECTOR,'.point'))==3)
+            self.assertFalse(driver.find_element(By.ID,'start').is_enabled())
+            self.assertIn('편집한 경로',driver.find_element(By.ID,'start').get_attribute('title'))
+            bridge.replace_route_ack=True
             driver.find_element(By.ID,'savePoints').click();wait.until(lambda d:len(bridge.state['route']['points'])==3)
+            # Saved coordinates restore start controls even if another command
+            # replaced the ACK before the next dashboard poll.
+            wait.until(lambda d:d.find_element(By.ID,'start').is_enabled())
+            self.assertTrue(driver.find_element(By.ID,'startModelTest').is_enabled())
+            self.assertIn('저장됨 · 3점',driver.find_element(By.ID,'savePoints').text)
+            # A delayed success ACK must not erase a newer local edit.
+            driver.find_element(By.ID,'undoPoint').click()
+            bridge.state['ack']={'id':'fixture-request','ok':True}
+            time.sleep(1)
+            self.assertEqual(len(driver.find_elements(By.CSS_SELECTOR,'.point')),2)
+            self.assertFalse(driver.find_element(By.ID,'start').is_enabled())
+            driver.find_element(By.ID,'savePoints').click()
+            wait.until(lambda d:len(bridge.state['route']['points'])==2 and d.find_element(By.ID,'start').is_enabled())
             for id in ['inputs','speed','yaw','ranking','errorsSpeed','errorsHeading','outputBands']:
                 count=driver.execute_script("const c=document.getElementById(arguments[0]),p=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<p.length;i+=4)if(p[i])n++;return n",id)
                 self.assertGreater(count,100,id)
@@ -134,11 +268,25 @@ class OutdoorBrowser(unittest.TestCase):
             driver.execute_script('window.scrollTo(0,document.body.scrollHeight)');driver.save_screenshot(str(artifacts/'graphs.png'))
             driver.find_element(By.ID,'defineTestArea').click()
             driver.execute_script("const c=document.getElementById('map'),r=c.getBoundingClientRect();for(const [x,y] of [[.2,.2],[.8,.2],[.8,.8],[.2,.8]]){const p={clientX:r.left+r.width*x,clientY:r.top+r.height*y,pointerId:1,bubbles:true};c.dispatchEvent(new PointerEvent('pointerdown',p));c.dispatchEvent(new PointerEvent('pointerup',p));}")
+            driver.find_element(By.ID,'addTestRegion').click()
             self.assertTrue(driver.find_element(By.ID,'startModelTest').is_enabled())
+            from selenium.webdriver.support.ui import Select
+            Select(driver.find_element(By.ID,'regionKind')).select_by_value('exclude')
+            driver.find_element(By.ID,'defineTestArea').click()
+            driver.execute_script("const c=document.getElementById('map'),r=c.getBoundingClientRect();for(const [x,y] of [[.4,.4],[.5,.4],[.5,.5],[.4,.5]]){const p={clientX:r.left+r.width*x,clientY:r.top+r.height*y,pointerId:1,bubbles:true};c.dispatchEvent(new PointerEvent('pointerdown',p));c.dispatchEvent(new PointerEvent('pointerup',p));}")
+            driver.find_element(By.ID,'addTestRegion').click()
+            driver.find_element(By.ID,'saveTestRegions').click()
+            wait.until(lambda d:len(bridge.state.get('regions',[]))==2)
+            self.assertEqual(bridge.state['regions'][1]['kind'],'exclude')
+            driver.refresh();wait.until(lambda d:len(d.find_elements(By.CSS_SELECTOR,'.region-item'))==2)
+            wait.until(lambda d:d.find_element(By.ID,'startModelTest').is_enabled())
             driver.find_element(By.ID,'startModelTest').click();wait.until(lambda d:'시험 중' in d.find_element(By.ID,'testInfo').text)
-            self.assertEqual(len(bridge.test_area),4);self.assertTrue(bridge.state['learning'])
+            self.assertEqual(driver.find_element(By.ID,'startModelTest').text,'SLAM 주행 중')
+            self.assertFalse(driver.find_element(By.ID,'startModelTest').is_enabled())
+            self.assertEqual(driver.execute_script("return getComputedStyle(document.getElementById('startModelTest')).opacity"),'1')
+            self.assertIsNone(bridge.test_area);self.assertTrue(bridge.state['learning'])
             self.assertIn('0.25m',driver.find_element(By.ID,'testInfo').text)
-            driver.find_element(By.ID,'stopModelTest').click();wait.until(lambda d:'시험 종료' in d.find_element(By.ID,'testInfo').text)
+            driver.find_element(By.ID,'stop').click();wait.until(lambda d:'시험 종료' in d.find_element(By.ID,'testInfo').text)
             driver.find_element(By.ID,'clearTrail').click();wait.until(lambda d:not bridge.state['trail'])
             self.assertEqual(bridge.state['valid_frames'],900)
             failures=[v for v in driver.get_log('browser') if v['level']=='SEVERE' and 'tile.openstreetmap.org' not in v['message'] and 'favicon' not in v['message']]

@@ -1,0 +1,387 @@
+#!/usr/bin/env python3
+"""ROS subscriptions and a loopback-only HTTP feed for the PC sensor viewer."""
+import argparse
+from collections import defaultdict, deque
+import gzip
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import math
+import os
+from pathlib import Path
+import signal
+import threading
+import time
+import uuid
+from urllib.parse import parse_qs, urlsplit
+
+from telemetry_core import (POINT_HEADER, GpsTrack, bounded_preview, cloud_value,
+                            finite, imu_value, quaternion_angles, scan_value,
+                            vector, vectornav_value)
+
+VERSION = 'kabot-sensor-viewer-v1'
+
+
+def dashboard_request():
+    try:
+        path=Path.home()/'water_trials/runtime/dashboard_wake.json'
+        if time.time()-path.stat().st_mtime>30:return None
+        value=json.loads(path.read_text())
+        return str(value['id'])[:64]
+    except (OSError,ValueError,KeyError,TypeError):return None
+
+
+def runtime_status(proc_root=Path('/proc')):
+    """Read local process lifetimes; stale ROS topics do not imply a live session."""
+    targets = {
+        'sensors': {'all_sensors.launch.py', 'mechaship_bringup.launch.py',
+                    'sensor_status.py', 'velodyne_driver_node', 'vectornav', 'ublox_gps_node'},
+        'mapping': {'tank_mapping.launch.py', 'tank_create_map.launch.py', 'tank_pose'},
+        'trial': {'indoor_trial', 'isv_water_trials.indoor_trial'},
+    }
+    result = dict.fromkeys(targets, 'stopped')
+    try: entries = list(proc_root.iterdir())
+    except OSError: return dict.fromkeys(targets, 'unknown')
+    for entry in entries:
+        if not entry.name.isdigit(): continue
+        try:
+            if entry.joinpath('stat').read_text().rsplit(')', 1)[1].split()[0] == 'Z': continue
+            args = entry.joinpath('cmdline').read_bytes().decode(errors='replace').strip('\0').split('\0')
+        except (OSError, IndexError): continue
+        tokens = {arg.rsplit('/', 1)[-1] for arg in args}
+        for name, names in targets.items():
+            if tokens & names: result[name] = 'running'
+        if 'isv_water_trials.tank_session' in args and '_worker' in args:
+            index = args.index('_worker') + 1
+            if index < len(args) and args[index] in result and result[args[index]] != 'running':
+                result[args[index]] = 'restarting'
+    return result
+
+
+class Store:
+    def __init__(self, args):
+        self.args = args
+        self.lock = threading.RLock()
+        self.graph = {'nodes':[], 'topics':[], 'updated_s':None}
+        self.arrivals = defaultdict(lambda:deque(maxlen=600))
+        self.values = {}
+        self.preview = None
+        self.selected = '/actuators/status'
+        self.cloud_bytes = b''
+        self.cloud_sequence = 0
+        self.errors = {}
+        self.last_client = 0.
+        self.instance_id=uuid.uuid4().hex
+
+    def touch(self):
+        with self.lock:
+            self.last_client = time.monotonic()
+
+    def note(self, topic):
+        with self.lock:
+            self.arrivals[topic].append(time.monotonic())
+
+    def value(self, key, data):
+        with self.lock:
+            self.values[key] = dict(data, received_monotonic=time.monotonic(), stamp_s=time.time())
+
+    def sensors_running(self):
+        names={'sensor_status','velodyne_driver_node','vectornav','ublox_gps_node','arduino_actuator_bridge'}
+        with self.lock:
+            return any(name.rsplit('/',1)[-1] in names for name in self.graph['nodes']) or any(
+                time.monotonic()-self.values[k]['received_monotonic']<3 for k in ('scan','imu','gps','cloud') if k in self.values)
+
+    def snapshot(self):
+        now = time.monotonic()
+        with self.lock:
+            topics = []
+            for row in self.graph['topics']:
+                arrivals = self.arrivals.get(row['name'], ())
+                recent = [x for x in arrivals if now-x < 5]
+                hz = (len(recent)-1)/(recent[-1]-recent[0]) if len(recent)>1 and recent[-1]>recent[0] else 0. if arrivals else None
+                topics.append(dict(row, hz=round(hz,2) if hz is not None else None,
+                                   age_s=round(now-arrivals[-1],3) if arrivals else None))
+            values = {k:dict((key,value) for key,value in v.items() if key!='received_monotonic')
+                      | {'age_s':round(now-v['received_monotonic'],3)} for k,v in self.values.items()}
+            return {'version':VERSION,'instance_id':self.instance_id,'server_time_s':time.time(),
+                    'nodes':self.graph['nodes'],'topics':topics,'graph_updated_s':self.graph['updated_s'],
+                    'values':values,'preview':self.preview,'selected_topic':self.selected,
+                    'errors':dict(self.errors),
+                    'limits':{'max_points':self.args.max_points,'cloud_hz':self.args.cloud_hz,
+                              'max_range_m':self.args.max_range,'ros_domain_id':os.environ.get('ROS_DOMAIN_ID','0')}}
+
+
+def make_node(store):
+    import rclpy
+    from rclpy.node import Node
+    from rclpy.qos import qos_profile_sensor_data, QoSProfile, DurabilityPolicy
+    from rosidl_runtime_py.utilities import get_message
+
+    class Monitor(Node):
+        def __init__(self):
+            super().__init__('kabot_sensor_monitor')
+            self.subscriptions_by_topic = {}
+            self.latest_cloud = None
+            self.cloud_topic = None
+            self.cloud_seen = 0
+            self.cloud_done = 0
+            self.preview_times = {}
+            self.summary_times = {}
+            self.summary_values = {}
+            self.gps_track = GpsTrack()
+            from tank_feed import TankFeed
+            store.tank = self.tank = TankFeed(self,store)
+            from outdoor_feed import OutdoorFeed
+            store.outdoor = OutdoorFeed(self, store)
+            self.create_timer(3.,self.refresh)
+            self.create_timer(1./store.args.cloud_hz,self.encode_cloud)
+            self.refresh()
+
+        def refresh(self):
+            store.value('runtime', {'services': runtime_status()})
+            topics = self.get_topic_names_and_types()
+            cloud_names = [name for name,types in topics if 'sensor_msgs/msg/PointCloud2' in types and self.count_publishers(name)>0]
+            with store.lock:
+                selected = store.selected
+            cloud_topic = selected if selected in cloud_names else next((n for n in ('/velodyne_points','/ouster/points','/points') if n in cloud_names),cloud_names[0] if cloud_names else None)
+            if cloud_topic != self.cloud_topic:
+                self.cloud_topic = cloud_topic
+                self.latest_cloud = None
+                self.cloud_done = self.cloud_seen
+                with store.lock:
+                    store.cloud_bytes = b''
+                    store.values.pop('cloud',None)
+            active_names = set()
+            graph = []
+            for name,types in topics[:500]:
+                if not types:
+                    continue
+                typename = types[0]
+                publishers = self.get_publishers_info_by_topic(name)
+                is_large = typename in ('sensor_msgs/msg/PointCloud2','sensor_msgs/msg/Image','sensor_msgs/msg/CompressedImage','nav_msgs/msg/OccupancyGrid')
+                noisy = name in ('/rosout','/parameter_events') or '/_action/' in name
+                observe = bool(publishers) and (not is_large or name==cloud_topic or name==selected or name=='/map') and (not noisy or name==selected)
+                if observe:
+                    active_names.add(name)
+                    old = self.subscriptions_by_topic.get(name)
+                    if old and old[0] != typename:
+                        self.destroy_subscription(old[1]);del self.subscriptions_by_topic[name]
+                    if name not in self.subscriptions_by_topic:
+                        try:
+                            qos = QoSProfile(depth=1,durability=DurabilityPolicy.TRANSIENT_LOCAL) if name=='/map' else qos_profile_sensor_data
+                            sub = self.create_subscription(get_message(typename),name,self.callback(name,typename),qos)
+                            self.subscriptions_by_topic[name] = (typename,sub)
+                            with store.lock:
+                                store.errors.pop(name,None)
+                        except (ImportError,AttributeError,ValueError,RuntimeError) as exc:
+                            with store.lock:
+                                store.errors[name] = type(exc).__name__+': '+str(exc)[:180]
+                graph.append({'name':name,'types':types,'publishers':len(publishers),
+                              'subscribers':self.count_subscribers(name),'observed':observe and name in self.subscriptions_by_topic,
+                              'publisher_nodes':[('/'+p.node_namespace.strip('/')+'/'+p.node_name).replace('//','/') for p in publishers]})
+            for name in list(self.subscriptions_by_topic):
+                if name not in active_names:
+                    self.destroy_subscription(self.subscriptions_by_topic.pop(name)[1])
+            nodes = sorted(('/'+namespace.strip('/')+'/'+name).replace('//','/') for name,namespace in self.get_node_names_and_namespaces())
+            with store.lock:
+                store.graph = {'nodes':nodes,'topics':sorted(graph,key=lambda x:x['name']),'updated_s':time.time()}
+
+        def callback(self, topic, typename):
+            def receive(message):
+                store.note(topic)
+                now = time.monotonic()
+                if typename == 'sensor_msgs/msg/PointCloud2' and topic == self.cloud_topic:
+                    self.latest_cloud = message
+                    self.cloud_seen += 1
+                if typename == 'nav_msgs/msg/OccupancyGrid' and topic == '/map':
+                    self.tank.map(message)
+                data = None
+                if now-self.summary_times.get(topic,0) >= .1:
+                    self.summary_times[topic] = now
+                    try:
+                        if typename == 'sensor_msgs/msg/Imu':
+                            data = imu_value(message)
+                            if topic in ('/vectornav/imu','/imu') or 'imu' not in store.values:
+                                store.value('imu',dict(data,topic=topic))
+                        elif typename == 'vectornav_msgs/msg/CommonGroup':
+                            data = vectornav_value(message);store.value('vectornav',dict(data,topic=topic))
+                        elif typename == 'sensor_msgs/msg/LaserScan':
+                            data = scan_value(message)
+                            if topic == '/scan' or 'scan' not in store.values:
+                                store.value('scan',dict(data,topic=topic))
+                        elif typename == 'sensor_msgs/msg/NavSatFix':
+                            if topic == '/gps/fix' or 'gps' not in store.values:
+                                data = self.gps_track.update(message);store.value('gps',dict(data,topic=topic))
+                        elif typename == 'std_msgs/msg/String' and topic == '/gps/corrections':
+                            data = json.loads(message.data)
+                            store.value('gps_corrections',dict(data,topic=topic))
+                        elif typename in ('geometry_msgs/msg/TwistWithCovarianceStamped','geometry_msgs/msg/TwistStamped','geometry_msgs/msg/Twist'):
+                            twist = message.twist if hasattr(message,'twist') else message
+                            twist = twist.twist if hasattr(twist,'twist') else twist
+                            data = {'linear_velocity_m_s':vector(twist.linear),'angular_velocity_deg_s':vector(twist.angular,180/math.pi)}
+                            if topic == '/gps/fix_velocity':
+                                speed = math.hypot(twist.linear.x,twist.linear.y)
+                                store.value('gps_velocity',dict(data,speed_m_s=finite(speed),topic=topic))
+                        elif typename in ('geometry_msgs/msg/PoseStamped','geometry_msgs/msg/PoseWithCovarianceStamped','nav_msgs/msg/Odometry'):
+                            pose = message.pose
+                            pose = pose.pose if hasattr(pose,'pose') else pose
+                            data = {'position_m':vector(pose.position),'orientation':quaternion_angles(pose.orientation)}
+                            if topic == '/tank/pose': store.value('tank_pose',data)
+                        elif typename == 'std_msgs/msg/String' and topic == '/actuators/status':
+                            data = json.loads(message.data);store.value('actuators',dict(data,topic=topic))
+                        elif typename == 'std_msgs/msg/String' and topic == '/outdoor/status':
+                            data = json.loads(message.data);store.value('outdoor',data)
+                        elif typename == 'std_msgs/msg/String' and topic in ('/tank/status','/tank/prediction','/tank/session','/tank/localization_candidates'):
+                            data = json.loads(message.data);store.value(topic.replace('/tank/','tank_'),data)
+                    except (ValueError,AttributeError,TypeError,OverflowError) as exc:
+                        with store.lock:
+                            store.errors[topic] = type(exc).__name__+': '+str(exc)[:180]
+                if data is not None:
+                    self.summary_values[topic] = data
+                with store.lock:
+                    selected = store.selected
+                if topic == selected and now-self.preview_times.get(topic,0) >= .5:
+                    self.preview_times[topic] = now
+                    if typename == 'sensor_msgs/msg/PointCloud2':
+                        raw = {'frame_id':message.header.frame_id,'width':message.width,'height':message.height,
+                               'point_step_bytes':message.point_step,'data_bytes':len(message.data)}
+                    elif typename in ('sensor_msgs/msg/Image','sensor_msgs/msg/CompressedImage'):
+                        raw = {'data_bytes':len(message.data),'encoding':getattr(message,'encoding',getattr(message,'format','')),
+                               'width':getattr(message,'width',None),'height':getattr(message,'height',None)}
+                    else:
+                        raw = bounded_preview(message)
+                    with store.lock:
+                        store.preview = {'topic':topic,'type':typename,'received_s':time.time(),
+                                         'display':self.summary_values.get(topic,raw),'raw':raw,
+                                         'units':'degrees / m / SI' if topic in self.summary_values else '메시지 정의 기준'}
+            return receive
+
+        def encode_cloud(self):
+            if self.latest_cloud is None or self.cloud_done == self.cloud_seen or time.monotonic()-store.last_client > 5:
+                return
+            sequence = self.cloud_seen
+            started = time.perf_counter()
+            try:
+                payload,metadata = cloud_value(self.latest_cloud,store.args.max_points,store.args.max_range)
+                self.cloud_done = sequence
+                metadata.update(decode_ms=round((time.perf_counter()-started)*1000,2),topic=self.cloud_topic)
+                with store.lock:
+                    store.cloud_sequence += 1
+                    number = store.cloud_sequence
+                    metadata['sequence'] = number
+                    stamp = time.time()
+                    store.cloud_bytes = POINT_HEADER.pack(b'KPC1',number,metadata['display_points'],stamp,16)+payload
+                    store.errors.pop(self.cloud_topic,None)
+                store.value('cloud',metadata)
+            except (ValueError,TypeError,BufferError) as exc:
+                with store.lock:
+                    store.errors[self.cloud_topic] = 'Cloud: '+str(exc)[:180]
+    return Monitor()
+
+
+def make_handler(store):
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = 'HTTP/1.1'
+
+        def log_message(self, *_):
+            pass
+
+        def send(self, status, body=b'', content_type='application/json', compress=False):
+            if compress and len(body)>1500 and 'gzip' in self.headers.get('Accept-Encoding',''):
+                body = gzip.compress(body,compresslevel=1);encoding = 'gzip'
+            else:
+                encoding = None
+            self.send_response(status);self.send_header('Content-Type',content_type)
+            self.send_header('Content-Length',str(len(body)));self.send_header('Cache-Control','no-store')
+            if encoding:
+                self.send_header('Content-Encoding',encoding)
+            self.end_headers()
+            try:
+                self.wfile.write(body)
+            except (BrokenPipeError,ConnectionResetError):
+                pass
+
+        def do_GET(self):
+            path = urlsplit(self.path)
+            if path.path == '/health':
+                self.send(200,json.dumps({'version':VERSION,'pid':os.getpid(),'sensors_running':store.sensors_running(),'dashboard_request':dashboard_request()}).encode());return
+            if path.path == '/api/state':
+                snapshot=store.snapshot()
+                if parse_qs(path.query).get('sensors')==['1']:snapshot['values'].pop('outdoor',None)
+                self.send(200,json.dumps(snapshot,ensure_ascii=False,allow_nan=False,separators=(',',':')).encode(),compress=True)
+            elif path.path == '/api/cloud':
+                store.touch()
+                try:
+                    after = int(parse_qs(path.query).get('after',['-1'])[0])
+                except ValueError:
+                    self.send(400);return
+                with store.lock:
+                    body = store.cloud_bytes
+                    unchanged = store.cloud_sequence == after
+                self.send(204 if not body or unchanged else 200,b'' if not body or unchanged else body,'application/octet-stream')
+            elif path.path == '/api/map':
+                try: after = int(parse_qs(path.query).get('after',['-1'])[0])
+                except ValueError: self.send(400); return
+                body = store.tank.payload(after)
+                self.send(200 if body else 204,body,'application/octet-stream',compress=True)
+            else:
+                self.send(404)
+
+        def do_POST(self):
+            path = urlsplit(self.path).path
+            if path not in ('/api/select','/api/route','/api/initial_pose','/api/localize','/api/outdoor'):
+                self.send(404);return
+            try:
+                size = int(self.headers.get('Content-Length','0'))
+                if not 0 < size <= (16384 if path == '/api/outdoor' else 1024):
+                    raise ValueError('Bad body size')
+                data = json.loads(self.rfile.read(size))
+                if path == '/api/outdoor':
+                    status,response = store.outdoor.request(data)
+                    self.send(status,json.dumps(response,ensure_ascii=False).encode());return
+                if path != '/api/select':
+                    status,response = store.tank.request(path,data)
+                    self.send(status,json.dumps(response,ensure_ascii=False).encode());return
+                topic = data['topic']
+                with store.lock:
+                    if topic not in {row['name'] for row in store.graph['topics']}:
+                        raise ValueError('Unknown topic')
+                    store.selected = topic
+                    store.preview = None
+                self.send(200,b'{"ok":true}')
+            except (ValueError,TypeError,KeyError,json.JSONDecodeError):
+                self.send(400,b'{"error":"invalid topic"}')
+    return Handler
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--port',type=int,default=0)
+    parser.add_argument('--max-points',type=int,default=5000)
+    parser.add_argument('--cloud-hz',type=float,default=5.)
+    parser.add_argument('--max-range',type=float,default=100.)
+    args = parser.parse_args()
+    if not 500 <= args.max_points <= 30000 or not 1 <= args.cloud_hz <= 10 or not 0 < args.max_range <= 1000:
+        parser.error('Invalid display limits')
+    import rclpy
+    from rclpy.signals import SignalHandlerOptions
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
+    stop = threading.Event()
+    signal.signal(signal.SIGINT,lambda *_:stop.set())
+    if hasattr(signal,'SIGHUP'):
+        signal.signal(signal.SIGHUP,signal.SIG_IGN)
+    signal.signal(signal.SIGTERM,signal.SIG_IGN)
+    store = Store(args);node = make_node(store)
+    server = ThreadingHTTPServer(('127.0.0.1',args.port),make_handler(store))
+    threading.Thread(target=server.serve_forever,daemon=True).start()
+    print(json.dumps({'ready_port':server.server_port,'pid':os.getpid(),'version':VERSION}),flush=True)
+    try:
+        while rclpy.ok() and not stop.is_set():
+            rclpy.spin_once(node,timeout_sec=.05)
+    finally:
+        server.shutdown();server.server_close();node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

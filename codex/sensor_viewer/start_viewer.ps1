@@ -1,9 +1,9 @@
 param(
-    [string]$Jetson = '10.182.77.20',
+    [string]$Jetson = 'auto',
     [string]$User = 'isv',
     [int]$Port = 8765,
-    [int]$MaxPoints = 5000,
-    [double]$Hz = 5
+    [int]$MaxPoints = 1800,
+    [double]$Hz = 3
 )
 $ErrorActionPreference = 'Stop'
 $viewerEnv = Join-Path $env:LOCALAPPDATA 'KabotSensorViewer\venv'

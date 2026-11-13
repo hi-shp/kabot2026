@@ -19,8 +19,8 @@ inline void beginEscPwm() {
     PORTB &= uint8_t(~(_BV(PB1) | _BV(PB2)));
     TCNT1 = 0;
     ICR1 = ESC_PWM_TOP;
-    OCR1A = NEUTRAL_US * 2;  // Timer tick is 0.5 us.
-    OCR1B = NEUTRAL_US * 2;
+    OCR1A = ESC_INITIALIZE_NEUTRAL_US * 2;  // Timer tick is 0.5 us.
+    OCR1B = ESC_INITIALIZE_NEUTRAL_US * 2;
     TIFR1 = _BV(ICF1) | _BV(OCF1B) | _BV(OCF1A) | _BV(TOV1);
     DDRB |= _BV(PB1) | _BV(PB2);
     TCCR1A = _BV(COM1A1) | _BV(COM1B1) | _BV(WGM11);

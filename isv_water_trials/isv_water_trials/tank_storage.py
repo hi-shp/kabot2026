@@ -43,6 +43,35 @@ class Journal:
             finally: self.stream.close(); self.stream = None
 
 
+class OptionalTrialJournal:
+    """Disable trial recording on I/O failure without interrupting navigation."""
+    def __init__(self, root, metadata):
+        self.journal = None
+        self.error = None
+        try:
+            atomic_json(Path(root)/'metadata.json', metadata)
+            self.journal = Journal(root)
+        except OSError as exc:
+            self.error = str(exc)
+
+    def write(self, row):
+        if self.journal is None:
+            return
+        try:
+            self.journal.write(row)
+        except OSError as exc:
+            self.error = str(exc)
+            self.close()
+
+    def close(self):
+        journal, self.journal = self.journal, None
+        if journal is not None:
+            try:
+                journal.close()
+            except OSError as exc:
+                self.error = str(exc)
+
+
 def read_rows(root):
     """Ignore only a power-cut partial LAST line; surface other corruption."""
     root = Path(root)

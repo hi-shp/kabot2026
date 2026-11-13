@@ -30,6 +30,7 @@ class SerialTransport:
         self.raw_at = 0.
         self.received_at = 0.
         self.error = None
+        self.last_failure = None
         self.sequence = secrets.randbelow(65536)
         self.closed = threading.Event()
         self.reader = threading.Thread(target=self.read, daemon=True)
@@ -78,9 +79,29 @@ class SerialTransport:
         time.sleep(.05)
         self.serial.dtr = False
 
+    def failure_snapshot(self):
+        with self.condition:
+            return dict(self.last_failure) if self.last_failure else None
+
+    def record_failure(self, reason, operation, left, right, expected=None):
+        with self.condition:
+            m = self.latest
+            self.last_failure = dict(
+                reason=reason, operation=operation,
+                requested_left=left, requested_right=right,
+                expected_sequence=expected,
+                received_sequence=m.sequence if m else None,
+                received_mode=m.mode if m else None,
+                received_armed=m.armed if m else None,
+                received_left=m.left if m else None,
+                received_right=m.right if m else None,
+                telemetry_age=time.monotonic()-self.received_at,
+                serial_error=self.error)
+
     def exchange(self, operation, left=1500, right=1500):
         # Do not queue an old propulsion request behind another in-flight transaction.
         if not self.lock.acquire(timeout=.3 if operation in ('S','R') else .03):
+            self.record_failure('serial_transaction_busy', operation, left, right)
             return False
         try:
             self.sequence = (self.sequence + 1) & 65535
@@ -94,21 +115,27 @@ class SerialTransport:
                         m = self.latest
                         if m is not None and self.received_at >= sent and m.sequence == sequence:
                             if operation == 'S':
-                                return not m.armed and (m.left,m.right)==(1500,1500)
-                            if operation == 'R':
-                                return not m.stop_latched and not m.armed
-                            if operation in ('D', 'I'):
-                                return not m.armed
-                            return m.mode == 2 and m.armed and not m.estop_active and (m.left, m.right) == (left, right)
+                                ok = not m.armed and (m.left,m.right)==(1500,1500)
+                            elif operation == 'R':
+                                ok = not m.stop_latched and not m.armed
+                            elif operation in ('D', 'I'):
+                                ok = not m.armed
+                            else:
+                                ok = m.mode == 2 and m.armed and not m.estop_active and (m.left, m.right) == (left, right)
+                            if not ok:
+                                self.record_failure('firmware_state_rejected', operation, left, right, sequence)
+                            return ok
                         remaining = deadline - time.monotonic()
                         if remaining <= 0:
                             break
                         self.condition.wait(remaining)
+                self.record_failure('matching_ack_not_received', operation, left, right, sequence)
                 # Invalidate a possibly applied but unacknowledged command. Hardware also times out.
                 self.sequence = (self.sequence + 1) & 65535
                 self.serial.write(command(self.sequence, 'D'))
             except Exception as exc:
                 self.error = str(exc)
+                self.record_failure('serial_io_error', operation, left, right, sequence)
             return False
         finally:
             self.lock.release()
@@ -200,6 +227,11 @@ class ReconnectingTransport:
             transport, error = self.current, self.error
         return transport.snapshot() if transport else (None, float('inf'), error)
 
+    def failure_snapshot(self):
+        with self.lock:
+            transport, error = self.current, self.error
+        return transport.failure_snapshot() if transport else dict(reason='transport_offline', serial_error=error)
+
     def raw_snapshot(self):
         with self.lock:
             transport = self.current
@@ -278,7 +310,10 @@ def main(argv=None):
 
     def log(state, left, right):
         output.publish(String(data=json.dumps({'status': state, 'source': 'arduino_bridge',
-                                              'left_pwm_us': left, 'right_pwm_us': right})))
+                                              'left_pwm_us': left, 'right_pwm_us': right,
+                                              'failure_detail': transport.failure_snapshot() if state == 'failed' else None})))
+        if state == 'failed':
+            node.get_logger().error('ACTUATOR_COMMAND_FAILED: ' + json.dumps(transport.failure_snapshot()))
     pairer = Pairer(transport.exchange, log)
     def callback(side):
         def handle(request, response):

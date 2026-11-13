@@ -1,7 +1,7 @@
 """Tangent-continuous corner fillets and continuous arc-length lookahead."""
 import math
 import numpy as np
-from isv_water_trials.codex_nav.fast_corridor import compiled_within_corridor
+from isv_water_trials.codex_nav.fast_corridor import compiled_within_corridor, compiled_corridor_candidate
 
 
 def samples_on_line(a,b,spacing=.04):
@@ -29,7 +29,7 @@ def smooth_path(raw, safe):
     # 0.40 m corridor belongs to at least one expanded segment cell.
     cell_size=.2
     corridor_cells=set()
-    for a,b in zip(raw[:-1],raw[1:]):
+    for a,b in (zip(raw[:-1],raw[1:]) if compiled_corridor_candidate is None else ()):
         x0=math.floor((min(a[0],b[0])-.400000001)/cell_size)
         x1=math.floor((max(a[0],b[0])+.400000001)/cell_size)
         y0=math.floor((min(a[1],b[1])-.400000001)/cell_size)
@@ -46,12 +46,16 @@ def smooth_path(raw, safe):
         distance=np.linalg.norm(offset-fraction[:,:,None]*delta,axis=2)
         return bool(np.all(distance.min(axis=1)<=.40))
     def safe(points):
+        if compiled_corridor_candidate is not None:
+            return bool(within_corridor(points) and validate(points))
         # A subset of the exact same samples can reject an impossible chord.
         # Any passing candidate still runs the full original safety checks.
         probe=points[np.linspace(0,len(points)-1,min(8,len(points)),dtype=int)]
         if not maybe_within_corridor(probe) or not within_corridor(probe):return False
         return bool(validate(points) and within_corridor(points))
     def safe_chord(a,b):
+        if compiled_corridor_candidate is not None:
+            return safe(samples_on_line(a,b))
         # Most proposed shortcuts fail the corridor test. Probe the same
         # eight line-sample indices before allocating every dense sample.
         count=max(2,int(np.ceil(np.linalg.norm(b-a)/.04))+1)
@@ -70,8 +74,15 @@ def smooth_path(raw, safe):
     nodes=[raw[0]];i=0
     while i<len(raw)-1:
         j=len(raw)-1
-        while j>i+1 and not safe_chord(raw[i],raw[j]):j-=1
-        if not safe_chord(raw[i],raw[j]):return None
+        if compiled_corridor_candidate is not None:
+            while j>i:
+                j=compiled_corridor_candidate(raw,raw_segment_starts,delta,segment_length_sq,i,j)
+                if safe_chord(raw[i],raw[j]):break
+                j-=1
+            if j<=i:return None
+        else:
+            while j>i+1 and not safe_chord(raw[i],raw[j]):j-=1
+            if not safe_chord(raw[i],raw[j]):return None
         nodes.append(raw[j]);i=j
     nodes=np.array(nodes);parts=[];last=nodes[0]
     for i in range(1,len(nodes)-1):

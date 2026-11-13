@@ -12,6 +12,44 @@ ACTIVE = Path.home()/'water_trials/tank_maps/active.json'
 REQUIRED = {'tank.posegraph','tank.data','grid.json','grid.bin'}
 
 
+def crop_files(files, bounds):
+    """Crop occupancy only; retain world coordinates and the SLAM restore graph."""
+    import numpy as np
+    import yaml
+    if len(bounds)!=4 or not all(math.isfinite(float(v)) for v in bounds):
+        raise ValueError('직사각형 구역을 다시 지정하세요.')
+    x0,y0,x1,y1=map(float,bounds)
+    x0,x1=sorted((x0,x1));y0,y1=sorted((y0,y1))
+    if x1<=x0 or y1<=y0:raise ValueError('직사각형 구역을 드래그해 지정하세요.')
+    info=json.loads(files['grid.json']);r=float(info['resolution'])
+    qx,qy,qz,qw=info['orientation'];angle=math.atan2(2*(qw*qz+qx*qy),1-2*(qy*qy+qz*qz))
+    co,si=math.cos(angle),math.sin(angle);ox,oy=info['position'][:2]
+    corners=np.array([(x0,y0),(x1,y0),(x0,y1),(x1,y1)])-np.array([ox,oy])
+    local=np.column_stack((co*corners[:,0]+si*corners[:,1],-si*corners[:,0]+co*corners[:,1]))/r
+    left,bottom=map(int,np.floor(local.min(axis=0)));right,top=map(int,np.ceil(local.max(axis=0)))
+    left=max(0,left);bottom=max(0,bottom);right=min(info['width'],right);top=min(info['height'],top)
+    if left>=right or bottom>=top:raise ValueError('선택 구역이 지도와 겹치지 않습니다.')
+    grid=np.frombuffer(files['grid.bin'],dtype=np.int8).reshape(info['height'],info['width'])
+    cropped=grid[bottom:top,left:right].copy()
+    rows,cols=np.indices(cropped.shape);gx=(cols+left+.5)*r;gy=(rows+bottom+.5)*r
+    wx=ox+co*gx-si*gy;wy=oy+si*gx+co*gy
+    cropped[(wx<x0)|(wx>x1)|(wy<y0)|(wy>y1)]=-1
+    if not np.any(cropped>=0):raise ValueError('선택 구역에 관측된 지도가 없습니다.')
+    info=dict(info,width=int(right-left),height=int(top-bottom),
+              position=[ox+co*left*r-si*bottom*r,oy+si*left*r+co*bottom*r,info['position'][2]],
+              crop_bounds_m=[x0,y0,x1,y1])
+    result=dict(files);result['grid.json']=json.dumps(info).encode();result['grid.bin']=cropped.tobytes()
+    # The selected crop is recognition evidence, not an artificial sailing fence.
+    result.setdefault('navigation_grid.json',files['grid.json'])
+    result.setdefault('navigation_grid.bin',files['grid.bin'])
+    pixels=np.where(cropped<0,205,np.where(cropped>=65,0,254)).astype(np.uint8)
+    result['tank.pgm']=f"P5\n{info['width']} {info['height']}\n255\n".encode()+np.flipud(pixels).tobytes()
+    result.pop('tank.png',None)
+    result['tank.yaml']=yaml.safe_dump(dict(image='tank.pgm',mode='trinary',resolution=r,
+        origin=[*info['position'][:2],angle],negate=0,occupied_thresh=.65,free_thresh=.196)).encode()
+    return result
+
+
 def bundle(path, files, seed=None):
     path = Path(path).expanduser().resolve()
     if path.suffix!='.tankmap': path = Path(str(path)+'.tankmap')
@@ -37,7 +75,7 @@ def bundle(path, files, seed=None):
     return path
 
 
-def import_snapshot(prefix,target):
+def import_snapshot(prefix,target,crop=None):
     """Import a previously completed SLAM SaveMap/SerializePoseGraph snapshot."""
     import yaml
     import numpy as np
@@ -71,7 +109,7 @@ def import_snapshot(prefix,target):
            'tank.pgm':raw,'grid.bin':np.flipud(cells).tobytes(),'grid.json':json.dumps(grid).encode()}
     config['image']='tank.pgm';config['free_thresh']=min(config['free_thresh'],.196)
     files['tank.yaml']=yaml.safe_dump(config).encode()
-    return bundle(target,files)
+    return bundle(target,crop_files(files,crop) if crop is not None else files)
 
 
 def read_bundle(path):

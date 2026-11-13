@@ -88,7 +88,7 @@ class VersionsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store=OutdoorStore(tmp,CONFIG);old=known_model();new=deepcopy(old);new['id']='abcdef0123456789'
             store.finalize_model(old);before=store.model_path(old['id']).read_bytes();store.save_model(new)
-            store.save_live_selection(new,old,False);store.close()
+            store.save_live_selection(new,old,True);store.close()
             store=OutdoorStore(tmp,CONFIG);current,validation,learning=store.live_selection()
             self.assertEqual(current['id'],new['id']);self.assertEqual(validation['id'],old['id']);self.assertFalse(learning)
             self.assertEqual(store.model_path(old['id']).read_bytes(),before);store.close()

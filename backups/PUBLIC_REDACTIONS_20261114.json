@@ -1,0 +1,122 @@
+[
+  {
+    "path": "backups/20261114-010132-jetson-code/projects/shape_course_lidar_imu_20261105_w577p_4h_before_move_20261105_011747/revisions/auto_start_678jp6ja/src/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/projects/shape_course_lidar_imu_20261105_w577p_4h_before_move_20261105_011747/src/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/codex/sensor_viewer/web/outdoor.js",
+    "reason": "Embedded recorded GPS mark coordinates omitted from public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uae30\ub85d/revisions/20261106_v2_openwater_no_recovery/stage/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uae30\ub85d/revisions/20261106_v2_weighted_selection/before/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uae30\ub85d/revisions/20261106_v2_weighted_selection/stage/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uae30\ub85d/revisions/avoidance_print_20261105_052758.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uae30\ub85d/revisions/gentle_turn_20261106_004455/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uae30\ub85d/revisions/lidar5m_inverse_20261105_050141/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uae30\ub85d/revisions/overall_slow_20261106_013004/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uae30\ub85d/revisions/raw_range_objective_20261105_053447/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uae30\ub85d/revisions/route_before_recovery_20261106_021806.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uae30\ub85d/revisions/small_tank_20261105_051410/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uae30\ub85d/revisions/weighted_avoidance_20261105_045935/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uc8fc\ud589\ucf54\ub4dc/mission_config.py",
+    "reason": "Mission GPS coordinate values replaced by None in public configuration template"
+  },
+  {
+    "path": "backups/20261114-010132-jetson-code/ros2_ws-src/isv_kaboat/kaboat2026/\uc8fc\ud589\ucf54\ub4dc/\uc7a5\uc560\ubb3c\ud68c\ud53c/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "codex/sensor_viewer/web/outdoor.js",
+    "reason": "Embedded recorded GPS mark coordinates omitted from public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uae30\ub85d/revisions/20261106_v2_openwater_no_recovery/stage/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uae30\ub85d/revisions/20261106_v2_weighted_selection/before/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uae30\ub85d/revisions/20261106_v2_weighted_selection/stage/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uae30\ub85d/revisions/avoidance_print_20261105_052758.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uae30\ub85d/revisions/gentle_turn_20261106_004455/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uae30\ub85d/revisions/lidar5m_inverse_20261105_050141/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uae30\ub85d/revisions/overall_slow_20261106_013004/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uae30\ub85d/revisions/raw_range_objective_20261105_053447/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uae30\ub85d/revisions/route_before_recovery_20261106_021806.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uae30\ub85d/revisions/small_tank_20261105_051410/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uae30\ub85d/revisions/weighted_avoidance_20261105_045935/\uc8fc\ud589\ucf54\ub4dc/isv_shape_navigation/isv_shape_navigation/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uc8fc\ud589\ucf54\ub4dc/mission_config.py",
+    "reason": "Mission GPS coordinate values replaced by None in public configuration template"
+  },
+  {
+    "path": "isv_kaboat/kaboat2026/\uc8fc\ud589\ucf54\ub4dc/\uc7a5\uc560\ubb3c\ud68c\ud53c/route_mission.py",
+    "reason": "Recorded default waypoint tuples emptied in public source"
+  }
+]

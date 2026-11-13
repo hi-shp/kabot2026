@@ -46,7 +46,7 @@ def imu_value(message):
     orientation = quaternion_angles(message.orientation)
     if len(message.orientation_covariance) and message.orientation_covariance[0] < 0:
         orientation = None
-    return {'frame_id':message.header.frame_id,'orientation':orientation,
+    return {'frame_id':message.header.frame_id,'orientation':orientation,'orientation_valid':orientation is not None,
             'angular_velocity_deg_s':vector(message.angular_velocity,180/math.pi),
             'acceleration_m_s2':vector(message.linear_acceleration)}
 
@@ -59,11 +59,27 @@ def vectornav_value(message):
         signed = dict(zip(('yaw','pitch','roll'),(message.yawpitchroll.x,message.yawpitchroll.y,message.yawpitchroll.z)))
         result.update(deg_360={k:degrees360(v) for k,v in signed.items()},
                       deg_signed={k:finite(v) for k,v in signed.items()},reference='VectorNav raw NED')
+        if all(finite(v) is not None for v in signed.values()):
+            result['orientation'] = {'deg_360':result['deg_360'],'deg_signed':result['deg_signed']}
+    result['orientation_valid'] = result.get('orientation') is not None
     if bits & 0x0020:
         result['angular_velocity_deg_s'] = vector(message.angularrate,180/math.pi)
     if bits & 0x0100:
         result['acceleration_m_s2'] = vector(message.accel)
     return result
+
+
+def vectornav_heading(data, reference):
+    """Use the same mount/declination as navigation, independently of its node."""
+    yaw = finite(data.get('deg_signed',{}).get('yaw'))
+    declination = finite(reference.get('magnetic_declination_deg'))
+    mount = finite(reference.get('heading_offset_deg',0.))
+    valid = yaw is not None and mount is not None
+    return {'heading_deg':(yaw+mount+(declination or 0.))%360 if valid else None,
+            'reference':'magnetic_north' if reference.get('imu_heading_mode')=='absolute_magnetic_raw' or declination is None else 'true_north',
+            'declination_deg':declination,'mount_offset_deg':mount,
+            'topic':data.get('topic'), 'source':'vectornav_raw',
+            'imu_heading_mode':reference.get('imu_heading_mode')}
 
 
 def scan_value(message, maximum=900):

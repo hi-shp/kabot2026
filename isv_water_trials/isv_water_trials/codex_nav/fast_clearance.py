@@ -8,7 +8,7 @@ except ImportError:
 
 
 if njit is not None:
-    @njit(cache=True)
+    @njit(cache=True,nogil=True)
     def compiled_clearance(points, obstacles, hull_radius):
         result = np.empty(len(points))
         for i in range(len(points)):
@@ -27,3 +27,5 @@ def warmup_clearance():
     if compiled_clearance is not None:
         compiled_clearance(np.zeros((1,2)),np.zeros((1,3)),.54)
         compiled_clearance(np.zeros((1,2),dtype=np.float32),np.zeros((1,3)),.54)
+    from .gpu_clearance import cuda_clearance
+    cuda_clearance(np.zeros((1,2)),np.zeros((1,3)),.54,force=True)

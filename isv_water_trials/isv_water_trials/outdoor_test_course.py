@@ -44,12 +44,16 @@ def fence(area,step=.35):
     return np.c_[points,np.full(len(points),step/2+.02)]
 
 
-def create_course(area,state,scan,config):
-    area=polygon(area);position=np.asarray(state['position'])
+def create_course(area,state,scan,config,regions=None):
+    from .outdoor_regions import OperatingRegion
+    region=OperatingRegion(regions) if regions is not None else None
+    area=np.asarray(regions[0]['points']) if region else polygon(area)
+    position=np.asarray(state['position'])
+    clearance=region.clearance if region else lambda p:point_clearance(p,area)
     sigma=float(state['position_sigma_m'])
     margin=config['obstacle_margin_m']+2*sigma
     radius=math.hypot(config['length_m'],config['width_m'])/2
-    if hull_clearance([*position,state['yaw']],area,config['length_m'],config['width_m'])[0]<margin:
+    if (region.hull_clearance([*position,state['yaw']],config['length_m'],config['width_m'])[0] if region else hull_clearance([*position,state['yaw']],area,config['length_m'],config['width_m'])[0])<margin:
         raise ValueError('현재 배를 시험구역 안쪽으로 두고 충분한 경계 여유를 확보하세요')
     pose=scan.get('pose',state);yaw=pose['yaw'];lx,ly=config['lidar_lever_arm_m']
     origin=np.array(pose['position'])+[math.cos(yaw)*lx-math.sin(yaw)*ly,math.sin(yaw)*lx+math.cos(yaw)*ly]
@@ -66,9 +70,11 @@ def create_course(area,state,scan,config):
         bearing=(np.arctan2(delta[:,1],delta[:,0])-heading-angles[0])%(2*math.pi)
         ids=np.rint(bearing/(2*math.pi/len(angles))).astype(int)%len(angles)
         return radial+radius+margin<observed[ids]
-    lo,hi=area.min(axis=0),area.max(axis=0)
+    lo,hi=region.bounds if region else (area.min(axis=0),area.max(axis=0))
+    lo=np.maximum(lo,position-25);hi=np.minimum(hi,position+25)
     x,y=np.meshgrid(np.linspace(lo[0],hi[0],25),np.linspace(lo[1],hi[1],25));candidates=np.c_[x.ravel(),y.ravel()]
-    keep=(point_clearance(candidates,area)>radius+margin+1)&visible(candidates)
+    keep=(clearance(candidates)>radius+margin+1)&visible(candidates)
+    if region:keep &= region.reachable(candidates,position,radius+margin)
     candidates=candidates[keep]
     if len(candidates)<8:raise ValueError('관측된 시험 수역이 좁습니다. 구역과 라이다를 확인하세요')
     # Seek a repeatable two-ended course that actually needs a virtual detour.
@@ -80,13 +86,129 @@ def create_course(area,state,scan,config):
             middle=(a+b)/2;spacing=np.linalg.norm(b-a);disc_radius=.45
             if spacing<max(7,2*config['arrival_radius_m']+2):continue
             if np.linalg.norm(middle-position)<radius+margin+disc_radius+1:continue
-            if point_clearance([middle],area)[0]<radius+margin+disc_radius+1:continue
+            if clearance([middle])[0]<radius+margin+disc_radius+1:continue
             if not visible(np.linspace(a,b,20)).all():continue
             goals=[a.tolist(),b.tolist()]
             if np.linalg.norm(position-b)<np.linalg.norm(position-a):goals.reverse()
-            return {'area':area.tolist(),'goals':goals,'obstacles':[[*middle.tolist(),disc_radius]],
+            if region:
+                # Spread automatic targets through the connected water area.
+                # A* chooses how to reach them around the excluded polygons.
+                pool=candidates[np.linalg.norm(candidates-middle,axis=1)>radius+margin+disc_radius+1]
+                while len(goals)<8 and len(pool):
+                    distance=np.min(np.linalg.norm(pool[:,None,:]-np.asarray(goals)[None,:,:],axis=2),axis=1)
+                    best=int(np.argmax(distance))
+                    if distance[best]<max(4,2*config['arrival_radius_m']+1):break
+                    goals.append(pool[best].tolist())
+            return {'area':area.tolist(),'regions':region.regions if region else None,'goals':goals,'obstacles':[[*middle.tolist(),disc_radius]],
                     'position_sigma_m':sigma,'margin_m':margin}
     raise ValueError('현재 관측 안에서 충분한 우회 공간을 찾지 못했습니다')
+
+
+def free_target(state, scan, config, visited=(), sequence=0):
+    """Choose a local goal with a scan-observed corridor, without a geofence."""
+    angles=np.asarray(scan['angles'],dtype=float);ranges=np.asarray(scan['ranges'],dtype=float)
+    if len(angles)<180 or angles.shape!=ranges.shape or not np.isfinite(angles).all():
+        raise ValueError('360도 라이다 수신 대기')
+    step=2*math.pi/len(angles)
+    if not np.allclose(np.diff(angles),step,rtol=.02,atol=1e-5):
+        raise ValueError('360도 라이다 각도 확인 필요')
+    maximum=float(scan.get('range_max',20.))
+    if config['scan_range_m']>0:maximum=min(maximum,config['scan_range_m'])
+    if not math.isfinite(maximum) or maximum<=0:raise ValueError('라이다 최대거리 오류')
+    observed=np.where(np.isposinf(ranges),maximum,ranges)
+    observed=np.where(np.isfinite(observed)&(observed>scan['range_min']),np.minimum(observed,maximum),0.)
+    if np.count_nonzero(observed)>0 and np.count_nonzero(observed)<.8*len(observed):
+        raise ValueError('라이다 유효 관측 범위 부족')
+    position=np.asarray(state['position'],dtype=float);yaw=float(state['yaw'])
+    pose=scan.get('pose',state);a=float(pose['yaw']);lx,ly=config['lidar_lever_arm_m']
+    origin=np.asarray(pose['position'])+[math.cos(a)*lx-math.sin(a)*ly,math.sin(a)*lx+math.cos(a)*ly]
+    heading=a+math.radians(config['lidar_yaw_deg'])
+    radius=math.hypot(config['length_m'],config['width_m'])/2+config['obstacle_margin_m']
+    minimum=max(2.,float(config['arrival_radius_m'])+1.)
+    far=min(8.,maximum-radius-.2)
+    if far<minimum:raise ValueError('주변 라이다에서 이동 공간을 찾지 못했습니다')
+    bearings=yaw+np.linspace(-math.pi,math.pi,72,endpoint=False)
+    lengths=np.linspace(minimum,far,3)
+    delta=(np.c_[np.cos(bearings),np.sin(bearings)][:,None,:]*lengths[None,:,None]).reshape(-1,2)
+    # Pick guidance outside the current footprint; MPC checks the immediate
+    # manoeuvre using its oriented hull. The already occupied footprint must
+    # not require every rear/occluded scan sector to report free space.
+    samples=max(8,math.ceil(far/.4)+1)
+    travel_all=np.linalg.norm(delta,axis=1)
+    start=np.minimum(.9,1.1*radius/travel_all)
+    fractions=start[:,None]+(1-start[:,None])*np.linspace(0,1,samples)[None,:]
+    centers=position+delta[:,None,:]*fractions[:,:,None]
+    relative=centers-origin;distance=np.linalg.norm(relative,axis=-1)
+    bearing=np.arctan2(relative[...,1],relative[...,0])-heading-angles[0]
+    bins=np.rint(bearing/step).astype(int)%len(angles)
+    half=np.arcsin(np.minimum(1.,radius/np.maximum(distance,1e-9)))
+    near=distance<=radius
+    valid=np.ones(distance.shape,dtype=bool);covered_count=np.zeros(distance.shape);known_count=np.zeros(distance.shape)
+    # A circular envelope is deliberately conservative; real-time MPC still
+    # rechecks its complete predicted hull against each new scan.
+    for offset in range(-len(angles)//2,len(angles)//2+1):
+        covered=near|(abs(offset)*step<=half+step)
+        ray=observed[(bins+offset)%len(angles)];known=ray>0
+        clearance=ray>distance+radius
+        valid &= ~covered|~known|clearance
+        covered_count+=covered;known_count+=covered&known
+    valid &= known_count>=.9*np.maximum(covered_count,1)
+    good=np.all(valid,axis=1)
+    if not np.any(good):raise ValueError('현재 라이다에서 선체가 통과할 이동 공간이 없습니다')
+    goals=position+delta[good];vectors=delta[good];travel=np.linalg.norm(vectors,axis=1)
+    preferred=yaw+(0.,.55,-.55,1.,-1.)[sequence%5]
+    turn=np.arctan2(vectors[:,1],vectors[:,0])-preferred
+    score=travel+.9*np.cos(turn)
+    history=np.asarray(visited[-20:],dtype=float)
+    if history.size:
+        nearest=np.linalg.norm(goals[:,None,:]-history[None,:,:],axis=2).min(axis=1)
+        score+=.4*np.minimum(nearest,5.)
+    return goals[int(np.argmax(score))].tolist()
+
+
+def virtual_detour(state, scan, config, goal):
+    """One virtual disc only when both sides have observed room for a detour."""
+    position=np.asarray(state['position']);goal=np.asarray(goal);length=np.linalg.norm(goal-position)
+    radius=.4;hull=math.hypot(config['length_m'],config['width_m'])/2+config['obstacle_margin_m']
+    if length<5:return []
+    middle=(position+goal)/2
+    pose=scan.get('pose',state);a=pose['yaw'];lx,ly=config['lidar_lever_arm_m']
+    origin=np.asarray(pose['position'])+[math.cos(a)*lx-math.sin(a)*ly,math.sin(a)*lx+math.cos(a)*ly]
+    # Check a ring around the disc, including the hull footprint on a detour.
+    theta=np.linspace(-math.pi,math.pi,48,endpoint=False)
+    probes=middle+(radius+2*hull+.35)*np.c_[np.cos(theta),np.sin(theta)]
+    ranges=np.asarray(scan['ranges']);angles=np.asarray(scan['angles']);maximum=float(scan['range_max'])
+    delta=probes-origin;d=np.linalg.norm(delta,axis=1)
+    bearings=np.arctan2(delta[:,1],delta[:,0])-a-math.radians(config['lidar_yaw_deg'])-angles[0]
+    ids=np.rint(bearings/(2*math.pi/len(ranges))).astype(int)%len(ranges)
+    observed=np.where(np.isposinf(ranges),maximum,ranges)
+    if not np.all(np.isfinite(observed[ids])&(observed[ids]>d+.2)):return []
+    return [[float(middle[0]),float(middle[1]),radius]]
+
+
+def create_free_course(state,scan,config):
+    goal=free_target(state,scan,config)
+    return {'navigation':'free','area':None,'regions':None,'obstacles':virtual_detour(state,scan,config,goal),
+            'goals':[goal],'visited':[list(state['position'])],
+            'goal_sequence':0}
+
+
+def latest_path_blocked(scan, pose, path, config):
+    """Fast current-return check while a new MPC job is running (first second)."""
+    trajectory=np.asarray(path,dtype=float)
+    if trajectory.size==0:return False
+    trajectory=trajectory.reshape(-1,3)
+    ranges=np.asarray(scan['ranges']);angles=np.asarray(scan['angles'])
+    valid=np.isfinite(ranges)&(ranges>scan['range_min'])&(ranges<scan['range_max'])
+    if not np.any(valid):return False
+    a=pose['yaw'];lx,ly=config['lidar_lever_arm_m']
+    origin=np.asarray(pose['position'])+[math.cos(a)*lx-math.sin(a)*ly,math.sin(a)*lx+math.cos(a)*ly]
+    b=angles[valid]+a+math.radians(config['lidar_yaw_deg'])
+    points=origin+ranges[valid,None]*np.c_[np.cos(b),np.sin(b)]
+    delta=points[:,None,:]-trajectory[None,:,:2];c=np.cos(trajectory[:,2]);s=np.sin(trajectory[:,2])
+    x=delta[:,:,0]*c+delta[:,:,1]*s;y=-delta[:,:,0]*s+delta[:,:,1]*c
+    margin=max(.1,config['obstacle_margin_m'])
+    return bool(np.any((np.abs(x)<config['length_m']/2+margin)&(np.abs(y)<config['width_m']/2+margin)))
 
 
 class PlanComparison:
